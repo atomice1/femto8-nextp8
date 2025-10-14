@@ -10,7 +10,11 @@
 #ifndef P8_AUDIO_H
 #define P8_AUDIO_H
 
+#ifdef NEXTP8
+#define SAMPLE_RATE 22050
+#else
 #define SAMPLE_RATE 44100
+#endif
 #define MAX_VOLUME 4096
 #define CHANNEL_COUNT 4
 #define SOUND_BUFFER_SIZE 2048
@@ -24,5 +28,8 @@ void audio_pause();
 void audio_close();
 void audio_sound(int32_t index, int32_t channel, uint32_t start, uint32_t end);
 void audio_music(int32_t index, int32_t fade_ms, int32_t mask);
+#ifdef NEXTP8
+void audio_update();
+#endif
 
 #endif

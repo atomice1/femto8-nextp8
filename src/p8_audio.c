@@ -9,14 +9,22 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
-#include <pthread.h>
 #include "p8_audio.h"
 #include "p8_dsp.h"
 #include "p8_emu.h"
 #include "queue.h"
 
+#ifdef ENABLE_AUDIO
+#ifndef OS_BAREMETAL
+#include <pthread.h>
+#endif
+
 #ifdef SDL
 #include "SDL.h"
+#endif
+
+#ifdef NEXTP8
+#include "nextp8.h"
 #endif
 
 #define EFFECT_MASK 0x7000
@@ -135,13 +143,22 @@ queue_t m_sound_queue = {
     .elements_size = sizeof(soundcommand_t),
 };
 
+#ifndef OS_BAREMETAL
 pthread_mutex_t m_sound_queue_mutex;
+#endif
 
 soundstate_t m_channels[CHANNEL_COUNT];
 musicstate_t m_music_state;
 
 #ifdef SDL
 SDL_AudioSpec m_audio_spec;
+#endif
+
+#ifdef NEXTP8
+#define DA_FREQUENCY        44100
+#define DA_CLKS_PER_SAMPLE  (_DA_CLKS_PER_SECOND / DA_FREQUENCY)
+
+unsigned prev_da_address = 8192;
 #endif
 
 void audio_callback(void *userdata, uint8_t *cbuffer, int length)
@@ -153,7 +170,15 @@ void audio_init()
 {
     _queue_init(&m_sound_queue);
 
-#ifdef SDL
+#if defined(NEXTP8)
+    int16_t *da_memory = (int16_t *) _DA_MEMORY_BASE;
+    memset(da_memory, 0, _DA_MEMORY_SIZE);
+
+    volatile uint16_t *control = (volatile uint16_t *) _DA_CONTROL;
+    *control = /* start */ (1 << 0) | /* mono */ (1 << 8);
+    volatile uint16_t *period = (volatile uint16_t *) _DA_PERIOD;
+    *period = DA_CLKS_PER_SAMPLE;
+#elif defined(SDL)
     m_audio_spec.freq = SAMPLE_RATE;
     m_audio_spec.format = AUDIO_S16SYS;
     m_audio_spec.channels = 1;
@@ -174,21 +199,30 @@ void audio_init()
 
 void audio_resume()
 {
-#ifdef SDL
+#if defined(NEXTP8)
+    volatile uint16_t *control = (volatile uint16_t *) _DA_CONTROL;
+    *control = /* start */ (1 << 0) | /* mono */ (1 << 8);
+#elif defined(SDL)
     SDL_PauseAudio(0);
 #endif
 }
 
 void audio_pause()
 {
-#ifdef SDL
+#if defined(NEXTP8)
+    volatile uint16_t *control = (volatile uint16_t *) _DA_CONTROL;
+    *control = 0;
+#elif defined(SDL)
     SDL_PauseAudio(1);
 #endif
 }
 
 void audio_close()
 {
-#ifdef SDL
+#if defined(NEXTP8)
+    volatile uint16_t *control = (volatile uint16_t *) _DA_CONTROL;
+    *control = 0;
+#elif defined(SDL)
     SDL_CloseAudio();
 #endif
 }
@@ -202,9 +236,13 @@ void audio_sound(int32_t index, int32_t channel, uint32_t start, uint32_t end)
     sound_command.sound.start = start;
     sound_command.sound.end = end;
 
+#ifndef OS_BAREMETAL
     pthread_mutex_lock(&m_sound_queue_mutex);
+#endif
     queue_add_back(&m_sound_queue, &sound_command);
+#ifndef OS_BAREMETAL
     pthread_mutex_unlock(&m_sound_queue_mutex);
+#endif
 }
 
 void audio_music(int32_t index, int32_t fadems, int32_t mask)
@@ -215,9 +253,13 @@ void audio_music(int32_t index, int32_t fadems, int32_t mask)
     sound_command.music.fadems = fadems;
     sound_command.music.mask = mask;
 
+#ifndef OS_BAREMETAL
     pthread_mutex_lock(&m_sound_queue_mutex);
+#endif
     queue_add_back(&m_sound_queue, &sound_command);
+#ifndef OS_BAREMETAL
     pthread_mutex_unlock(&m_sound_queue_mutex);
+#endif
 }
 
 void update_channel(soundstate_t *channel)
@@ -275,7 +317,9 @@ void update_channel(soundstate_t *channel)
 
 void update_sound_queue()
 {
+#ifndef OS_BAREMETAL
     pthread_mutex_lock(&m_sound_queue_mutex);
+#endif
 
     soundcommand_t sound_command;
 
@@ -361,7 +405,9 @@ void update_sound_queue()
         }
     }
 
+#ifndef OS_BAREMETAL
     pthread_mutex_unlock(&m_sound_queue_mutex);
+#endif
 }
 
 float get_frequency(int pitch)
@@ -444,3 +490,25 @@ void render_sounds(int16_t *buffer, int total_samples)
         }
     }
 }
+
+#ifdef NEXTP8
+
+#define DA_MEMORY_SAMPLES (_DA_MEMORY_SIZE / 2)
+#define SECTION_COUNT 4
+#define SECTION_SAMPLES (DA_MEMORY_SAMPLES / SECTION_COUNT)
+
+void audio_update()
+{
+    volatile uint16_t *control = (volatile uint16_t *) _DA_CONTROL;
+    uint16_t da_address = *control;
+    int16_t *da_memory = (int16_t *) _DA_MEMORY_BASE;
+    int current_section = da_address / SECTION_SAMPLES;
+    int prev_section = prev_da_address * SECTION_SAMPLES;
+    if (current_section != prev_section) {
+        int next_section = (current_section + 1) % SECTION_COUNT;
+        render_sounds(da_memory + next_section * SECTION_SAMPLES, SECTION_SAMPLES);
+    }
+    prev_da_address = da_address;
+}
+#endif
+#endif

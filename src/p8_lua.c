@@ -1482,6 +1482,7 @@ void lua_call_function(const char *name, int ret)
 
     if (error)
         lua_print_error(name);
+    fflush(stdout);
 }
 
 void lua_update()

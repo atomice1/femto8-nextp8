@@ -29,13 +29,16 @@
 #include "p8_lua_helper.h"
 #include "p8_parser.h"
 
-#ifdef SDL
+#if defined(SDL)
 #include "SDL.h"
-#else
+#elif defined(__DA1470x__)
 #include "gdi.h"
+#elif defined(NEXTP8)
+#include "nextp8.h"
+#include "postcodes.h"
 #endif
 
-#ifdef SDL
+#if defined(SDL)
 // ARGB
 uint32_t m_colors[32] = {
     0x00000000, 0x001d2b53, 0x007e2553, 0x00008751, 0x00ab5236, 0x005f574f, 0x00c2c3c7, 0x00fff1e8,
@@ -76,7 +79,8 @@ static bool restart;
 SDL_Surface *m_screen = NULL;
 SDL_Surface *m_output = NULL;
 SDL_PixelFormat *m_format = NULL;
-#else
+#endif
+#ifdef OS_FREERTOS
 SemaphoreHandle_t m_drawSemaphore;
 #endif
 
@@ -97,6 +101,10 @@ static bool cartdata_needs_flush = false;
 
 static int m_initialized = 0;
 
+#ifdef NEXTP8
+static int vfrontreq = 0;
+#endif
+
 int p8_init()
 {
     assert(!m_initialized);
@@ -104,8 +112,6 @@ int p8_init()
     srand((unsigned int)time(NULL));
 
 #ifdef SDL
-    m_memory = (uint8_t *)malloc(MEMORY_SIZE);
-    m_cart_memory = (uint8_t *)malloc(CART_MEMORY_SIZE);
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0)
     {
         printf("Error on SDL_Init().\n");
@@ -121,11 +127,16 @@ int p8_init()
     m_output = SDL_CreateRGBSurface(0, P8_WIDTH, P8_HEIGHT, 32, m_format->Rmask, m_format->Gmask, m_format->Bmask, m_format->Amask);
 
     SDL_WM_SetCaption("femto-8", NULL);
-#else
+#endif
+#ifdef OS_FREERTOS
     m_drawSemaphore = xSemaphoreCreateBinary();
 
     xSemaphoreGive(m_drawSemaphore);
-    
+#endif
+#ifndef OS_FREERTOS
+    m_memory = (uint8_t *)malloc(MEMORY_SIZE);
+    m_cart_memory = (uint8_t *)malloc(CART_MEMORY_SIZE);
+#else
     m_memory = (uint8_t *)rh_malloc(MEMORY_SIZE);
     m_cart_memory = (uint8_t *)rh_malloc(CART_MEMORY_SIZE);
 #endif
@@ -146,7 +157,9 @@ int p8_init()
 
 static int p8_init_lcd(void)
 {
-#ifndef SDL
+#if defined(NEXTP8)
+    vfrontreq = *(volatile uint8_t *)_VFRONT;
+#elif defined(__DA1470x__)
     gdi_set_layer_start(HW_LCDC_LAYER_0, 0, 0);
 
     gdi_set_layer_enable(HW_LCDC_LAYER_0, true);
@@ -224,12 +237,12 @@ int p8_init_ram(uint8_t *buffer, int size)
     if (!m_initialized)
         p8_init();
 
+    p8_init();
+
     const char *lua_script = NULL;
     uint8_t *decompression_buffer = NULL;
 
     parse_cart_ram(buffer, size, m_cart_memory, &lua_script, &decompression_buffer);
-
-    // printf("%s", m_lua_script);
 
     p8_init_common(NULL, lua_script);
 
@@ -244,7 +257,9 @@ int p8_init_ram(uint8_t *buffer, int size)
 
 int p8_shutdown()
 {
+#ifdef ENABLE_AUDIO
     audio_close();
+#endif
 
     lua_shutdown_api();
 
@@ -254,12 +269,13 @@ int p8_shutdown()
     SDL_FreeSurface(m_output);
     SDL_FreeSurface(m_screen);
     SDL_Quit();
-
-    free(m_cart_memory);
-    free(m_memory);
-#else
+#endif
+#ifdef OS_FREERTOS
     rh_free(m_cart_memory);
     rh_free(m_memory);
+#else
+    free(m_cart_memory);
+    free(m_memory);
 #endif
 
     m_initialized = 0;
@@ -270,9 +286,6 @@ int p8_shutdown()
 #ifdef SDL
 void p8_render()
 {
-    sprintf(m_str_buffer, "%d", (int)m_actual_fps);
-    draw_text(m_str_buffer, 0, 0, 1);
-
     uint32_t *output = m_output->pixels;
 
     for (int y = 0; y < P8_HEIGHT; y++)
@@ -293,22 +306,28 @@ void p8_render()
     SDL_SoftStretch(m_output, NULL, m_screen, &rect);
     SDL_Flip(m_screen);
 }
-#else
+#elif defined(__DA1470x__)
 
+#ifdef OS_FREERTOS
 void draw_complete(bool underflow, void *user_data)
 {
     xSemaphoreGive(m_drawSemaphore);
 }
+#endif
 
 void p8_render()
 {
+#ifdef OS_FREERTOS
     if (xSemaphoreTake(m_drawSemaphore, portMAX_DELAY) != pdTRUE)
         return;
+#endif
 
     sprintf(m_str_buffer, "%d", (int)m_actual_fps);
     draw_text(m_str_buffer, 0, 0, 1);
 
+#if defined(__DA1470x__)
     uint16_t *output = gdi_get_frame_buffer_addr(HW_LCDC_LAYER_0);
+#endif
     uint8_t *screen_mem = &m_memory[MEMORY_SCREEN];
     uint8_t *pal = &m_memory[MEMORY_PALETTES + PALTYPE_SCREEN * 16];
 
@@ -484,6 +503,94 @@ void p8_render()
 
     gdi_display_update_async(draw_complete, NULL);
 }
+#elif defined(NEXTP8)
+void p8_render()
+{
+    while (*(volatile uint8_t *) _VFRONT != vfrontreq) {
+        // wait for previous flip to complete
+    }
+    int vback = 1 - vfrontreq;
+    uint8_t *screen_mem = &m_memory[MEMORY_SCREEN];
+    uint8_t *pal = &m_memory[MEMORY_PALETTES + PALTYPE_SCREEN * 16];
+    memcpy((uint8_t *)_PALETTE_BASE, pal, _PALETTE_SIZE);
+    memcpy((uint8_t *)_BACK_BUFFER_BASE, screen_mem, _FRAME_BUFFER_SIZE);
+    *(volatile uint8_t *) _VFRONTREQ = vfrontreq = vback;
+}
+#endif
+
+#if defined(NEXTP8)
+char scancode_to_name[2][256] = {
+    {
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\t', '`', '\0',
+        '\0', '\0', '\0', '\0', '\0', 'q', '1', '\0', '\0', '\0', 'z', 's', 'a', 'w', '2', '\0',
+        '\0', 'c', 'x', 'd', 'e', '4', '3', '\0', '\0', '\0', 'v', 'f', 't', 'r', '5', '\0',
+        '\0', 'n', 'b', 'h', 'g', 'y', '6', '\0', '\0', '\0', 'm', 'j', 'u', '7', '8', '\0',
+        '\0', ',', 'k', 'i', 'o', '0', '9', '\0', '\0', '.', '/', 'l', ';', 'p', '-', '\0',
+        '\0', '\0', '\'', '\0', '[', '=', '\0', '\0', '\0', '\0', '\r', ']', '\0', '\\', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\b', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\x1b', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\x7f', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+    },
+    {
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\t', '~', '\0',
+        '\0', '\0', '\0', '\0', '\0', 'Q', '!', '\0', '\0', '\0', 'Z', 'S', 'A', 'W', '@', '\0',
+        '\0', 'C', 'X', 'D', 'E', '$', '#', '\0', '\0', '\0', 'V', 'F', 'T', 'R', '%', '\0',
+        '\0', 'N', 'B', 'H', 'G', 'Y', '&', '\0', '\0', '\0', 'M', 'J', 'U', '\'', '(', '\0',
+        '\0', '<', 'K', 'I', 'O', '-', ')', '\0', '\0', '>', '?', 'L', ':', 'P', '_', '\0',
+        '\0', '\0', '"', '\0', '{', '+', '\0', '\0', '\0', '\0', '\r', '}', '\0', '|', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\b', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\x1b', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\x7f', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'
+    },
+};
+
+#define KEY_CURSOR_LEFT 235
+#define KEY_CURSOR_DOWN 242
+#define KEY_CURSOR_RIGHT 244
+#define KEY_CURSOR_UP 245
+#define KEY_Z 26
+#define KEY_X 34
+#define KEY_N 49
+#define KEY_M 58
+#define KEY_C 33
+#define KEY_V 42
+#define KEY_S 27
+#define KEY_D 35
+#define KEY_F 43
+#define KEY_E 36
+#define KEY_TAB 13
+#define KEY_Q 21
+#define KEY_LEFT_SHIFT 18
+#define KEY_A 28
+#define KEY_RIGHT_SHIFT 89
+#define KEY_ENTER 0x5a
+#define KEY_BREAK 0x76
+
+#define JOY_UP      (1 << 0)
+#define JOY_DOWN    (1 << 1)
+#define JOY_LEFT    (1 << 2)
+#define JOY_RIGHT   (1 << 3)
+#define JOY_BUTTON1 (1 << 4)
+#define JOY_BUTTON2 (1 << 5)
+
+static unsigned is_down(uint8_t *base, unsigned index)
+{
+    return base[index >> 3] & (1 << (index & 0x7));
+}
 #endif
 
 void p8_update_input()
@@ -495,6 +602,8 @@ void p8_update_input()
         SDL_WM_GrabInput(pointer_lock ? SDL_GRAB_ON : SDL_GRAB_OFF);
 #endif
     }
+
+    bool escape = false;
 
 #ifdef SDL
     SDL_Event event;
@@ -535,6 +644,9 @@ void p8_update_input()
             case INPUT_ACTION2:
                 update_buttons(0, 5, true);
                 break;
+            case INPUT_ESCAPE:
+                escape = true;
+                break;
             default:
                 break;
             }
@@ -572,7 +684,7 @@ void p8_update_input()
             break;
         }
     }
-#else
+#elif defined(OS_FREERTOS)
     uint8_t mask = 0;
 
     if (gamepad & AXIS_L_LEFT)
@@ -610,6 +722,67 @@ void p8_update_input()
 
     m_buttons[0] = mask;
 
+#elif defined(NEXTP8)
+    uint8_t *keyboard_matrix = (uint8_t *) _KEYBOARD_MATRIX;
+    uint8_t joy0 = *(volatile uint8_t *) _JOYSTICK0;
+    uint8_t mask = 0;
+    if (is_down(keyboard_matrix, KEY_CURSOR_LEFT) ||
+        (joy0 & JOY_LEFT))
+        mask |= BUTTON_LEFT;
+    if (is_down(keyboard_matrix, KEY_CURSOR_RIGHT) ||
+        (joy0 & JOY_RIGHT))
+        mask |= BUTTON_RIGHT;
+    if (is_down(keyboard_matrix, KEY_CURSOR_UP) ||
+        (joy0 & JOY_UP))
+        mask |= BUTTON_UP;
+    if (is_down(keyboard_matrix, KEY_CURSOR_DOWN) ||
+        (joy0 & JOY_DOWN))
+        mask |= BUTTON_DOWN;
+    if (is_down(keyboard_matrix, KEY_Z) ||
+        is_down(keyboard_matrix, KEY_N) ||
+        is_down(keyboard_matrix, KEY_C) ||
+        is_down(keyboard_matrix, KEY_ENTER) ||
+        (joy0 & JOY_BUTTON1))
+        mask |= BUTTON_ACTION1;
+    if (is_down(keyboard_matrix, KEY_X) ||
+        is_down(keyboard_matrix, KEY_M) ||
+        is_down(keyboard_matrix, KEY_V) ||
+        (joy0 & JOY_BUTTON2))
+        mask |= BUTTON_ACTION2;
+    m_buttons[0] = mask;
+
+    uint8_t joy1 = *(volatile uint8_t *) _JOYSTICK1;
+    mask = 0;
+    if (is_down(keyboard_matrix, KEY_S) ||
+        (joy1 & JOY_LEFT))
+        mask |= BUTTON_LEFT;
+    if (is_down(keyboard_matrix, KEY_D) ||
+        (joy1 & JOY_RIGHT))
+        mask |= BUTTON_RIGHT;
+    if (is_down(keyboard_matrix, KEY_F) ||
+        (joy1 & JOY_UP))
+        mask |= BUTTON_UP;
+    if (is_down(keyboard_matrix, KEY_E) ||
+        (joy1 & JOY_DOWN))
+        mask |= BUTTON_DOWN;
+    if (is_down(keyboard_matrix, KEY_TAB) ||
+        is_down(keyboard_matrix, KEY_LEFT_SHIFT) ||
+        (joy1 & JOY_BUTTON1))
+        mask |= BUTTON_ACTION1;
+    if (is_down(keyboard_matrix, KEY_Q) ||
+        is_down(keyboard_matrix, KEY_A) ||
+        (joy1 & JOY_BUTTON2))
+        mask |= BUTTON_ACTION2;
+    m_buttons[1] = mask;
+
+    escape = is_down(keyboard_matrix, KEY_BREAK);
+
+    bool shifted = is_down(keyboard_matrix, KEY_LEFT_SHIFT) ||
+                   is_down(keyboard_matrix, KEY_RIGHT_SHIFT);
+    for (unsigned i=0;i<256;++i) {
+        if (is_down(keyboard_matrix, i))
+            m_keypress = scancode_to_name[shifted?1:0][i];
+    }
 #endif
 
     if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
@@ -644,11 +817,21 @@ void p8_update_input()
             }
         }
     }
+
+    static bool prev_escape = false;
+    bool old_prev_escape = prev_escape;
+    prev_escape = escape;
+    if (escape && !old_prev_escape)
+        p8_abort();
 }
 
 void p8_flip()
 {
     p8_update_input();
+
+#ifdef NEXTP8
+    audio_update();
+#endif
 
     p8_render();
 

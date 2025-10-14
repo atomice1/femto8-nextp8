@@ -14,13 +14,33 @@
 #include <stdint.h>
 #include <time.h>
 
+#ifdef NEXTP8
+#define PROGNAME "femto8-nextp8"
+#else
 #define PROGNAME "femto8"
+#endif
 
 #ifdef __DA1470x__
 #define OS_FREERTOS
+#define __DA1470x__
+#define SCREEN_WIDTH 240
+#define SCREEN_HEIGHT 240
+#elif defined(NEXTP8)
+#define OS_BAREMETAL
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 128
+#define ENABLE_AUDIO
+#define CARTDATA_PATH "0:/nextp8/cdata"
 #else
 #define SDL
 #define ENABLE_AUDIO
+#endif
+
+#if !defined(OS_FREERTOS) && !defined(OS_BAREMETAL)
+#define ENABLE_AUDIO
+#endif
+#ifndef CARTDATA_PATH
+#define CARTDATA_PATH "cdata"
 #endif
 
 #ifndef CARTDATA_PATH
@@ -39,10 +59,7 @@
 #define NIBBLE_SWAP(n) ((n << 4) | (n >> 4))
 #define ARGB_TO_RGB565(argb) (((argb >> 8) & 0xF800) | ((argb >> 5) & 0x07E0) | ((argb >> 3) & 0x001F))
 
-#ifdef __DA1470x__
-#define SCREEN_WIDTH 240
-#define SCREEN_HEIGHT 240
-#else
+#ifndef SCREEN_WIDTH
 #define SCREEN_WIDTH 512
 #define SCREEN_HEIGHT 512
 #endif
@@ -123,12 +140,15 @@
 #define STAT_MOUSE_XREL 38
 #define STAT_MOUSE_YREL 39
 
+#ifdef SDL
 #define INPUT_LEFT SDLK_LEFT
 #define INPUT_RIGHT SDLK_RIGHT
 #define INPUT_UP SDLK_UP
 #define INPUT_DOWN SDLK_DOWN
 #define INPUT_ACTION1 SDLK_z
 #define INPUT_ACTION2 SDLK_x
+#define INPUT_ESCAPE SDLK_ESCAPE
+#endif
 
 #define DEFAULT_AUTO_REPEAT_DELAY 15
 #define DEFAULT_AUTO_REPEAT_INTERVAL 4

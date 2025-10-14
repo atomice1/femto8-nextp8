@@ -9,9 +9,17 @@
 #include "p8_browse.h"
 #include "p8_parser.h"
 #include "p8_emu.h"
+#ifdef NEXTP8
+#include "nextp8.h"
+#include "postcodes.h"
+#endif
 
 int main(int argc, char *argv[])
 {
+#ifdef NEXTP8
+    _set_postcode(POST_CODE_ENTER_MAIN);
+#endif
+
     const char *file_name;
     if (argc >= 2)
         file_name = argv[1];
