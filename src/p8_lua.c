@@ -752,9 +752,9 @@ int sfx(lua_State *L)
     int n = lua_tointeger(L, 1);
     int channel = lua_to_or_default(L, integer, 2, -1);
     int offset = lua_to_or_default(L, integer, 3, 0);
-    int length = lua_to_or_default(L, integer, 3, 32);
+    int length = lua_to_or_default(L, integer, 4, 32 - offset);
 
-    audio_sound(n, channel, offset, m_memory[MEMORY_SFX + length * 64]);
+    audio_sound(n, channel, offset, length);
 #endif
 
     return 0;

@@ -829,10 +829,6 @@ void p8_flip()
 {
     p8_update_input();
 
-#ifdef NEXTP8
-    audio_update();
-#endif
-
     p8_render();
 
     p8_flush_cartdata();
