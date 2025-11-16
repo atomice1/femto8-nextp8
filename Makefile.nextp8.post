@@ -1,0 +1,4 @@
+all: $(TARGET).bin
+
+$(TARGET).bin: $(TARGET)
+	$(OBJCOPY) -O binary $(TARGET) $(TARGET).bin

@@ -50,3 +50,4 @@ clean:
 .PHONY: clean
 
 -include $(OBJECTS:.o=.d)
+-include Makefile.$(PLATFORM).post
