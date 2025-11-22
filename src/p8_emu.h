@@ -30,7 +30,7 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 128
 #define ENABLE_AUDIO
-#define CARTDATA_PATH "0:/nextp8/cdata"
+#define CARTDATA_PATH "0:/machines/nextp8/cdata"
 #else
 #define SDL
 #define ENABLE_AUDIO

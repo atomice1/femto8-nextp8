@@ -35,8 +35,8 @@ int main(int argc, char *argv[])
     if (_EXTRACT_API(hw_version) != HW_API_VERSION)
         _fatal_error("Incompatible hardware version");
 #if DEV_BUILD
-    uint32_t loader_version = _loader_data.loader_version;
-    uint32_t loader_timestamp = _loader_data.loader_timestamp;
+    uint32_t loader_version = _loader_data->loader_version;
+    uint32_t loader_timestamp = _loader_data->loader_timestamp;
     _set_postcode(32);
     _show_message(
         "This is a development build of\n"

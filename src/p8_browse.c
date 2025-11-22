@@ -18,7 +18,7 @@
 #include "p8_lua_helper.h"
 
 #ifdef NEXTP8
-#define DEFAULT_PATH "0:/nextp8/carts"
+#define DEFAULT_PATH "0:/machines/nextp8/carts"
 #define FALLBACK_PATH "0:/"
 #else
 #define DEFAULT_PATH "carts"
