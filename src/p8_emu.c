@@ -292,7 +292,7 @@ void p8_render()
     {
         for (int x = 0; x < P8_WIDTH; x++)
         {
-            int screen_offset = MEMORY_SCREEN + (x >> 1) + y * 64;
+            int screen_offset = (m_memory[MEMORY_SCREEN_PHYS] << 8) + (x >> 1) + y * 64;
             uint8_t value = m_memory[screen_offset];
             uint8_t index = color_get(PALTYPE_SCREEN, IS_EVEN(x) ? value & 0xF : value >> 4);
             uint32_t color = m_colors[color_index(index)];
@@ -328,7 +328,7 @@ void p8_render()
 #if defined(__DA1470x__)
     uint16_t *output = gdi_get_frame_buffer_addr(HW_LCDC_LAYER_0);
 #endif
-    uint8_t *screen_mem = &m_memory[MEMORY_SCREEN];
+    uint8_t *screen_mem = &m_memory[(m_memory[MEMORY_SCREEN_PHYS] << 8)];
     uint8_t *pal = &m_memory[MEMORY_PALETTES + PALTYPE_SCREEN * 16];
 
     for (int y = 1; y <= 128; y++)
@@ -510,7 +510,7 @@ void p8_render()
         // wait for previous flip to complete
     }
     int vback = 1 - vfrontreq;
-    uint8_t *screen_mem = &m_memory[MEMORY_SCREEN];
+    uint8_t *screen_mem = &m_memory[(m_memory[MEMORY_SCREEN_PHYS] << 8)];
     uint8_t *pal = &m_memory[MEMORY_PALETTES + PALTYPE_SCREEN * 16];
     memcpy((uint8_t *)_PALETTE_BASE, pal, _PALETTE_SIZE);
     memcpy((uint8_t *)_BACK_BUFFER_BASE, screen_mem, _FRAME_BUFFER_SIZE);
@@ -891,6 +891,8 @@ void p8_reset(void)
 {
     memset(m_memory + MEMORY_DRAWSTATE, 0, MEMORY_DRAWSTATE_SIZE);
     memset(m_memory + MEMORY_HARDWARESTATE, 0, MEMORY_HARDWARESTATE_SIZE);
+    m_memory[MEMORY_SCREEN_PHYS] = 0x60;
+    m_memory[MEMORY_MAP_START] = 0x20;
     pencolor_set(6);
     reset_color();
     clip_set(0, 0, P8_WIDTH, P8_HEIGHT);
