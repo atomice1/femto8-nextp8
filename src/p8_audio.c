@@ -271,6 +271,17 @@ void audio_music(int32_t index, int32_t fadems, int32_t mask)
 #endif
 }
 
+int32_t audio_stat(int32_t index)
+{
+#ifdef NEXTP8
+    if (index >= 46 && index <= 56)
+        return *(volatile int16_t *)(_P8AUDIO_STAT46 + (index - 46) * 2);
+    else if (index >= 16 && index <= 26)
+        return *(volatile int16_t *)(_P8AUDIO_STAT46 + (index - 16) * 2);
+#endif
+    return 0;
+}
+
 #ifndef NEXTP8
 void update_channel(soundstate_t *channel)
 {
