@@ -88,6 +88,7 @@ int16_t m_mouse_x, m_mouse_y;
 int16_t m_mouse_xrel, m_mouse_yrel;
 uint8_t m_mouse_buttons;
 uint8_t m_keypress;
+bool m_scancodes[NUM_SCANCODES];
 
 uint8_t m_buttons[2];
 uint8_t m_buttonsp[2];
@@ -556,6 +557,57 @@ char scancode_to_name[2][256] = {
     },
 };
 
+unsigned nextp8_scancode_to_sdl_scancode[NUM_SCANCODES] = {
+    // 0x00-0x0F
+    0, 66, 0, 62, 60, 58, 59, 69,     // F9, F5, F3, F1, F2, F12
+    0, 67, 65, 63, 61, 43, 53, 0,     // F10, F8, F6, F4, TAB, `
+    // 0x10-0x1F
+    0, 226, 225, 0, 224, 20, 30, 0,   // L-Alt, L-Shift, L-Ctrl, Q, 1
+    0, 0, 29, 22, 4, 26, 31, 0,       // Z, S, A, W, 2
+    // 0x20-0x2F
+    0, 6, 27, 7, 8, 33, 32, 0,        // C, X, D, E, 4, 3
+    0, 44, 25, 23, 21, 34, 0, 0,      // Space, V, F, T, R, 5
+    // 0x30-0x3F
+    0, 17, 5, 11, 10, 28, 35, 0,      // N, B, H, G, Y, 6
+    0, 0, 16, 13, 24, 36, 37, 0,      // M, J, U, 7, 8
+    // 0x40-0x4F
+    0, 54, 14, 12, 18, 39, 38, 0,     // comma, K, I, O, 0, 9
+    0, 55, 56, 15, 51, 19, 45, 0,     // period, slash, L, semicolon, P, minus
+    // 0x50-0x5F
+    0, 0, 52, 0, 47, 46, 0, 0,        // apostrophe, [, =
+    57, 229, 40, 48, 0, 49, 0, 0,     // CapsLock, R-Shift, Enter, ], \,
+    // 0x60-0x6F
+    0, 0, 0, 0, 0, 0, 42, 0,          // Backspace
+    0, 89, 0, 92, 95, 0, 0, 0,        // KP-1, KP-4, KP-7
+    // 0x70-0x7F
+    98, 99, 90, 93, 94, 96, 41, 83,   // KP-0, KP-., KP-2, KP-5, KP-6, KP-8, Esc, NumLock
+    68, 87, 91, 86, 85, 77, 71, 64,   // F11, KP-+, KP-3, KP--, KP-*, PageUp, ScrollLock, F7
+    // 0x80-0x8F
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    // 0x90-0x9F
+    0, 230, 0, 0, 228, 0, 0, 0,       // 0x91: R-Alt, 0x94: R-Ctrl
+    0, 227, 0, 0, 0, 0, 0, 231,       // 0x9F: L-GUI, 0x9F: R-GUI
+    // 0xA0-0xAF
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 266, 0, 0, 0, 0, 101,       // 0xAB: Calculator, 0xAF: Apps
+    // 0xB0-0xBF
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    // 0xC0-0xCF
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 88, 0, 0, 0, 0, 0,          // 0xCA: KP-Enter
+    // 0xD0-0xDF
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    // 0xE0-0xEF
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 77, 0, 80, 74, 0, 0, 0,        // 0xE9: End, 0xEB: Left, 0xEC: Home
+    // 0xF0-0xFF
+    73, 76, 81, 0, 79, 82, 78, 75,    // 0xF0: Insert, 0xF1: Delete, 0xF2: Down, 0xF4: Right, 0xF5: Up, 0xF6: PageDown, 0xF7: PageUp
+    0, 0, 0, 0, 0, 0, 0, 0
+};
+
 #define KEY_CURSOR_LEFT 235
 #define KEY_CURSOR_DOWN 242
 #define KEY_CURSOR_RIGHT 244
@@ -585,10 +637,12 @@ char scancode_to_name[2][256] = {
 #define JOY_BUTTON1 (1 << 4)
 #define JOY_BUTTON2 (1 << 5)
 
-static unsigned is_down(uint8_t *base, unsigned index)
+static unsigned is_down(volatile uint8_t *base, unsigned index)
 {
     return base[index >> 3] & (1 << (index & 0x7));
 }
+
+static uint32_t keyboard_matrix_prev[8];
 #endif
 
 void p8_update_input()
@@ -648,6 +702,8 @@ void p8_update_input()
             default:
                 break;
             }
+            if (event.key.keysym.scancode < NUM_SCANCODES)
+                m_scancodes[event.key.keysym.scancode] = true;
             m_keypress = (event.key.keysym.sym < 256) ? event.key.keysym.sym : 0;
             break;
         case SDL_KEYUP:
@@ -674,6 +730,8 @@ void p8_update_input()
             default:
                 break;
             }
+            if (event.key.keysym.scancode < NUM_SCANCODES)
+                m_scancodes[event.key.keysym.scancode] = false;
             break;
         case SDL_QUIT:
             p8_abort();
@@ -721,8 +779,8 @@ void p8_update_input()
     m_buttons[0] = mask;
 
 #elif defined(NEXTP8)
-    uint8_t *keyboard_matrix = (uint8_t *) _KEYBOARD_MATRIX;
-    uint8_t joy0 = *(volatile uint8_t *) _JOYSTICK0;
+    volatile uint8_t *keyboard_matrix = (volatile uint8_t *) _KEYBOARD_MATRIX;
+    volatile uint8_t joy0 = *(volatile uint8_t *) _JOYSTICK0;
     uint8_t mask = 0;
     if (is_down(keyboard_matrix, KEY_CURSOR_LEFT) ||
         (joy0 & JOY_LEFT))
@@ -775,11 +833,22 @@ void p8_update_input()
 
     escape = is_down(keyboard_matrix, KEY_BREAK);
 
-    bool shifted = is_down(keyboard_matrix, KEY_LEFT_SHIFT) ||
-                   is_down(keyboard_matrix, KEY_RIGHT_SHIFT);
-    for (unsigned i=0;i<256;++i) {
-        if (is_down(keyboard_matrix, i))
-            m_keypress = scancode_to_name[shifted?1:0][i];
+    bool need_update = false;
+    volatile uint32_t *keyboard_matrix32 = (volatile  uint32_t *) keyboard_matrix;
+    for (unsigned i = 0; i < 8; ++i) {
+        if (keyboard_matrix32[i] != keyboard_matrix_prev[i])
+            need_update = true;
+        keyboard_matrix_prev[i] = keyboard_matrix32[i];
+    }
+    if (need_update) {
+        bool shifted = is_down(keyboard_matrix, KEY_LEFT_SHIFT) ||
+                    is_down(keyboard_matrix, KEY_RIGHT_SHIFT);
+        for (unsigned i=0;i<256;++i) {
+            bool down = is_down(keyboard_matrix, i);
+            if (down)
+                m_keypress = scancode_to_name[shifted?1:0][i];
+            m_scancodes[nextp8_scancode_to_sdl_scancode[i]] = down;
+        }
     }
 #endif
 

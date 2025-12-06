@@ -1154,7 +1154,7 @@ int printh(lua_State *L)
 // stat(n)
 int _stat(lua_State *L)
 {
-    int n = lua_tointeger(L, -1);
+    int n = lua_tointeger(L, 1);
 
     switch (n)
     {
@@ -1188,6 +1188,11 @@ int _stat(lua_State *L)
     case STAT_TARGET_FRAMERATE:
         lua_pushinteger(L, m_fps);
         break;
+    case STAT_RAW_KEYBOARD: {
+        int key = lua_tointeger(L, 2);
+        lua_pushboolean(L, (key < NUM_SCANCODES) ? m_scancodes[key] : false);
+        break;
+    }
     case STAT_KEY_PRESSED:
         lua_pushboolean(L, m_keypress != 0);
         break;
