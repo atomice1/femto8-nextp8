@@ -957,13 +957,13 @@ static void p8_show_compatibility_error(int severity)
     clear_screen(0);
     draw_rect(10, 51, 118, 78, 7, 0);
     if (severity <= COMPAT_SOME) {
-        draw_text("this cart may not be", 24, 55, 7);
-        draw_text("fully compatible with", 22, 62, 7);
-        draw_text(PROGNAME, 64-strlen(PROGNAME)*GLYPH_WIDTH/2, 69, 7);
+        draw_simple_text("this cart may not be", 24, 55, 7);
+        draw_simple_text("fully compatible with", 22, 62, 7);
+        draw_simple_text(PROGNAME, 64-strlen(PROGNAME)*GLYPH_WIDTH/2, 69, 7);
     } else {
-        draw_text("this cart is not", 32, 55, 7);
-        draw_text("compatible with", 34, 62, 7);
-        draw_text(PROGNAME, 64-strlen(PROGNAME)*GLYPH_WIDTH/2, 69, 7);
+        draw_simple_text("this cart is not", 32, 55, 7);
+        draw_simple_text("compatible with", 34, 62, 7);
+        draw_simple_text(PROGNAME, 64-strlen(PROGNAME)*GLYPH_WIDTH/2, 69, 7);
     }
     p8_flip();
     p8_update_input();
