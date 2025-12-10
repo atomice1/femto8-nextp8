@@ -196,9 +196,9 @@ static void p8_init_common(const char *file_name, const char *lua_script)
 
     memcpy(m_memory, m_cart_memory, CART_MEMORY_SIZE);
 
+    p8_reset();
     clear_screen(0);
 
-    p8_reset();
     p8_update_input();
 
     lua_init_script(lua_script);
