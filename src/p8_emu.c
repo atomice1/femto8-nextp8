@@ -70,7 +70,7 @@ unsigned m_fps = 30;
 unsigned m_actual_fps = 0;
 unsigned m_frames = 0;
 
-clock_t m_start_time;
+p8_clock_t m_start_time;
 
 jmp_buf jmpbuf;
 static bool restart;
@@ -107,6 +107,47 @@ static int m_initialized = 0;
 #ifdef NEXTP8
 static int vfrontreq = 0;
 #endif
+
+#include <time.h>
+
+static p8_clock_t p8_clock(void)
+{
+#ifdef OS_FREERTOS
+    return xTaskGetTickCount();
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+#endif
+}
+
+static unsigned p8_clock_ms(p8_clock_t clocks)
+{
+#ifdef OS_FREERTOS
+    return clocks * portTICK_PERIOD_MS;
+#else
+    return clocks * (clock_t)1000 / CLOCKS_PER_SEC;
+#endif
+}
+
+static p8_clock_t p8_clock_delta(p8_clock_t start, p8_clock_t end)
+{
+#ifdef OS_FREERTOS
+    return (end - start) * portTICK_PERIOD_MS;
+#else
+#define CLOCKS_PER_CLOCK_T (((clock_t)1) << (CHAR_BIT * sizeof(clock_t) - 1))
+    return ((end - start) + ((end < start) ? CLOCKS_PER_CLOCK_T : 0));
+#endif
+}
+
+static void p8_sleep(unsigned ms)
+{
+#ifdef OS_FREERTOS
+    vTaskDelay(pdMS_TO_TICKS(ms));
+#else
+    usleep(ms * 1000);
+#endif
+}
 
 int p8_init()
 {
@@ -895,13 +936,16 @@ void p8_update_input()
         p8_abort();
 }
 
+static void p8_post_flip(void)
+{
+    m_frames++;
+    p8_flush_cartdata();
+    p8_update_input();
+}
+
 void p8_flip()
 {
-    p8_update_input();
-
     p8_render();
-
-    p8_flush_cartdata();
 
     unsigned elapsed_time = p8_elapsed_time();
     const unsigned target_frame_time = 1000 / m_fps;
@@ -909,51 +953,60 @@ void p8_flip()
     if (sleep_time < 0)
         sleep_time = 0;
     m_actual_fps = 1000 / (elapsed_time + sleep_time);
-    m_frames++;
 
     if (sleep_time > 0)
-    {
-#ifdef OS_FREERTOS
-        vTaskDelay(pdMS_TO_TICKS(sleep_time));
-#else
-        usleep(sleep_time * 1000);
-#endif
-    }
+        p8_sleep(sleep_time);
 
-#ifdef OS_FREERTOS
-    m_start_time = xTaskGetTickCount();
-#else
-    m_start_time = clock();
-#endif
+    m_start_time = p8_clock();
+
+    p8_post_flip();
 }
 
 static void p8_main_loop()
 {
+    const int target_frame_time = 1000 / m_fps;
+    int time_debt = 0;
+    unsigned updates_since_last_flip = 0;
+
     for (;;)
     {
         lua_update();
-        lua_draw();
+        updates_since_last_flip++;
 
-        p8_flip();
+        unsigned elapsed = p8_elapsed_time();
+
+        time_debt += elapsed;
+
+        if (time_debt < target_frame_time || updates_since_last_flip >= m_fps) {
+            lua_draw();
+            time_debt += p8_elapsed_time() - elapsed;
+
+            p8_flip();
+
+            if (updates_since_last_flip >= m_fps) {
+                time_debt = 0;
+            } else {
+                time_debt -= target_frame_time;
+                if (time_debt < -target_frame_time) time_debt = -target_frame_time;
+            }
+
+            updates_since_last_flip = 0;
+        } else {
+            p8_post_flip();
+
+            time_debt -= target_frame_time;
+        }
     }
 }
 
 unsigned p8_elapsed_time(void)
 {
+    p8_clock_t now = p8_clock();
     unsigned elapsed_time;
-#ifdef OS_FREERTOS
-    long now = xTaskGetTickCount();
-    if (start_time == 0)
-        elapsed_time = 0;
-    else
-        elapsed_time = (now - m_start_time) * portTICK_PERIOD_MS;
-#else
-    clock_t now = clock();
     if (m_start_time == 0)
         elapsed_time = 0;
     else
-        elapsed_time = ((now - m_start_time) + ((now < m_start_time) ? CLOCKS_PER_CLOCK_T : 0)) * (clock_t)1000 / CLOCKS_PER_SEC;
-#endif
+        elapsed_time = p8_clock_ms(p8_clock_delta(m_start_time, now));
     return elapsed_time;
 }
 
