@@ -213,7 +213,7 @@ extern unsigned m_frames;
 #ifdef OS_FREERTOS
 typedef long p8_clock_t;
 #else
-typedef clock_t p8_clock_t;
+typedef uint_fast64_t p8_clock_t;
 #endif
 
 extern p8_clock_t m_start_time;

@@ -108,8 +108,6 @@ static int m_initialized = 0;
 static int vfrontreq = 0;
 #endif
 
-#include <time.h>
-
 static p8_clock_t p8_clock(void)
 {
 #ifdef OS_FREERTOS
@@ -117,7 +115,7 @@ static p8_clock_t p8_clock(void)
 #else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+    return ts.tv_sec * UINT64_C(1000000) + ts.tv_nsec / UINT64_C(1000);
 #endif
 }
 
@@ -126,18 +124,13 @@ static unsigned p8_clock_ms(p8_clock_t clocks)
 #ifdef OS_FREERTOS
     return clocks * portTICK_PERIOD_MS;
 #else
-    return clocks * (clock_t)1000 / CLOCKS_PER_SEC;
+    return clocks / UINT64_C(1000);
 #endif
 }
 
 static p8_clock_t p8_clock_delta(p8_clock_t start, p8_clock_t end)
 {
-#ifdef OS_FREERTOS
-    return (end - start) * portTICK_PERIOD_MS;
-#else
-#define CLOCKS_PER_CLOCK_T (((clock_t)1) << (CHAR_BIT * sizeof(clock_t) - 1))
-    return ((end - start) + ((end < start) ? CLOCKS_PER_CLOCK_T : 0));
-#endif
+    return end - start;
 }
 
 static void p8_sleep(unsigned ms)
