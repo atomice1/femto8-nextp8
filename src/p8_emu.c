@@ -110,8 +110,10 @@ static int vfrontreq = 0;
 
 static p8_clock_t p8_clock(void)
 {
-#ifdef OS_FREERTOS
+#if defined(OS_FREERTOS)
     return xTaskGetTickCount();
+#elif defined(NEXTP8)
+    return *(volatile uint32_t *)_UTIMER_1KHZ_HI;
 #else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -121,8 +123,10 @@ static p8_clock_t p8_clock(void)
 
 static unsigned p8_clock_ms(p8_clock_t clocks)
 {
-#ifdef OS_FREERTOS
+#if defined(OS_FREERTOS)
     return clocks * portTICK_PERIOD_MS;
+#elif defined(NEXTP8)
+    return clocks;
 #else
     return clocks / UINT64_C(1000);
 #endif
