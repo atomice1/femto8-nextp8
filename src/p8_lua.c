@@ -55,9 +55,9 @@ void lua_register_functions(lua_State *L);
 static unsigned addr_remap(unsigned address)
 {
     if (address >= 0x0000 && address < 0x2000)
-        address = (m_memory[MEMORY_SPRITE_PHYS] << 8) | (address & 0xfff);
+        address = (m_memory[MEMORY_SPRITE_PHYS] << 8) | (address & 0x1fff);
     else if (address >= 0x6000 && address < 0x8000)
-        address = (m_memory[MEMORY_SCREEN_PHYS] << 8) | (address & 0xfff);
+        address = (m_memory[MEMORY_SCREEN_PHYS] << 8) | (address & 0x1fff);
     return address;
 }
 
