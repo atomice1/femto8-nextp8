@@ -130,7 +130,7 @@ int main(int argc, char **argv)
         const char *lua_script = NULL;
         uint8_t *file_buffer = NULL;
         
-        parse_cart_file(file_list[i], m_cart_memory, &lua_script, &file_buffer);
+        parse_cart_file(file_list[i], m_cart_memory, &lua_script, &file_buffer, NULL);
         if (lua_script) {
             total++;
             int result = check_compatibility(file_list[i], lua_script);
