@@ -30,6 +30,7 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 128
 #define ENABLE_AUDIO
+#define DEFAULT_CARTS_PATH "0:/machines/nextp8/carts"
 #define CARTDATA_PATH "0:/machines/nextp8/cdata"
 #else
 #define SDL
@@ -39,13 +40,15 @@
 #if !defined(OS_FREERTOS) && !defined(OS_BAREMETAL)
 #define ENABLE_AUDIO
 #endif
-#ifndef CARTDATA_PATH
-#define CARTDATA_PATH "cdata"
-#endif
 
 #ifndef CARTDATA_PATH
 #define CARTDATA_PATH "cdata"
 #endif
+
+#ifndef DEFAULT_CARTS_PATH
+#define DEFAULT_CARTS_PATH "carts"
+#endif
+
 
 // #define BOOL_NULL -1
 #define PI 3.14159265358f
