@@ -108,6 +108,7 @@ uint8_t m_button_first_repeat[2];
 unsigned m_button_down_time[2][6];
 
 static bool m_prev_pointer_lock;
+static bool m_prev_escape = true;
 
 static FILE *cartdata = NULL;
 static bool cartdata_needs_flush = false;
@@ -980,9 +981,8 @@ void p8_update_input()
         }
     }
 
-    static bool prev_escape = false;
-    bool old_prev_escape = prev_escape;
-    prev_escape = escape;
+    bool old_prev_escape = m_prev_escape;
+    m_prev_escape = escape;
     if (escape && !old_prev_escape)
         p8_abort();
 }
@@ -1063,7 +1063,7 @@ unsigned p8_elapsed_time(void)
 
 void p8_pump_events(void)
 {
-#ifdef SDL
+#if defined(SDL)
     SDL_PumpEvents();
 
     SDL_Event event;
@@ -1071,6 +1071,13 @@ void p8_pump_events(void)
         if (event.type == SDL_QUIT)
             p8_abort();
     }
+#elif defined(NEXTP8)
+    volatile uint8_t *keyboard_matrix = (volatile uint8_t *) _KEYBOARD_MATRIX;
+    bool escape = is_down(keyboard_matrix, KEY_BREAK);
+    bool old_prev_escape = m_prev_escape;
+    m_prev_escape = escape;
+    if (escape && !old_prev_escape)
+        p8_abort();
 #endif
 }
 
