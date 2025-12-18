@@ -1662,7 +1662,7 @@ void lua_load_api()
 
     luaL_openlibs(L);
 
-    printf("Loading extended PICO-8 Api\r\n");
+    lua_register_functions(L);
 
     if (luaL_dostring(L, lua_api_string))
         lua_print_error("Error loading extended PICO-8 Api");
@@ -1700,8 +1700,6 @@ void lua_init_script(const char *script)
 {
     if (!L)
         L = luaL_newstate();
-
-    lua_register_functions(L);
 
     if (luaL_loadstring(L, script))
         lua_print_error("luaL_loadString");

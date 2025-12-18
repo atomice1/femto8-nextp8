@@ -264,10 +264,8 @@ static void p8_init_common(const char *file_name, const char *lua_script)
 
 int p8_init_file_with_param(const char *file_name, const char *param)
 {
-    if (!m_initialized) {
+    if (!m_initialized)
         p8_init();
-        lua_load_api();
-    }
 
     m_param_string = param ? param : "";
     m_load_available = true;
@@ -283,6 +281,8 @@ int p8_init_file_with_param(const char *file_name, const char *param)
 #else
         free(file_buffer);
 #endif
+
+        lua_shutdown_api();
 
         m_param_string = load_param ? load_param : "";
         file_name = load_filename;
@@ -310,6 +310,8 @@ int p8_init_file_with_param(const char *file_name, const char *param)
         current_cart_dir = strdup(".");
     }
 
+    lua_load_api();
+
     printf("Loading %s\n", file_name);
     parse_cart_file(file_name, m_cart_memory, &lua_script, &file_buffer, NULL);
 
@@ -326,10 +328,10 @@ int p8_init_file_with_param(const char *file_name, const char *param)
 
 int p8_init_ram(uint8_t *buffer, int size)
 {
-    if (!m_initialized) {
+    if (!m_initialized)
         p8_init();
-        lua_load_api();
-    }
+
+    lua_load_api();
 
     const char *lua_script = NULL;
     uint8_t *decompression_buffer = NULL;
