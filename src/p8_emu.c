@@ -66,6 +66,10 @@ static void p8_show_compatibility_error(int severity);
 uint8_t *m_memory = NULL;
 uint8_t *m_cart_memory = NULL;
 
+uint8_t *m_overlay_memory = NULL;
+bool m_overlay_enabled = false;
+uint8_t m_overlay_transparent_color = 0;
+
 unsigned m_fps = 30;
 unsigned m_actual_fps = 0;
 unsigned m_frames = 0;
@@ -187,13 +191,16 @@ int p8_init()
 #ifndef OS_FREERTOS
     m_memory = (uint8_t *)malloc(MEMORY_SIZE);
     m_cart_memory = (uint8_t *)malloc(CART_MEMORY_SIZE);
+    m_overlay_memory = (uint8_t *)malloc(MEMORY_SCREEN_SIZE);
 #else
     m_memory = (uint8_t *)rh_malloc(MEMORY_SIZE);
     m_cart_memory = (uint8_t *)rh_malloc(CART_MEMORY_SIZE);
+    m_overlay_memory = (uint8_t *)rh_malloc(MEMORY_SCREEN_SIZE);
 #endif
 
     memset(m_memory, 0, MEMORY_SIZE);
     memset(m_cart_memory, 0, CART_MEMORY_SIZE);
+    memset(m_overlay_memory, 0, MEMORY_SCREEN_SIZE);
 
 #ifdef ENABLE_AUDIO
     audio_init();
@@ -375,9 +382,11 @@ int p8_shutdown()
 #ifdef OS_FREERTOS
     rh_free(m_cart_memory);
     rh_free(m_memory);
+    rh_free(m_overlay_memory);
 #else
     free(m_cart_memory);
     free(m_memory);
+    free(m_overlay_memory);
 #endif
 
     m_initialized = 0;
@@ -400,6 +409,28 @@ void p8_render()
             uint32_t color = m_colors[color_index(index)];
 
             output[x + (y * P8_WIDTH)] = color;
+        }
+    }
+
+    if (m_overlay_enabled)
+    {
+        uint8_t transparent_color = m_overlay_transparent_color;
+        uint8_t *overlay_mem = m_overlay_memory;
+
+        for (int y = 0; y < P8_HEIGHT; y++)
+        {
+            for (int x = 0; x < P8_WIDTH; x++)
+            {
+                int overlay_offset = (x >> 1) + y * 64;
+                uint8_t value = overlay_mem[overlay_offset];
+                uint8_t pixel_color = IS_EVEN(x) ? (value & 0xF) : (value >> 4);
+
+                if (pixel_color != transparent_color)
+                {
+                    uint32_t color = m_colors[color_index(pixel_color)];
+                    output[x + (y * P8_WIDTH)] = color;
+                }
+            }
         }
     }
 
@@ -603,6 +634,47 @@ void p8_render()
         }
     }
 
+    if (m_overlay_enabled)
+    {
+        uint8_t transparent_color = m_overlay_transparent_color;
+        uint8_t *overlay_mem = m_overlay_memory;
+        output = gdi_get_frame_buffer_addr(HW_LCDC_LAYER_0);
+
+        for (int y = 1; y <= 128; y++)
+        {
+            if (y & 0x7)
+            {
+                uint16_t *top = output;
+
+                for (int x = 0; x < 128; x += 2)
+                {
+                    int overlay_offset = (x >> 1) + (y - 1) * 64;
+                    uint8_t value = overlay_mem[overlay_offset];
+                    uint8_t left = value & 0xF;
+                    uint8_t right = value >> 4;
+
+                    if (left != transparent_color)
+                    {
+                        uint16_t c_left = m_colors[color_index(left)];
+                        *top = c_left;
+                        *(top + 1) = c_left;
+                    }
+                    top += 2;
+
+                    if (right != transparent_color)
+                    {
+                        uint16_t c_right = m_colors[color_index(right)];
+                        *top = c_right;
+                        *(top + 1) = c_right;
+                    }
+                    top += 2;
+                }
+
+                output += 240;
+            }
+        }
+    }
+
     gdi_display_update_async(draw_complete, NULL);
 }
 #elif defined(NEXTP8)
@@ -616,6 +688,10 @@ void p8_render()
     uint8_t *pal = &m_memory[MEMORY_PALETTES + PALTYPE_SCREEN * 16];
     memcpy((uint8_t *)_PALETTE_BASE, pal, _PALETTE_SIZE);
     memcpy((uint8_t *)_BACK_BUFFER_BASE, screen_mem, _FRAME_BUFFER_SIZE);
+    if (m_overlay_enabled)
+        memcpy((uint8_t *)_OVERLAY_BACK_BUFFER_BASE, m_overlay_memory, MEMORY_SCREEN_SIZE);
+    uint8_t overlay_ctrl_reg = (m_overlay_enabled ? _OVERLAY_ENABLE_BIT : 0) | (m_overlay_transparent_color & _OVERLAY_TRANSPARENT_MASK);
+    *(volatile uint8_t *)_OVERLAY_CONTROL = overlay_ctrl_reg;
     *(volatile uint8_t *) _VFRONTREQ = vfrontreq = vback;
 }
 #endif
