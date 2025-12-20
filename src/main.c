@@ -41,8 +41,8 @@ int main(int argc, char *argv[])
     _set_postcode(32);
     _show_message(
         "This is a development build of\n"
-        "nextp8. About 60%%-70%% of carts\n"
-        "may work. Audio may be glitchy.\n"
+        "nextp8. Not all carts may work.\n"
+        "Audio may be glitchy.\n"
         "\n"
         "nextp8 comes with NO WARRANTY.\n"
         "\n"
