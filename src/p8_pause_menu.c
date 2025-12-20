@@ -78,10 +78,7 @@ void p8_show_pause_menu(void)
     }
 
     m_overlay_enabled = false;
-#ifdef NEXTP8
-    *(volatile uint8_t *)_OVERLAY_CONTROL = 0;
-#endif
-
+    p8_flip();
     m_pause_menu_showing = false;
 
     switch (current_item) {
