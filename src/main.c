@@ -36,56 +36,57 @@ int main(int argc, char *argv[])
     if (_EXTRACT_API(hw_version) != HW_API_VERSION)
         _fatal_error("Incompatible hardware version");
 #if DEV_BUILD
-    uint32_t loader_version = _loader_data->loader_version;
-    uint32_t loader_timestamp = _loader_data->loader_timestamp;
-    _set_postcode(32);
-    _show_message(
-        "This is a development build of\n"
-        "nextp8. Not all carts may work.\n"
-        "Audio may be glitchy.\n"
-        "\n"
-        "nextp8 comes with NO WARRANTY.\n"
-        "\n"
-        "nextp8 %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
-        "HW %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
-        "BSP %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
-        "Loader %u.%u.%u %u%02u%02u %02u:%02u:%02u\n",
-        _EXTRACT_MAJOR(femto8_version),
-        _EXTRACT_MINOR(femto8_version),
-        _EXTRACT_PATCH(femto8_version),
-        _EXTRACT_YEAR(femto8_timestamp),
-        _EXTRACT_MONTH(femto8_timestamp),
-        _EXTRACT_DAY(femto8_timestamp),
-        _EXTRACT_HOUR(femto8_timestamp),
-        _EXTRACT_MINUTE(femto8_timestamp),
-        _EXTRACT_SECOND(femto8_timestamp),
-        _EXTRACT_MAJOR(hw_version),
-        _EXTRACT_MINOR(hw_version),
-        _EXTRACT_PATCH(hw_version),
-        _EXTRACT_YEAR(hw_timestamp),
-        _EXTRACT_MONTH(hw_timestamp),
-        _EXTRACT_DAY(hw_timestamp),
-        _EXTRACT_HOUR(hw_timestamp),
-        _EXTRACT_MINUTE(hw_timestamp),
-        _EXTRACT_SECOND(hw_timestamp),
-        _EXTRACT_MAJOR(_bsp_version),
-        _EXTRACT_MINOR(_bsp_version),
-        _EXTRACT_PATCH(_bsp_version),
-        _EXTRACT_YEAR(_bsp_timestamp),
-        _EXTRACT_MONTH(_bsp_timestamp),
-        _EXTRACT_DAY(_bsp_timestamp),
-        _EXTRACT_HOUR(_bsp_timestamp),
-        _EXTRACT_MINUTE(_bsp_timestamp),
-        _EXTRACT_SECOND(_bsp_timestamp),
-        _EXTRACT_MAJOR(loader_version),
-        _EXTRACT_MINOR(loader_version),
-        _EXTRACT_PATCH(loader_version),
-        _EXTRACT_YEAR(loader_timestamp),
-        _EXTRACT_MONTH(loader_timestamp),
-        _EXTRACT_DAY(loader_timestamp),
-        _EXTRACT_HOUR(loader_timestamp),
-        _EXTRACT_MINUTE(loader_timestamp),
-        _EXTRACT_SECOND(loader_timestamp));
+    if (_loader_data->reset_type != _RESET_TYPE_APP_RESTART) {
+        uint32_t loader_version = _loader_data->loader_version;
+        uint32_t loader_timestamp = _loader_data->loader_timestamp;
+        _show_message(
+            "This is a development build of\n"
+            "nextp8. Not all carts may work.\n"
+            "Audio may be glitchy.\n"
+            "\n"
+            "nextp8 comes with NO WARRANTY.\n"
+            "\n"
+            "nextp8 %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
+            "HW %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
+            "BSP %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
+            "Loader %u.%u.%u %u%02u%02u %02u:%02u:%02u\n",
+            _EXTRACT_MAJOR(femto8_version),
+            _EXTRACT_MINOR(femto8_version),
+            _EXTRACT_PATCH(femto8_version),
+            _EXTRACT_YEAR(femto8_timestamp),
+            _EXTRACT_MONTH(femto8_timestamp),
+            _EXTRACT_DAY(femto8_timestamp),
+            _EXTRACT_HOUR(femto8_timestamp),
+            _EXTRACT_MINUTE(femto8_timestamp),
+            _EXTRACT_SECOND(femto8_timestamp),
+            _EXTRACT_MAJOR(hw_version),
+            _EXTRACT_MINOR(hw_version),
+            _EXTRACT_PATCH(hw_version),
+            _EXTRACT_YEAR(hw_timestamp),
+            _EXTRACT_MONTH(hw_timestamp),
+            _EXTRACT_DAY(hw_timestamp),
+            _EXTRACT_HOUR(hw_timestamp),
+            _EXTRACT_MINUTE(hw_timestamp),
+            _EXTRACT_SECOND(hw_timestamp),
+            _EXTRACT_MAJOR(_bsp_version),
+            _EXTRACT_MINOR(_bsp_version),
+            _EXTRACT_PATCH(_bsp_version),
+            _EXTRACT_YEAR(_bsp_timestamp),
+            _EXTRACT_MONTH(_bsp_timestamp),
+            _EXTRACT_DAY(_bsp_timestamp),
+            _EXTRACT_HOUR(_bsp_timestamp),
+            _EXTRACT_MINUTE(_bsp_timestamp),
+            _EXTRACT_SECOND(_bsp_timestamp),
+            _EXTRACT_MAJOR(loader_version),
+            _EXTRACT_MINOR(loader_version),
+            _EXTRACT_PATCH(loader_version),
+            _EXTRACT_YEAR(loader_timestamp),
+            _EXTRACT_MONTH(loader_timestamp),
+            _EXTRACT_DAY(loader_timestamp),
+            _EXTRACT_HOUR(loader_timestamp),
+            _EXTRACT_MINUTE(loader_timestamp),
+            _EXTRACT_SECOND(loader_timestamp));
+    }
 #endif
 #endif
 
