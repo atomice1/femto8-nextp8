@@ -170,6 +170,42 @@ static inline void draw_line(int x0, int y0, int x1, int y1, int col, int fillp)
 
 static inline void draw_hline(int x0, int y, int x1, int col, int fillp)
 {
+    uint16_t fillp_reg = m_memory[MEMORY_FILLP] | (m_memory[MEMORY_FILLP + 1] << 8);
+    bool fillp_graphics_secondary = (m_memory[MEMORY_FILLP_ATTR] & 4) != 0;
+    if (!m_overlay_enabled && (col & 0x1000) == 0 && fillp_reg == 0 && !fillp_graphics_secondary) {
+        // Optimized version for common case: no overlay, no fillp.
+        int cx, cy;
+        camera_get(&cx, &cy);
+        x0 -= cx;
+        y -= cy;
+        x1 -= cx;
+        int cx0, cy0, cx1, cy1;
+        clip_get(&cx0, &cy0, &cx1, &cy1);
+
+        if (y < cy0 || y >= cy1 || y < 0 || y >= P8_HEIGHT) return;
+
+        if (x0 < cx0) x0 = cx0;
+        if (x1 > cx1) x1 = cx1;
+        if (x0 < 0) x0 = 0;
+        if (x1 > P8_WIDTH - 1) x1 = P8_WIDTH - 1;
+
+        int base_screen_offset = gfx_addr_remap(MEMORY_SCREEN);
+        int screen_offset = base_screen_offset + (x0 >> 1) + y * 64;
+        int c = color_get(PALTYPE_DRAW, col);
+        if (!IS_EVEN(x0)) {
+            m_memory[screen_offset] = (c << 4) | (m_memory[screen_offset] & 0xF);
+            x0++;
+            screen_offset += 1;
+        }
+        for (int x=x0;x<=x1-1;x+=2) {
+            m_memory[screen_offset] = (c << 4) | (c & 0xF);
+            screen_offset += 1;
+        }
+        if (IS_EVEN(x1))
+            m_memory[screen_offset] = (m_memory[screen_offset] & 0xF0) | (c & 0xF);
+        return;
+    }
+
     for (int x=x0;x<=x1;x++)
         pixel_set(x, y, col, fillp, DRAWTYPE_GRAPHIC);
 }
