@@ -30,8 +30,8 @@ INCFLAGS += -Isrc -Isrc/data -Isrc/lua -Isrc/lodepng -Isrc/lexaloffle
 DEFINES += -DLODEPNG_NO_COMPILE_ENCODER -DLODEPNG_NO_COMPILE_DISK -DLODEPNG_NO_COMPILE_ANCILLARY_CHUNKS -DLODEPNG_NO_COLOR_CONVERT
 
 # NOTE: SDL_CFLAGS is provided by the platform Makefile (pkg-config/sdl-config)
-CFLAGS   += -Wall $(DEFINES) $(fpic) $(INCFLAGS) $(SDL_CFLAGS) -g
-CXXFLAGS += -Wall $(DEFINES) $(fpic) $(INCFLAGS) $(SDL_CFLAGS) -g -fno-threadsafe-statics
+CFLAGS   += -Wall $(DEFINES) $(fpic) $(INCFLAGS) $(SDL_CFLAGS) -g -O3
+CXXFLAGS += -Wall $(DEFINES) $(fpic) $(INCFLAGS) $(SDL_CFLAGS) -g -O3 -fno-threadsafe-statics
 
 # Source directories
 SRC_DIRS := src src/lua src/data src/lodepng src/lexaloffle
