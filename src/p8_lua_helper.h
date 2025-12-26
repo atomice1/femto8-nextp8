@@ -246,6 +246,56 @@ static inline void draw_rect(int x0, int y0, int x1, int y1, int col, int fillp)
 
 static inline void draw_rectfill(int x0, int y0, int x1, int y1, int col, int fillp)
 {
+    uint16_t fillp_reg = m_memory[MEMORY_FILLP] | (m_memory[MEMORY_FILLP + 1] << 8);
+    bool fillp_graphics_secondary = (m_memory[MEMORY_FILLP_ATTR] & 4) != 0;
+    if (!m_overlay_enabled && (col & 0x1000) == 0 && fillp_reg == 0 && !fillp_graphics_secondary) {
+        // Optimized version for common case: no overlay, no fillp.
+        int cx, cy;
+        camera_get(&cx, &cy);
+        x0 -= cx;
+        y0 -= cy;
+        x1 -= cx;
+        y1 -= cy;
+        int cx0, cy0, cx1, cy1;
+        clip_get(&cx0, &cy0, &cx1, &cy1);
+
+        if (x0 < cx0) x0 = cx0;
+        if (y0 < cy0) y0 = cy0;
+        if (x1 > cx1) x1 = cx1;
+        if (y1 > cy1) y1 = cy1;
+        if (x0 < 0) x0 = 0;
+        if (y0 < 0) y0 = 0;
+        if (x1 > P8_WIDTH - 1) x1 = P8_WIDTH - 1;
+        if (y1 > P8_HEIGHT - 1) y1 = P8_HEIGHT - 1;
+
+        int base_screen_offset = gfx_addr_remap(MEMORY_SCREEN);
+        int c = color_get(PALTYPE_DRAW, col);
+        if (!IS_EVEN(x0)) {
+            int screen_offset = base_screen_offset + (x0 >> 1) + y0 * 64;
+            for(int y=y0;y<=y1;y++) {
+                m_memory[screen_offset] = (c << 4) | (m_memory[screen_offset] & 0xF);
+                screen_offset += 64;
+            }
+            x0++;
+        }
+        if (IS_EVEN(x1)) {
+            int screen_offset = base_screen_offset + (x1 >> 1) + y0 * 64;
+            for(int y=y0;y<=y1;y++) {
+                m_memory[screen_offset] = (m_memory[screen_offset] & 0xF0) | (c & 0xF);
+                screen_offset += 64;
+            }
+            x1--;
+        }
+        for (int x=x0;x<=x1;x+=2) {
+            int screen_offset = base_screen_offset + (x >> 1) + y0 * 64;
+            for(int y=y0;y<=y1;y++) {
+                m_memory[screen_offset] = (c & 0xF) | (c << 4);
+                screen_offset += 64;
+            }
+        }
+        return;
+    }
+
     for (int x=x0;x<=x1;x++)
         for(int y=y0;y<=y1;y++)
             pixel_set(x, y, col, fillp, DRAWTYPE_GRAPHIC);
