@@ -304,6 +304,7 @@ int32_t audio_stat(int32_t index)
     return 0;
 }
 
+#ifndef NEXTP8
 void update_channel(soundstate_t *channel)
 {
     if (channel->sound_mode == SOUNDMODE_NONE)
@@ -566,6 +567,7 @@ void render_sounds(int16_t *buffer, int total_samples)
         }
     }
 }
+#endif
 
 void audio_pcm_write(uint16_t address, uint16_t length)
 {

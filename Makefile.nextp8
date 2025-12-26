@@ -13,4 +13,4 @@ BUILD_DIR = build-nextp8
 INCFLAGS += -isystem$(NEXTP8_BSP)/include
 LDFLAGS += -L$(NEXTP8_BSP)/lib -T$(NEXTP8_BSP)/nextp8-ram.ld -Wl,--enable-non-contiguous-regions  -Wl,-Map=build-nextp8/femto8.map -nostdlib++
 LIBS += -lm
-CFLAGS += -DNEXTP8
+DEFINES += -DNEXTP8
