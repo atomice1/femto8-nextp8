@@ -33,6 +33,7 @@ static inline void draw_char(int n, int left, int top, int col);
 static inline void draw_rect(int x0, int y0, int x1, int y1, int col, int fillp);
 static inline void draw_rectfill(int x0, int y0, int x1, int y1, int col, int fillp);
 static inline uint8_t gfx_addr_get(int x, int y, uint8_t *memory, int location, int size);
+static inline int gfx_addr_remap(int location);
 static inline uint8_t gfx_get(int x, int y, int location, int size);
 static inline void gfx_set(int x, int y, int location, int size, int col);
 static inline void camera_get(int *x, int *y);
@@ -351,8 +352,48 @@ static inline void draw_scaled_sprite(int sx, int sy, int sw, int sh, int dx, in
 
 static inline void draw_sprite(int n, int left, int top, bool flip_x, bool flip_y)
 {
+    if (n < 0)
+        return;
     int sx = (n & 0xF) * SPRITE_WIDTH;
     int sy = (n >> 4) * SPRITE_HEIGHT;
+    if (sy >= P8_HEIGHT)
+        return;
+
+    bool fillp_sprites = (m_memory[MEMORY_FILLP_ATTR] & 2) != 0;
+    if (!m_overlay_enabled &&
+        !fillp_sprites) {
+        int cx, cy;
+        camera_get(&cx, &cy);
+        int dx = left - cx;
+        int dy = top - cy;
+        int x0, y0, x1, y1;
+        clip_get(&x0, &y0, &x1, &y1);
+        if (dx >= x0 && dy >= y0 && (dx + SPRITE_WIDTH) <= x1 && (dy + SPRITE_HEIGHT) <= y1 &&
+            dx >= 0 && dy >= 0 && dx + SPRITE_WIDTH <= P8_WIDTH && dy + SPRITE_HEIGHT <= P8_HEIGHT) {
+            // Optimized version for common case: no overlay, no fillp, fully on screen
+            int base_sprite_offset = gfx_addr_remap(MEMORY_SPRITES);
+            int base_screen_offset = gfx_addr_remap(MEMORY_SCREEN);
+            for (int x = 0; x < SPRITE_WIDTH; x++)
+            {
+                int fx = flip_x ? (SPRITE_WIDTH - x - 1) : x;
+                int fy = flip_y ? (SPRITE_HEIGHT - 1) : 0;
+                bool screen_even = IS_EVEN(dx + fx);
+                int screen_offset = base_screen_offset + ((dx + fx) >> 1) + (dy + fy) * 64;
+                bool sprite_even = IS_EVEN(sx + x);
+                int sprite_offset = base_sprite_offset + ((sx + x) >> 1) + sy * 64;
+                for (int y = 0; y < SPRITE_HEIGHT; y++)
+                {
+                    uint8_t index = sprite_even ? m_memory[sprite_offset] & 0xF : m_memory[sprite_offset] >> 4;
+                    uint8_t color = color_get(PALTYPE_DRAW, index);
+                    if ((color & 0x10) == 0)
+                        m_memory[screen_offset] = screen_even ? (m_memory[screen_offset] & 0xF0) | (color & 0xF) : (color << 4) | (m_memory[screen_offset] & 0xF);
+                    screen_offset += flip_y ? -64 : 64;
+                    sprite_offset += 64;
+                }
+            }
+            return;
+        }
+    }
 
     for (int y = 0; y < SPRITE_HEIGHT; y++)
     {
