@@ -49,6 +49,7 @@ int main(int argc, char *argv[])
             "nextp8 comes with NO WARRANTY.\n"
             "\n"
             "nextp8 %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
+            "femto8 " VERSION "\n"
             "HW %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
             "BSP %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
             "Loader %u.%u.%u %u%02u%02u %02u:%02u:%02u\n",
