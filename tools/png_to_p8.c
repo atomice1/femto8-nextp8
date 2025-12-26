@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
     const char *output_file = NULL;
     char *default_output_file = NULL;
     int exit_status = 0;
-    
+
     if (argc == 3) {
         output_file = argv[2];
     } else {

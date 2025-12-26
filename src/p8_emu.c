@@ -12,7 +12,14 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
+#if defined(_WIN32)
+#include <direct.h>   // _mkdir
+#define MKDIR(p) _mkdir(p)
+#else
+#include <sys/types.h>
+#include <sys/stat.h> // mkdir
+#define MKDIR(p) mkdir((p), 0777)
+#endif
 #include <unistd.h>
 #include <math.h>
 #include <assert.h>
@@ -458,9 +465,7 @@ void p8_render()
     sprintf(m_str_buffer, "%d", (int)m_actual_fps);
     draw_text(m_str_buffer, 0, 0, 1);
 
-#if defined(__DA1470x__)
     uint16_t *output = gdi_get_frame_buffer_addr(HW_LCDC_LAYER_0);
-#endif
     uint8_t *screen_mem = &m_memory[(m_memory[MEMORY_SCREEN_PHYS] << 8)];
     uint8_t *pal = &m_memory[MEMORY_PALETTES + PALTYPE_SCREEN * 16];
 
@@ -1315,20 +1320,26 @@ bool p8_open_cartdata(const char *id)
 {
     if (cartdata)
         return false;
-    int ret = mkdir(CARTDATA_PATH, 0777);
-    if (ret == 0 && errno != EEXIST) {
+    int ret = MKDIR(CARTDATA_PATH);
+    if (ret == -1 && errno != EEXIST) {
         return false;
-    } else {
-        char *path = alloca(strlen(CARTDATA_PATH) + 1 + strlen(id) + 1);
-        sprintf(path, "%s/%s", CARTDATA_PATH, id);
-        cartdata = fopen(path, "w+");
-        if (cartdata == NULL) {
+    }
+    char *path = alloca(strlen(CARTDATA_PATH) + 1 + strlen(id) + 1);
+    sprintf(path, "%s/%s", CARTDATA_PATH, id);
+    cartdata = fopen(path, "r+b");
+    if (!cartdata) {
+        cartdata = fopen(path, "w+b");
+        if (!cartdata) {
             return false;
-        } else {
-            fread(m_memory + MEMORY_CARTDATA, 0x100, 1, cartdata);
-            return true;
         }
     }
+    fseek(cartdata, 0, SEEK_SET);
+    uint8_t *dst = m_memory + MEMORY_CARTDATA;
+    size_t n = fread(dst, 1, 0x100, cartdata);
+    if (n < 0x100) {
+        memset(dst + n, 0, 0x100 - n);
+    }
+    return true;
 }
 
 void p8_flush_cartdata(void)

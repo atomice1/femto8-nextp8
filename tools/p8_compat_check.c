@@ -1,6 +1,6 @@
 /**
  * Copyright (C) 2025 Chris January
- * 
+ *
  * PICO-8 cart compatibility checker
  * Tests PICO-8 cart files for femto8 compatibility
  */
@@ -44,7 +44,7 @@ static int add_files_from_directory(const char *dir_path, char **file_list, int 
         fprintf(stderr, "%s: %s\n", dir_path, strerror(errno));
         return file_count;
     }
-    
+
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL && file_count < MAX_FILES) {
         if (entry->d_type == DT_REG && is_cart_file(entry->d_name)) {
@@ -59,7 +59,7 @@ static int add_files_from_directory(const char *dir_path, char **file_list, int 
             file_list[file_count++] = full_path;
         }
     }
-    
+
     closedir(dir);
     return file_count;
 }
@@ -73,28 +73,25 @@ int main(int argc, char **argv)
         fprintf(stderr, "Directories are searched non-recursively for .p8 files.\n");
         return 1;
     }
-    
+
     char **file_list = malloc(MAX_FILES * sizeof(char *));
     if (!file_list) {
         write(STDERR_FILENO, "Out of memory\n", 14);
         return 1;
     }
-    
+
     int file_count = 0;
-    
-    // Process arguments - files or directories
+
     for (int i = 1; i < argc; i++) {
         struct stat st;
         if (stat(argv[i], &st) != 0) {
             fprintf(stderr, "%s: %s\n", argv[i], strerror(errno));
             continue;
         }
-        
+
         if (S_ISDIR(st.st_mode)) {
-            // It's a directory
             file_count = add_files_from_directory(argv[i], file_list, file_count);
         } else if (S_ISREG(st.st_mode)) {
-            // It's a regular file
             if (is_cart_file(argv[i])) {
                 if (file_count < MAX_FILES) {
                     file_list[file_count++] = strdup(argv[i]);
@@ -104,14 +101,13 @@ int main(int argc, char **argv)
             }
         }
     }
-    
+
     if (file_count == 0) {
         fprintf(stderr, "Error: no cart files found\n");
         free(file_list);
         return 1;
     }
-    
-    // Allocate cart memory
+
     m_cart_memory = malloc(CART_MEMORY_SIZE);
     if (!m_cart_memory) {
         write(STDERR_FILENO, "Out of memory\n", 14);
@@ -121,15 +117,14 @@ int main(int argc, char **argv)
         free(file_list);
         return 1;
     }
-    
+
     int total = 0;
     int compatible = 0;
-    
-    // Check each file
+
     for (int i = 0; i < file_count; i++) {
         const char *lua_script = NULL;
         uint8_t *file_buffer = NULL;
-        
+
         parse_cart_file(file_list[i], m_cart_memory, &lua_script, &file_buffer, NULL);
         if (lua_script) {
             total++;
@@ -138,17 +133,16 @@ int main(int argc, char **argv)
                 compatible++;
             }
         }
-        
+
         if (file_buffer) {
             free(file_buffer);
         }
         free(file_list[i]);
     }
-    
+
     free(file_list);
     free(m_cart_memory);
-    
-    // Report results
+
     if (total > 0) {
         int percentage = (compatible * 100) / total;
         printf("%d/%d compatible (%d%%)\n", compatible, total, percentage);
@@ -156,6 +150,6 @@ int main(int argc, char **argv)
         fprintf(stderr, "No valid cart files processed\n");
         return 1;
     }
-    
+
     return 0;
 }

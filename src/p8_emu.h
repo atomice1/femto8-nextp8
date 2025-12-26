@@ -49,7 +49,6 @@
 #define DEFAULT_CARTS_PATH "carts"
 #endif
 
-
 // #define BOOL_NULL -1
 #define PI 3.14159265358f
 #define TWO_PI 6.28318530718f
@@ -265,6 +264,7 @@ extern jmp_buf jmpbuf_restart;
 
 extern bool m_load_available;
 
+void __attribute__ ((noreturn)) p8_abort();
 void p8_close_cartdata(void);
 void p8_delayed_flush_cartdata(void);
 unsigned p8_elapsed_time(void);
@@ -282,7 +282,6 @@ int p8_shutdown(void);
 void p8_render();
 void p8_reset(void);
 char *p8_resolve_relative_path(const char *filename);
-void __attribute__ ((noreturn)) p8_abort();
 void __attribute__ ((noreturn)) p8_restart();
 
 extern const char *m_param_string;

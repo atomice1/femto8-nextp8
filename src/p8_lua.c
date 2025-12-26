@@ -12,7 +12,20 @@ extern "C" {
 #include "p8_audio.h"
 #include "p8_emu.h"
 #include "p8_lua.h"
-#include <malloc.h>
+#if defined(_WIN32)
+#include <windows.h>
+#include <psapi.h>    // GetProcessMemoryInfo
+#elif defined(__GLIBC__)
+#if defined(__APPLE__)
+  #include <stdlib.h>
+  #include <malloc/malloc.h>
+#else
+  #include <malloc.h> // mallinfo / mallinfo2
+#endif
+#else
+#include <unistd.h>   // sysconf
+#include <stdio.h>    // fopen/fscanf
+#endif
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -1332,18 +1345,42 @@ int _stat(lua_State *L)
 
     switch (n)
     {
-    case STAT_MEM_USAGE: {
-#if defined(__GLIBC_PREREQ)
-#if __GLIBC_PREREQ(2, 33)
-        struct mallinfo2 info = mallinfo2();
+case STAT_MEM_USAGE: {
+    double kb = 0.0;
+
+#if defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(),
+                             (PROCESS_MEMORY_COUNTERS*)&pmc,
+                             sizeof(pmc))) {
+        // PrivateUsage = committed private bytes
+        kb = (double)pmc.PrivateUsage / 1024.0;
+    }
+
+#elif defined(__GLIBC__)
+  #if defined(__GLIBC_PREREQ) && __GLIBC_PREREQ(2,33)
+    struct mallinfo2 mi = mallinfo2();
+    kb = (double)mi.uordblks / 1024.0;
+  #else
+    struct mallinfo mi = mallinfo();
+    kb = (double)mi.uordblks / 1024.0;
+  #endif
+
 #else
-        struct mallinfo info = mallinfo();
+    // Fallback for Linux/non-glibc: /proc/self/statm
+    long pages = 0;
+    FILE* f = fopen("/proc/self/statm", "r");
+    if (f && fscanf(f, "%*ld %ld", &pages) == 1) {
+        fclose(f);
+        long page_sz = sysconf(_SC_PAGESIZE);
+        kb = (double)pages * (double)page_sz / 1024.0;
+    } else if (f) {
+        fclose(f);
+    }
 #endif
-#else
-        struct mallinfo info = mallinfo();
-#endif
-        lua_pushnumber(L, info.uordblks / 1024.0f);
-        break;
+
+    lua_pushnumber(L, (lua_Number)kb);
+    break;
     }
     case STAT_CPU_USAGE:
     case STAT_SYSTEM_CPU_USAGE: {
@@ -1706,7 +1743,6 @@ void lua_load_api()
     lua_register_functions(L);
 
     // Set debug hook to pump events every ~3000 instructions
-    // At 30MHz 16-bit CPU interpreting Lua, this is roughly every 100ms
     lua_sethook(L, lua_event_pump_hook, LUA_MASKCOUNT, 3000);
 
     if (luaL_dostring(L, lua_api_string))

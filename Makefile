@@ -1,14 +1,37 @@
-PLATFORM ?= linux
-include Makefile.$(PLATFORM)
+ifeq ($(OS),Windows_NT)
+  PLATFORM ?= windows
+else
+  UNAME_S := $(shell uname -s 2>/dev/null || echo Unknown)
+  ifeq ($(UNAME_S),Linux)
+    PLATFORM ?= linux
+  else ifeq ($(UNAME_S),Darwin)
+    PLATFORM ?= mac
+  else ifneq (,$(findstring MINGW,$(UNAME_S)))
+    PLATFORM ?= windows
+  else ifneq (,$(findstring MSYS,$(UNAME_S)))
+    PLATFORM ?= windows
+  else
+    PLATFORM ?= linux
+  endif
+endif
+
+PLATFORM_MK := Makefile.$(PLATFORM)
+ifeq (,$(wildcard $(PLATFORM_MK)))
+  $(error No platform file '$(PLATFORM_MK)' found)
+endif
+
+include $(PLATFORM_MK)
 
 BUILD_DIR := build-$(PLATFORM)
 TARGET_NAME := femto8
 TARGET := $(BUILD_DIR)/$(TARGET_NAME)
+
 INCFLAGS += -Isrc -Isrc/data -Isrc/lua -Isrc/lodepng -Isrc/lexaloffle
 DEFINES += -DLODEPNG_NO_COMPILE_ENCODER -DLODEPNG_NO_COMPILE_DISK -DLODEPNG_NO_COMPILE_ANCILLARY_CHUNKS -DLODEPNG_NO_COLOR_CONVERT
 
-CFLAGS   += -Wall $(DEFINES) $(fpic) $(INCFLAGS) -g
-CXXFLAGS += -Wall $(DEFINES) $(fpic) $(INCFLAGS) -g -fno-threadsafe-statics
+# NOTE: SDL_CFLAGS is provided by the platform Makefile (pkg-config/sdl-config)
+CFLAGS   += -Wall $(DEFINES) $(fpic) $(INCFLAGS) $(SDL_CFLAGS) -g
+CXXFLAGS += -Wall $(DEFINES) $(fpic) $(INCFLAGS) $(SDL_CFLAGS) -g -fno-threadsafe-statics
 
 # Source directories
 SRC_DIRS := src src/lua src/data src/lodepng src/lexaloffle

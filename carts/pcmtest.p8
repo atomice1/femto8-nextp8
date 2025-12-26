@@ -10,13 +10,13 @@ function _init()
 end
 
 function _update()
-    frame_count += 1
-    if frame_count >= 30 then
-        frame_count = 0
-        tone = 1 - tone
-    end
-
     if stat(108) < 768 then
+        frame_count += 1
+        if frame_count >= 30 then
+            frame_count = 0
+            tone = 1 - tone
+        end
+
         for i=0,255 do
             local sample = sin(phase) * 127 + 128
             if tone == 0 then
