@@ -33,12 +33,36 @@ int main(int argc, char *argv[])
 {
 #ifdef NEXTP8
     _set_postcode(POST_CODE_ENTER_MAIN);
+#endif
+
+    const char *file_name = NULL;
+    const char *param_string = NULL;
+    bool skip_compat = false;
+    bool skip_main_loop = false;
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--version") == 0) {
+            printf("v%s\n", VERSION);
+            return 0;
+        } else if (strcmp(argv[i], "--skip-compat-check") == 0) {
+            skip_compat = true;
+        } else if (strcmp(argv[i], "-x") == 0) {
+            skip_main_loop = true;
+        } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
+            param_string = argv[++i];
+        } else if (file_name == NULL) {
+            file_name = argv[i];
+        }
+    }
+
+#ifdef NEXTP8
     uint32_t hw_timestamp = *(uint32_t *)_BUILD_TIMESTAMP_HI;
     uint32_t hw_version = *(uint32_t *)_HW_VERSION_HI;
     if (_EXTRACT_API(hw_version) != HW_API_VERSION)
         _fatal_error("Incompatible hardware version");
 #if DEV_BUILD
-    if (_loader_data->reset_type != _RESET_TYPE_APP_RESTART) {
+    if (_loader_data->reset_type != _RESET_TYPE_APP_RESTART &&
+        !skip_main_loop && !skip_compat) {
         uint32_t loader_version = _loader_data->loader_version;
         uint32_t loader_timestamp = _loader_data->loader_timestamp;
         _show_message(
@@ -92,26 +116,6 @@ int main(int argc, char *argv[])
     }
 #endif
 #endif
-
-    const char *file_name = NULL;
-    const char *param_string = NULL;
-    bool skip_compat = false;
-    bool skip_main_loop = false;
-
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--version") == 0) {
-            printf("v%s\n", VERSION);
-            return 0;
-        } else if (strcmp(argv[i], "--skip-compat-check") == 0) {
-            skip_compat = true;
-        } else if (strcmp(argv[i], "-x") == 0) {
-            skip_main_loop = true;
-        } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
-            param_string = argv[++i];
-        } else if (file_name == NULL) {
-            file_name = argv[i];
-        }
-    }
 
     if (file_name == NULL)
         file_name = browse_for_cart();
