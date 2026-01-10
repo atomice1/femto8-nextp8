@@ -1,4 +1,7 @@
-all: $(TARGET).bin
+all: $(TARGET).bin $(TARGET).lst
 
 $(TARGET).bin: $(TARGET)
 	$(OBJCOPY) -O binary $(TARGET) $(TARGET).bin
+
+$(TARGET).lst: $(TARGET)
+	$(TOOLCHAIN)objdump -d -S $(TARGET) > $(TARGET).lst
