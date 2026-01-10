@@ -221,6 +221,13 @@ int p8_init()
         }
     }
 
+#ifdef NEXTP8
+    memset((void *)_KEYBOARD_MATRIX_LATCHED, 0xff, 32);
+    *(volatile uint8_t *)_JOYSTICK0_LATCHED = 0xff;
+    *(volatile uint8_t *)_JOYSTICK1_LATCHED = 0xff;
+    *(volatile uint8_t *)_MOUSE_BUTTONS_LATCHED = 0xff;
+#endif
+
     m_initialized = 1;
 
     return 0;
@@ -317,7 +324,7 @@ int p8_init_file_with_param(const char *file_name, const char *param)
         free(current_cart_dir);
 #endif
     }
-    
+
     const char *last_slash = strrchr(file_name, '/');
     if (last_slash) {
         size_t dir_len = last_slash - file_name;
@@ -827,6 +834,67 @@ static unsigned is_down(volatile uint8_t *base, unsigned index)
     return base[index >> 3] & (1 << (index & 0x7));
 }
 
+static uint16_t player0_mask(volatile uint8_t *keyboard_matrix, uint8_t joy0)
+{
+    uint16_t mask = 0;
+    if (is_down(keyboard_matrix, KEY_CURSOR_LEFT) ||
+        (joy0 & JOY_LEFT))
+        mask |= BUTTON_MASK_LEFT;
+    if (is_down(keyboard_matrix, KEY_CURSOR_RIGHT) ||
+        (joy0 & JOY_RIGHT))
+        mask |= BUTTON_MASK_RIGHT;
+    if (is_down(keyboard_matrix, KEY_CURSOR_UP) ||
+        (joy0 & JOY_UP))
+        mask |= BUTTON_MASK_UP;
+    if (is_down(keyboard_matrix, KEY_CURSOR_DOWN) ||
+        (joy0 & JOY_DOWN))
+        mask |= BUTTON_MASK_DOWN;
+    if (is_down(keyboard_matrix, KEY_Z) ||
+        is_down(keyboard_matrix, KEY_N) ||
+        is_down(keyboard_matrix, KEY_C) ||
+        is_down(keyboard_matrix, KEY_ENTER) ||
+        (joy0 & JOY_BUTTON1))
+        mask |= BUTTON_MASK_ACTION1;
+    if (is_down(keyboard_matrix, KEY_X) ||
+        is_down(keyboard_matrix, KEY_M) ||
+        is_down(keyboard_matrix, KEY_V) ||
+        (joy0 & JOY_BUTTON2))
+        mask |= BUTTON_MASK_ACTION2;
+    if (is_down(keyboard_matrix, KEY_ENTER))
+        mask |= BUTTON_MASK_PAUSE | BUTTON_MASK_RETURN;
+    if (is_down(keyboard_matrix, KEY_P))
+        mask |= BUTTON_MASK_PAUSE;
+    if (is_down(keyboard_matrix, KEY_BREAK))
+        mask |= BUTTON_MASK_ESCAPE;
+    return mask;
+}
+
+static uint16_t player1_mask(volatile uint8_t *keyboard_matrix, uint8_t joy1)
+{
+    uint16_t mask = 0;
+    if (is_down(keyboard_matrix, KEY_S) ||
+        (joy1 & JOY_LEFT))
+        mask |= BUTTON_MASK_LEFT;
+    if (is_down(keyboard_matrix, KEY_D) ||
+        (joy1 & JOY_RIGHT))
+        mask |= BUTTON_MASK_RIGHT;
+    if (is_down(keyboard_matrix, KEY_F) ||
+        (joy1 & JOY_UP))
+        mask |= BUTTON_MASK_UP;
+    if (is_down(keyboard_matrix, KEY_E) ||
+        (joy1 & JOY_DOWN))
+        mask |= BUTTON_MASK_DOWN;
+    if (is_down(keyboard_matrix, KEY_TAB) ||
+        is_down(keyboard_matrix, KEY_LEFT_SHIFT) ||
+        (joy1 & JOY_BUTTON1))
+        mask |= BUTTON_MASK_ACTION1;
+    if (is_down(keyboard_matrix, KEY_Q) ||
+        is_down(keyboard_matrix, KEY_A) ||
+        (joy1 & JOY_BUTTON2))
+        mask |= BUTTON_MASK_ACTION2;
+    return mask;
+}
+
 static uint32_t keyboard_matrix_prev[8];
 #endif
 
@@ -980,64 +1048,37 @@ void p8_update_input()
 
 #elif defined(NEXTP8)
     volatile uint8_t *keyboard_matrix = (volatile uint8_t *) _KEYBOARD_MATRIX;
-    volatile uint8_t joy0 = *(volatile uint8_t *) _JOYSTICK0;
-    uint16_t mask = 0;
-    if (is_down(keyboard_matrix, KEY_CURSOR_LEFT) ||
-        (joy0 & JOY_LEFT))
-        mask |= BUTTON_MASK_LEFT;
-    if (is_down(keyboard_matrix, KEY_CURSOR_RIGHT) ||
-        (joy0 & JOY_RIGHT))
-        mask |= BUTTON_MASK_RIGHT;
-    if (is_down(keyboard_matrix, KEY_CURSOR_UP) ||
-        (joy0 & JOY_UP))
-        mask |= BUTTON_MASK_UP;
-    if (is_down(keyboard_matrix, KEY_CURSOR_DOWN) ||
-        (joy0 & JOY_DOWN))
-        mask |= BUTTON_MASK_DOWN;
-    if (is_down(keyboard_matrix, KEY_Z) ||
-        is_down(keyboard_matrix, KEY_N) ||
-        is_down(keyboard_matrix, KEY_C) ||
-        is_down(keyboard_matrix, KEY_ENTER) ||
-        (joy0 & JOY_BUTTON1))
-        mask |= BUTTON_MASK_ACTION1;
-    if (is_down(keyboard_matrix, KEY_X) ||
-        is_down(keyboard_matrix, KEY_M) ||
-        is_down(keyboard_matrix, KEY_V) ||
-        (joy0 & JOY_BUTTON2))
-        mask |= BUTTON_MASK_ACTION2;
-    if (is_down(keyboard_matrix, KEY_ENTER))
-        mask |= BUTTON_MASK_PAUSE | BUTTON_MASK_RETURN;
-    if (is_down(keyboard_matrix, KEY_P))
-        mask |= BUTTON_MASK_PAUSE;
-    if (is_down(keyboard_matrix, KEY_BREAK))
-        mask |= BUTTON_MASK_ESCAPE;
-    m_buttons[0] = mask;
-    m_memory[MEMORY_BUTTON_STATE] = mask & 0xff;
+    volatile uint8_t *keyboard_matrix_latched = (volatile uint8_t *) _KEYBOARD_MATRIX_LATCHED;
+    volatile uint8_t *joy0_latched_ptr = (volatile uint8_t *) _JOYSTICK0_LATCHED;
+    volatile uint8_t *joy1_latched_ptr = (volatile uint8_t *) _JOYSTICK1_LATCHED;
 
+    uint8_t joy0 = *(volatile uint8_t *) _JOYSTICK0;
     uint8_t joy1 = *(volatile uint8_t *) _JOYSTICK1;
-    mask = 0;
-    if (is_down(keyboard_matrix, KEY_S) ||
-        (joy1 & JOY_LEFT))
-        mask |= BUTTON_MASK_LEFT;
-    if (is_down(keyboard_matrix, KEY_D) ||
-        (joy1 & JOY_RIGHT))
-        mask |= BUTTON_MASK_RIGHT;
-    if (is_down(keyboard_matrix, KEY_F) ||
-        (joy1 & JOY_UP))
-        mask |= BUTTON_MASK_UP;
-    if (is_down(keyboard_matrix, KEY_E) ||
-        (joy1 & JOY_DOWN))
-        mask |= BUTTON_MASK_DOWN;
-    if (is_down(keyboard_matrix, KEY_TAB) ||
-        is_down(keyboard_matrix, KEY_LEFT_SHIFT) ||
-        (joy1 & JOY_BUTTON1))
-        mask |= BUTTON_MASK_ACTION1;
-    if (is_down(keyboard_matrix, KEY_Q) ||
-        is_down(keyboard_matrix, KEY_A) ||
-        (joy1 & JOY_BUTTON2))
-        mask |= BUTTON_MASK_ACTION2;
-    m_buttons[1] = mask;
-    m_memory[MEMORY_BUTTON_STATE + 1] = mask & 0xff;
+    uint8_t joy0_latched = *joy0_latched_ptr;
+    uint8_t joy1_latched = *joy1_latched_ptr;
+
+    // Set current button state from unlatched inputs
+    m_buttons[0] = player0_mask(keyboard_matrix, joy0);
+    m_memory[MEMORY_BUTTON_STATE] = m_buttons[0] & 0xff;
+
+    // Set button press state from latched inputs
+    m_buttonsp[0] = player0_mask(keyboard_matrix_latched, joy0_latched);
+
+    // Clear joystick latched bits for player 0
+    *joy0_latched_ptr = 255;
+
+    // Set current button state from unlatched inputs
+    m_buttons[1] = player1_mask(keyboard_matrix, joy1);
+    m_memory[MEMORY_BUTTON_STATE + 1] = m_buttons[1] & 0xff;
+
+    // Set button press state from latched inputs
+    m_buttonsp[1] = player1_mask(keyboard_matrix_latched, joy1_latched);
+
+    // Clear joystick latched bits for player 1
+    *joy1_latched_ptr = 255;
+
+    // Clear all keyboard latched bits
+    memset((void *)keyboard_matrix_latched, 0xff, 32);
 
     bool need_update = false;
     volatile uint32_t *keyboard_matrix32 = (volatile  uint32_t *) keyboard_matrix;
@@ -1058,8 +1099,18 @@ void p8_update_input()
     }
 #endif
 
+#ifdef NEXTP8
+    if (m_memory[MEMORY_DEVKIT_MODE] & 0x2) {
+        volatile uint8_t mouse_buttons= *(volatile uint8_t *) _MOUSE_BUTTONS;
+        volatile uint8_t mouse_buttons_latched = *(volatile uint8_t *) _MOUSE_BUTTONS_LATCHED;
+        m_buttons[0] |= (mouse_buttons & 0x7) << 4;
+        m_buttonsp[0] |= (mouse_buttons_latched & 0x7) << 4;
+        *(volatile uint8_t *) _MOUSE_BUTTONS_LATCHED = 0xff;
+    }
+#else
     if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
         m_buttons[0] |= (((m_mouse_buttons >> 0) & 1) << 4) | (((m_mouse_buttons >> 1) & 1) << 5) | (((m_mouse_buttons >> 2) & 1) << 6);
+#endif
 
     uint8_t delay = m_memory[MEMORY_AUTO_REPEAT_DELAY];
     if (delay == 0)
@@ -1068,14 +1119,18 @@ void p8_update_input()
     if (interval == 0)
         interval = DEFAULT_AUTO_REPEAT_INTERVAL;
     for (unsigned p=0;p<PLAYER_COUNT;++p) {
+#ifndef NEXTP8
         m_buttonsp[p] = 0;
+#endif
         for (unsigned i=0;i<BUTTON_INTERNAL_COUNT;++i) {
             if (m_buttons[p] & (1 << i)) {
                 if (m_button_down_time[p][i] == UINT_MAX) {
                     // ignore buttons pressed at startup
                 } else if (!m_button_down_time[p][i]) {
                     m_button_down_time[p][i] = m_frames;
+#ifndef NEXTP8
                     m_buttonsp[p] |= 1 << i;
+#endif
                 } else if (i < BUTTON_REPEAT_COUNT) {
                     if (delay != 255 && !(m_button_first_repeat[p] & (1 << i)) && m_frames - m_button_down_time[p][i] >= delay) {
                         m_button_down_time[p][i] = m_frames;
@@ -1189,7 +1244,7 @@ void p8_pump_events(void)
         if (event.type == SDL_QUIT)
             p8_abort();
         else if (event.type == SDL_KEYDOWN) {
-            if ((event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_p) && 
+            if ((event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_p) &&
                 (m_buttons[0] & BUTTON_MASK_PAUSE) == 0) {
                 p8_show_pause_menu();
             } else if (event.key.keysym.sym == INPUT_ESCAPE && (m_buttons[0] & BUTTON_MASK_ESCAPE) == 0) {
@@ -1202,7 +1257,7 @@ void p8_pump_events(void)
     bool escape_down = is_down(keyboard_matrix, KEY_BREAK);
     if (escape_down && (m_buttons[0] & BUTTON_MASK_ESCAPE) == 0)
         p8_abort();
-    
+
     bool enter_down = is_down(keyboard_matrix, KEY_ENTER);
     bool p_down = is_down(keyboard_matrix, KEY_P);
     if ((enter_down || p_down) && (m_buttons[0] & BUTTON_MASK_PAUSE) == 0)
