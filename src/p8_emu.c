@@ -139,7 +139,7 @@ static p8_clock_t p8_clock(void)
 #if defined(OS_FREERTOS)
     return xTaskGetTickCount();
 #elif defined(NEXTP8)
-    return *(volatile uint32_t *)_UTIMER_1KHZ_HI;
+    return *(volatile uint64_t *)_UTIMER_1MHZ;
 #else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -151,8 +151,6 @@ static unsigned p8_clock_ms(p8_clock_t clocks)
 {
 #if defined(OS_FREERTOS)
     return clocks * portTICK_PERIOD_MS;
-#elif defined(NEXTP8)
-    return clocks;
 #else
     return clocks / UINT64_C(1000);
 #endif
