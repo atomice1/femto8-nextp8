@@ -172,8 +172,8 @@ static inline void draw_hline(int x0, int y, int x1, int col, int fillp)
 {
     uint16_t fillp_reg = m_memory[MEMORY_FILLP] | (m_memory[MEMORY_FILLP + 1] << 8);
     bool fillp_graphics_secondary = (m_memory[MEMORY_FILLP_ATTR] & 4) != 0;
-    if (!m_overlay_enabled && (col & 0x1000) == 0 && fillp_reg == 0 && !fillp_graphics_secondary) {
-        // Optimized version for common case: no overlay, no fillp.
+    if ((col & 0x1000) == 0 && fillp_reg == 0 && !fillp_graphics_secondary) {
+        // Optimized version for common case: no fillp.
         int cx, cy;
         camera_get(&cx, &cy);
         x0 -= cx;
@@ -284,8 +284,8 @@ static inline void draw_rectfill(int x0, int y0, int x1, int y1, int col, int fi
 {
     uint16_t fillp_reg = m_memory[MEMORY_FILLP] | (m_memory[MEMORY_FILLP + 1] << 8);
     bool fillp_graphics_secondary = (m_memory[MEMORY_FILLP_ATTR] & 4) != 0;
-    if (!m_overlay_enabled && (col & 0x1000) == 0 && fillp_reg == 0 && !fillp_graphics_secondary) {
-        // Optimized version for common case: no overlay, no fillp.
+    if ((col & 0x1000) == 0 && fillp_reg == 0 && !fillp_graphics_secondary) {
+        // Optimized version for common case: no fillp.
         int cx, cy;
         camera_get(&cx, &cy);
         x0 -= cx;
@@ -357,58 +357,54 @@ static inline void draw_ovalfill(int x0, int y0, int x1, int y1, int col, int fi
 
 static inline void pixel_set(int x, int y, int c, int fillp, int draw_type)
 {
-    if (m_overlay_enabled) {
-        gfx_set(x, y, MEMORY_SCREEN, MEMORY_SCREEN_SIZE, c);
-    } else {
-        int cx, cy;
-        camera_get(&cx, &cy);
-        x -= cx;
-        y -= cy;
-        int x0, y0, x1, y1;
-        clip_get(&x0, &y0, &x1, &y1);
+    int cx, cy;
+    camera_get(&cx, &cy);
+    x -= cx;
+    y -= cy;
+    int x0, y0, x1, y1;
+    clip_get(&x0, &y0, &x1, &y1);
 
-        if (x >= x0 && x < x1 && y >= y0 && y < y1)
-        {
-            bool fillp_sprites, fillp_graphics_secondary, transparency, invert;
-            if (c & 0x1000) {
-                transparency = (c & 0x100) != 0;
-                fillp_sprites = (c & 0x200) != 0;
-                fillp_graphics_secondary = (c & 0x400) != 0;
-                invert = (c & 0x800) != 0;
+    if (x >= x0 && x < x1 && y >= y0 && y < y1)
+    {
+        bool fillp_sprites, fillp_graphics_secondary, transparency, invert;
+        if (c & 0x1000) {
+            transparency = (c & 0x100) != 0;
+            fillp_sprites = (c & 0x200) != 0;
+            fillp_graphics_secondary = (c & 0x400) != 0;
+            invert = (c & 0x800) != 0;
+        } else {
+            fillp = m_memory[MEMORY_FILLP] | (m_memory[MEMORY_FILLP + 1] << 8);
+            transparency = (m_memory[MEMORY_FILLP_ATTR] & 1) != 0;
+            fillp_sprites = (m_memory[MEMORY_FILLP_ATTR] & 2) != 0;
+            fillp_graphics_secondary = (m_memory[MEMORY_FILLP_ATTR] & 4) != 0;
+            invert = false;
+        }
+        unsigned bit = ((3-y) & 0x3) * 4 + ((3-x) & 0x3);
+        bool on = (fillp & (1 << bit)) != 0;
+        if (invert) on = !on;
+        bool use_fillp = (draw_type == DRAWTYPE_GRAPHIC) || (draw_type == DRAWTYPE_SPRITE && fillp_sprites);
+        bool use_secondary_palette = (draw_type == DRAWTYPE_SPRITE  && fillp_sprites) || (draw_type == DRAWTYPE_GRAPHIC && fillp_graphics_secondary);
+        if (!use_fillp || (use_fillp && !transparency) || !on) {
+            uint8_t col;
+            if (c == -1)
+                c = pencolor_get();
+            if (use_secondary_palette) {
+                uint8_t col_draw = color_get(PALTYPE_DRAW, (uint8_t)c);
+                uint8_t col_secondary = color_get(PALTYPE_SECONDARY, col_draw);
+                if (on)
+                    col = (col_secondary >> 4) & 0xf;
+                else
+                    col = col_secondary & 0xf;
             } else {
-                fillp = m_memory[MEMORY_FILLP] | (m_memory[MEMORY_FILLP + 1] << 8);
-                transparency = (m_memory[MEMORY_FILLP_ATTR] & 1) != 0;
-                fillp_sprites = (m_memory[MEMORY_FILLP_ATTR] & 2) != 0;
-                fillp_graphics_secondary = (m_memory[MEMORY_FILLP_ATTR] & 4) != 0;
-                invert = false;
-            }
-            unsigned bit = ((3-y) & 0x3) * 4 + ((3-x) & 0x3);
-            bool on = (fillp & (1 << bit)) != 0;
-            if (invert) on = !on;
-            bool use_fillp = (draw_type == DRAWTYPE_GRAPHIC) || (draw_type == DRAWTYPE_SPRITE && fillp_sprites);
-            bool use_secondary_palette = (draw_type == DRAWTYPE_SPRITE  && fillp_sprites) || (draw_type == DRAWTYPE_GRAPHIC && fillp_graphics_secondary);
-            if (!use_fillp || (use_fillp && !transparency) || !on) {
-                uint8_t col;
-                if (c == -1)
-                    c = pencolor_get();
-                if (use_secondary_palette) {
-                    uint8_t col_draw = color_get(PALTYPE_DRAW, (uint8_t)c);
-                    uint8_t col_secondary = color_get(PALTYPE_SECONDARY, col_draw);
+                if (use_fillp) {
                     if (on)
-                        col = (col_secondary >> 4) & 0xf;
+                        c = (c >> 4) & 0xf;
                     else
-                        col = col_secondary & 0xf;
-                } else {
-                    if (use_fillp) {
-                        if (on)
-                            c = (c >> 4) & 0xf;
-                        else
-                            c = c & 0xf;
-                    }
-                    col = color_get(PALTYPE_DRAW, c);
+                        c = c & 0xf;
                 }
-                gfx_set(x, y, MEMORY_SCREEN, MEMORY_SCREEN_SIZE, col);
+                col = color_get(PALTYPE_DRAW, c);
             }
+            gfx_set(x, y, MEMORY_SCREEN, MEMORY_SCREEN_SIZE, col);
         }
     }
 }
@@ -422,8 +418,7 @@ static inline void draw_scaled_sprite(int sx, int sy, int sw, int sh, int dx, in
         return;
 
     bool fillp_sprites = (m_memory[MEMORY_FILLP_ATTR] & 2) != 0;
-    if (!m_overlay_enabled &&
-        !fillp_sprites) {
+    if (!fillp_sprites) {
         int cx, cy;
         camera_get(&cx, &cy);
         dx -= cx;
@@ -432,7 +427,7 @@ static inline void draw_scaled_sprite(int sx, int sy, int sw, int sh, int dx, in
         clip_get(&x0, &y0, &x1, &y1);
         if (dx >= x0 && dy >= y0 && dx + SPRITE_WIDTH <= x1 && dy + SPRITE_HEIGHT <= y1 &&
             dx >= 0 && dy >= 0 && dx + SPRITE_WIDTH <= P8_WIDTH && dy + SPRITE_HEIGHT <= P8_HEIGHT) {
-            // Optimized version for common case: no overlay, no fillp, fully on screen
+            // Optimized version for common case: no fillp, fully on screen
             int base_sprite_offset = gfx_addr_remap(MEMORY_SPRITES);
             int base_screen_offset = gfx_addr_remap(MEMORY_SCREEN);
             if (dw > sw && dh > sh) {
@@ -520,8 +515,7 @@ static inline void draw_sprite(int n, int left, int top, bool flip_x, bool flip_
         return;
 
     bool fillp_sprites = (m_memory[MEMORY_FILLP_ATTR] & 2) != 0;
-    if (!m_overlay_enabled &&
-        !fillp_sprites) {
+    if (!fillp_sprites) {
         int cx, cy;
         camera_get(&cx, &cy);
         int dx = left - cx;
@@ -530,7 +524,7 @@ static inline void draw_sprite(int n, int left, int top, bool flip_x, bool flip_
         clip_get(&x0, &y0, &x1, &y1);
         if (dx >= x0 && dy >= y0 && (dx + SPRITE_WIDTH) <= x1 && (dy + SPRITE_HEIGHT) <= y1 &&
             dx >= 0 && dy >= 0 && dx + SPRITE_WIDTH <= P8_WIDTH && dy + SPRITE_HEIGHT <= P8_HEIGHT) {
-            // Optimized version for common case: no overlay, no fillp, fully on screen
+            // Optimized version for common case: no fillp, fully on screen
             int base_sprite_offset = gfx_addr_remap(MEMORY_SPRITES);
             int base_screen_offset = gfx_addr_remap(MEMORY_SCREEN);
             for (int x = 0; x < SPRITE_WIDTH; x++)
@@ -662,18 +656,8 @@ static inline void gfx_set(int x, int y, int location, int size, int col)
     if (x < 0 || y < 0 || x > P8_WIDTH || y > P8_HEIGHT)
         return;
 
-    bool use_overlay = m_overlay_enabled && (location == MEMORY_SCREEN);
-
-    if (use_overlay)
-    {
-        int offset = (x >> 1) + y * 64;
-        m_overlay_memory[offset] = IS_EVEN(x) ? (m_overlay_memory[offset] & 0xF0) | (col & 0xF) : (col << 4) | (m_overlay_memory[offset] & 0xF);
-    }
-    else
-    {
-        int offset = gfx_addr_remap(location) + (x >> 1) + y * 64;
-        m_memory[offset] = IS_EVEN(x) ? (m_memory[offset] & 0xF0) | (col & 0xF) : (col << 4) | (m_memory[offset] & 0xF);
-    }
+    int offset = gfx_addr_remap(location) + (x >> 1) + y * 64;
+    m_memory[offset] = IS_EVEN(x) ? (m_memory[offset] & 0xF0) | (col & 0xF) : (col << 4) | (m_memory[offset] & 0xF);
 }
 
 static inline void camera_get(int *x, int *y)

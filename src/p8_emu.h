@@ -190,6 +190,8 @@
 #define DEFAULT_AUTO_REPEAT_DELAY 15
 #define DEFAULT_AUTO_REPEAT_INTERVAL 4
 
+#define OVERLAY_TRANSPARENT_COLOR 0
+
 enum
 {
     PALTYPE_DRAW,
@@ -253,8 +255,6 @@ extern unsigned char *m_cart_memory;
 extern char *m_font;
 
 extern uint8_t *m_overlay_memory;
-extern bool m_overlay_enabled;
-extern uint8_t m_overlay_transparent_color;
 
 extern int16_t m_mouse_x, m_mouse_y;
 extern int16_t m_mouse_xrel, m_mouse_yrel;
@@ -271,6 +271,8 @@ extern unsigned m_button_down_time[PLAYER_COUNT][BUTTON_INTERNAL_COUNT];
 extern jmp_buf jmpbuf_restart;
 
 extern bool m_load_available;
+
+extern const char *m_param_string;
 
 void __attribute__ ((noreturn)) p8_abort();
 void p8_close_cartdata(void);
@@ -291,13 +293,12 @@ void p8_render();
 void p8_reset(void);
 char *p8_resolve_relative_path(const char *filename);
 void __attribute__ ((noreturn)) p8_restart();
-
-extern const char *m_param_string;
 void p8_seed_rng_state(uint32_t seed);
+void p8_show_disk_icon(bool show);
 int p8_shutdown(void);
 void p8_update_input(void);
 #ifdef NEXTP8
 void p8_update_keyboard_input(void);
 #endif
-
+    
 #endif

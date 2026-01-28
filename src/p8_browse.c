@@ -136,6 +136,7 @@ static void list_dir(const char* path) {
         return;
     }
 #endif
+    p8_show_disk_icon(true);
     DIR *dir = opendir(path);
     if (dir == NULL) {
         fprintf(stderr, "%s: %s\n", path, strerror(errno));
@@ -177,6 +178,7 @@ static void list_dir(const char* path) {
         closedir(dir);
     }
     qsort(dir_contents, nitems, sizeof(dir_contents[0]), compare_dir_entry);
+    p8_show_disk_icon(false);
 }
 static void draw_file_name(const char *str, int x, int y, int col)
 {
@@ -242,6 +244,8 @@ const char *browse_for_cart(void)
         m_pause_menu_showing = false;
         return NULL;
     }
+    display_dir_contents();
+    p8_flip();
     if (access(DEFAULT_CARTS_PATH, F_OK) == 0)
         list_dir(DEFAULT_CARTS_PATH);
     else

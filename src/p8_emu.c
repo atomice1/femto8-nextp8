@@ -34,6 +34,7 @@
 #include "p8_emu.h"
 #include "p8_lua.h"
 #include "p8_lua_helper.h"
+#include "p8_overlay_helper.h"
 #include "p8_parser.h"
 #include "p8_pause_menu.h"
 
@@ -74,8 +75,6 @@ uint8_t *m_memory = NULL;
 uint8_t *m_cart_memory = NULL;
 
 uint8_t *m_overlay_memory = NULL;
-bool m_overlay_enabled = false;
-uint8_t m_overlay_transparent_color = 0;
 
 unsigned m_fps = 30;
 unsigned m_actual_fps = 0;
@@ -133,6 +132,28 @@ static int16_t mouse_x_accum_prev = 0;
 static int16_t mouse_y_accum_prev = 0;
 static int16_t mouse_z_accum_prev = 0;
 #endif
+
+const uint8_t turtle_icon[32] = {
+    0x11, 0x11, 0x11, 0x11,
+    0x11, 0x11, 0x11, 0x11,
+    0x11, 0x44, 0x11, 0xbb,
+    0x41, 0x44, 0xb4, 0x3b,
+    0x93, 0x99, 0x19, 0x11,
+    0xb1, 0xbb, 0xbb, 0x11,
+    0x1b, 0x11, 0xb1, 0x11,
+    0x11, 0x11, 0x11, 0x11,
+};
+
+const uint8_t disk_icon[32] = {
+    0xc1, 0x66, 0x61, 0x11,
+    0xc1, 0x66, 0x61, 0x1c,
+    0xc1, 0xcc, 0xcc, 0x1c,
+    0xc1, 0x77, 0x77, 0x1c,
+    0xc1, 0x77, 0x77, 0x1c,
+    0xc1, 0x77, 0x77, 0x1c,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+};
 
 static p8_clock_t p8_clock(void)
 {
@@ -210,7 +231,7 @@ int p8_init()
 
     memset(m_memory, 0, MEMORY_SIZE);
     memset(m_cart_memory, 0, CART_MEMORY_SIZE);
-    memset(m_overlay_memory, 0, MEMORY_SCREEN_SIZE);
+    memset(m_overlay_memory, (OVERLAY_TRANSPARENT_COLOR << 4) | OVERLAY_TRANSPARENT_COLOR, MEMORY_SCREEN_SIZE);
 
 #ifdef ENABLE_AUDIO
     audio_init();
@@ -239,6 +260,8 @@ int p8_init()
 static int p8_init_lcd(void)
 {
 #if defined(NEXTP8)
+    uint8_t overlay_ctrl_reg = _OVERLAY_ENABLE_BIT | (OVERLAY_TRANSPARENT_COLOR & _OVERLAY_TRANSPARENT_MASK);
+    *(volatile uint8_t *)_OVERLAY_CONTROL = overlay_ctrl_reg;
     vfrontreq = *(volatile uint8_t *)_VFRONT;
 #elif defined(__DA1470x__)
     gdi_set_layer_start(HW_LCDC_LAYER_0, 0, 0);
@@ -281,14 +304,13 @@ static void p8_init_common(const char *file_name, const char *lua_script)
 
     p8_reset();
     clear_screen(0);
+    p8_show_disk_icon(false);
 
     p8_update_input();
 
     lua_init_script(lua_script);
 
     lua_init();
-
-    p8_init_lcd();
 
     if (!skip_main_loop_if_no_callbacks || lua_has_main_loop_callbacks())
         p8_main_loop();
@@ -342,6 +364,7 @@ int p8_init_file_with_param(const char *file_name, const char *param)
         current_cart_dir = strdup(".");
     }
 
+    p8_show_disk_icon(true);
     lua_load_api();
 
     printf("Loading %s\n", file_name);
@@ -363,6 +386,7 @@ int p8_init_ram(uint8_t *buffer, int size)
     if (!m_initialized)
         p8_init();
 
+    p8_show_disk_icon(true);
     lua_load_api();
 
     const char *lua_script = NULL;
@@ -429,24 +453,20 @@ void p8_render()
         }
     }
 
-    if (m_overlay_enabled)
+    uint8_t *overlay_mem = m_overlay_memory;
+
+    for (int y = 0; y < P8_HEIGHT; y++)
     {
-        uint8_t transparent_color = m_overlay_transparent_color;
-        uint8_t *overlay_mem = m_overlay_memory;
-
-        for (int y = 0; y < P8_HEIGHT; y++)
+        for (int x = 0; x < P8_WIDTH; x++)
         {
-            for (int x = 0; x < P8_WIDTH; x++)
-            {
-                int overlay_offset = (x >> 1) + y * 64;
-                uint8_t value = overlay_mem[overlay_offset];
-                uint8_t pixel_color = IS_EVEN(x) ? (value & 0xF) : (value >> 4);
+            int overlay_offset = (x >> 1) + y * 64;
+            uint8_t value = overlay_mem[overlay_offset];
+            uint8_t pixel_color = IS_EVEN(x) ? (value & 0xF) : (value >> 4);
 
-                if (pixel_color != transparent_color)
-                {
-                    uint32_t color = m_colors[color_index(pixel_color)];
-                    output[x + (y * P8_WIDTH)] = color;
-                }
+            if (pixel_color != OVERLAY_TRANSPARENT_COLOR)
+            {
+                uint32_t color = m_colors[color_index(pixel_color)];
+                output[x + (y * P8_WIDTH)] = color;
             }
         }
     }
@@ -649,44 +669,39 @@ void p8_render()
         }
     }
 
-    if (m_overlay_enabled)
+    output = gdi_get_frame_buffer_addr(HW_LCDC_LAYER_0);
+
+    for (int y = 1; y <= P8_HEIGHT; y++)
     {
-        uint8_t transparent_color = m_overlay_transparent_color;
-        uint8_t *overlay_mem = m_overlay_memory;
-        output = gdi_get_frame_buffer_addr(HW_LCDC_LAYER_0);
-
-        for (int y = 1; y <= 128; y++)
+        if (y & 0x7)
         {
-            if (y & 0x7)
+            uint16_t *top = output;
+
+            for (int x = 0; x < 128; x += 2)
             {
-                uint16_t *top = output;
+                int overlay_offset = (x >> 1) + (y - 1) * 64;
+                uint8_t value = m_overlay_memory[overlay_offset];
+                uint8_t left = value & 0xF;
+                uint8_t right = value >> 4;
 
-                for (int x = 0; x < 128; x += 2)
+                if (left != OVERLAY_TRANSPARENT_COLOR)
                 {
-                    int overlay_offset = (x >> 1) + (y - 1) * 64;
-                    uint8_t value = overlay_mem[overlay_offset];
-                    uint8_t left = value & 0xF;
-                    uint8_t right = value >> 4;
-
-                    if (left != transparent_color)
-                    {
-                        uint16_t c_left = m_colors[color_index(left)];
-                        *top = c_left;
-                        *(top + 1) = c_left;
-                    }
-                    top += 2;
-
-                    if (right != transparent_color)
-                    {
-                        uint16_t c_right = m_colors[color_index(right)];
-                        *top = c_right;
-                        *(top + 1) = c_right;
-                    }
-                    top += 2;
+                    uint16_t c_left = m_colors[color_index(left)];
+                    *top = c_left;
+                    *(top + 1) = c_left;
                 }
+                top += 2;
 
-                output += 240;
+                if (right != OVERLAY_TRANSPARENT_COLOR)
+                {
+                    uint16_t c_right = m_colors[color_index(right)];
+                    *top = c_right;
+                    *(top + 1) = c_right;
+                }
+                top += 2;
             }
+
+            output += 240;
         }
     }
 
@@ -703,10 +718,12 @@ void p8_render()
     uint8_t *pal = &m_memory[MEMORY_PALETTES + PALTYPE_SCREEN * 16];
     memcpy((uint8_t *)_PALETTE_BASE, pal, _PALETTE_SIZE);
     memcpy((uint8_t *)_BACK_BUFFER_BASE, screen_mem, _FRAME_BUFFER_SIZE);
-    if (m_overlay_enabled)
+    static bool prev_pause_menu_showing = false;
+    if (m_pause_menu_showing || prev_pause_menu_showing != m_pause_menu_showing)
         memcpy((uint8_t *)_OVERLAY_BACK_BUFFER_BASE, m_overlay_memory, MEMORY_SCREEN_SIZE);
-    uint8_t overlay_ctrl_reg = (m_overlay_enabled ? _OVERLAY_ENABLE_BIT : 0) | (m_overlay_transparent_color & _OVERLAY_TRANSPARENT_MASK);
-    *(volatile uint8_t *)_OVERLAY_CONTROL = overlay_ctrl_reg;
+    else
+        memcpy((uint8_t *)_OVERLAY_BACK_BUFFER_BASE, m_overlay_memory, 512); // optimization: only copy first 8 rows if pause menu not showing
+    prev_pause_menu_showing = m_pause_menu_showing;
     *(volatile uint8_t *) _VFRONTREQ = vfrontreq = vback;
 }
 #endif
@@ -1496,4 +1513,13 @@ static void p8_show_compatibility_error(int severity)
     clear_screen(0);
     m_button_down_time[0][BUTTON_ACTION1] = UINT_MAX;
     m_pause_menu_showing = false;
+}
+
+void p8_show_disk_icon(bool show)
+{
+    if (show)
+        overlay_draw_icon(disk_icon, P8_WIDTH - 8, 0);
+    else
+        overlay_draw_rectfill(P8_WIDTH - 8, 0, P8_WIDTH-1, 7, OVERLAY_TRANSPARENT_COLOR);
+    p8_flip();
 }
