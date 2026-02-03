@@ -279,6 +279,8 @@ static int p8_init_lcd(void)
 
 static void p8_init_common(const char *file_name, const char *lua_script)
 {
+    p8_show_disk_icon(false);
+
     if (lua_script == NULL) {
         if (file_name) fprintf(stderr, "%s: ", file_name);
         fprintf(stderr, "invalid cart\n");
@@ -305,7 +307,6 @@ static void p8_init_common(const char *file_name, const char *lua_script)
 
     p8_reset();
     clear_screen(0);
-    p8_show_disk_icon(false);
 
     p8_update_input();
 
@@ -1502,22 +1503,33 @@ static void p8_show_compatibility_error(int severity)
 {
     m_dialog_showing = true;
     p8_reset();
-    clear_screen(0);
-    draw_rect(10, 51, 118, 78, 7, 0);
-    if (severity <= COMPAT_SOME) {
-        draw_simple_text("this cart may not be", 24, 55, 7);
-        draw_simple_text("fully compatible with", 22, 62, 7);
-        draw_simple_text(PROGNAME, 64-strlen(PROGNAME)*GLYPH_WIDTH/2, 69, 7);
-    } else {
-        draw_simple_text("this cart is not", 32, 55, 7);
-        draw_simple_text("compatible with", 34, 62, 7);
-        draw_simple_text(PROGNAME, 64-strlen(PROGNAME)*GLYPH_WIDTH/2, 69, 7);
-    }
-    p8_flip();
-    do {
-        p8_update_input();
-    } while ((m_buttons[0] & (BUTTON_MASK_ACTION1 | BUTTON_MASK_RETURN)) == 0);
-    clear_screen(0);
+
+
+    p8_dialog_control_t compat_controls_some[] = {
+        DIALOG_LABEL("this cart may not be"),
+        DIALOG_LABEL("fully compatible with"),
+        DIALOG_LABEL(PROGNAME),
+        DIALOG_SPACING(),
+        DIALOG_BUTTONBAR_OK_ONLY(),
+    };
+
+    p8_dialog_control_t compat_controls_none[] = {
+        DIALOG_LABEL("this cart is not"),
+        DIALOG_LABEL("compatible with"),
+        DIALOG_LABEL(PROGNAME),
+        DIALOG_SPACING(),
+        DIALOG_BUTTONBAR_OK_ONLY(),
+    };
+
+    p8_dialog_t compat_dialog;
+    if (severity <= COMPAT_SOME)
+        p8_dialog_init(&compat_dialog, NULL, compat_controls_some, 5, 0);
+    else
+        p8_dialog_init(&compat_dialog, NULL, compat_controls_none, 5, 0);
+
+    p8_dialog_run(&compat_dialog);
+    p8_dialog_cleanup(&compat_dialog);
+
     m_button_down_time[0][BUTTON_ACTION1] = UINT_MAX;
     m_dialog_showing = false;
 }
