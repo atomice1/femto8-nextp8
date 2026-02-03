@@ -24,8 +24,6 @@ static const char *menu_items[MENU_ITEMS] = {
 #define MENU_X ((P8_WIDTH - MENU_WIDTH) / 2)
 #define MENU_Y ((P8_HEIGHT - MENU_HEIGHT) / 2)
 
-bool m_pause_menu_showing;
-
 static void draw_pause_menu(int current_item)
 {
     overlay_draw_rect(MENU_X - 2, MENU_Y - 2, MENU_X + MENU_WIDTH + 1, MENU_Y + MENU_HEIGHT + 1, 1);
@@ -48,9 +46,9 @@ static void draw_pause_menu(int current_item)
 
 void p8_show_pause_menu(void)
 {
-    if (m_pause_menu_showing)
+    if (m_dialog_showing)
         return;
-    m_pause_menu_showing = true;
+    m_dialog_showing = true;
 
     int current_item = 0;
     draw_pause_menu(current_item);
@@ -73,7 +71,7 @@ void p8_show_pause_menu(void)
     }
     overlay_clear();
     p8_flip();
-    m_pause_menu_showing = false;
+    m_dialog_showing = false;
 
     switch (current_item) {
         case 0: // Continue
