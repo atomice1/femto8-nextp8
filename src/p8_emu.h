@@ -32,9 +32,11 @@
 #define ENABLE_AUDIO
 #define DEFAULT_CARTS_PATH "0:/machines/nextp8/carts"
 #define CARTDATA_PATH "0:/machines/nextp8/cdata"
+#define CACHE_PATH "0:/machines/nextp8/cache"
 #else
 #define SDL
 #define ENABLE_AUDIO
+#define ENABLE_BBS_DOWNLOAD
 #endif
 
 #if !defined(OS_FREERTOS) && !defined(OS_BAREMETAL)
@@ -47,6 +49,10 @@
 
 #ifndef DEFAULT_CARTS_PATH
 #define DEFAULT_CARTS_PATH "carts"
+#endif
+
+#ifndef CACHE_PATH
+#define CACHE_PATH "cache"
 #endif
 
 // #define BOOL_NULL -1
@@ -171,6 +177,8 @@
 #define STAT_HOUR 93
 #define STAT_MINUTE 94
 #define STAT_SECOND 95
+#define STAT_BREADCRUMB 100
+#define STAT_BBS_CART_ID 101
 #define STAT_PCM_BUFFER_SIZE 108
 #define STAT_PCM_APP_BUFFER 109
 
@@ -258,6 +266,9 @@ extern char *m_font;
 
 extern uint8_t *m_overlay_memory;
 
+extern char *m_breadcrumb;
+extern char *m_bbs_cart_id;
+
 extern int16_t m_mouse_x, m_mouse_y;
 extern int16_t m_mouse_xrel, m_mouse_yrel;
 extern uint8_t m_mouse_buttons;
@@ -295,12 +306,22 @@ void p8_render();
 void p8_reset(void);
 char *p8_resolve_relative_path(const char *filename);
 void __attribute__ ((noreturn)) p8_restart();
+/* Error dialog severity levels */
+typedef enum {
+    P8_ERROR_WARNING,
+    P8_ERROR_ERROR
+} p8_error_severity_t;
+
 void p8_seed_rng_state(uint32_t seed);
 void p8_show_disk_icon(bool show);
+void p8_show_error_dialog(const char **lines, int line_count, p8_error_severity_t severity);
+#ifdef ENABLE_BBS_DOWNLOAD
+char *p8_download_bbs_cart(const char *cart_id);
+#endif
 int p8_shutdown(void);
 void p8_update_input(void);
 #ifdef NEXTP8
 void p8_update_keyboard_input(void);
 #endif
-    
+
 #endif

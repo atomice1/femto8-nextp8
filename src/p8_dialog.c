@@ -671,18 +671,17 @@ p8_dialog_action_t p8_dialog_run(p8_dialog_t *dialog)
     m_keypress = 0;
 
     // Main dialog loop
-    while (result.type == DIALOG_RESULT_NONE) {
-        result = p8_dialog_update(dialog);
-
+    do {
         p8_dialog_draw(dialog);
         p8_flip();  // p8_flip calls p8_update_input internally
-    }
+
+        result = p8_dialog_update(dialog);
+    } while (result.type == DIALOG_RESULT_NONE);
 
     // Clear overlay before returning
     overlay_draw_rectfill(dialog->x, dialog->y,
                           dialog->x + dialog->width - 1,
                           dialog->y + dialog->height - 1, 0);
-    p8_flip();
 
     p8_dialog_set_showing(dialog, false);
 

@@ -1290,31 +1290,67 @@ int _load(lua_State *L)
     if (!filename)
         luaL_error(L, "load() filename must be a string");
 
+    const char *breadcrumb = NULL;
+    if (nargs >= 2)
+        breadcrumb = lua_tostring(L, 2);
+
+    /* Set breadcrumb */
+    if (m_breadcrumb) {
+        free(m_breadcrumb);
+        m_breadcrumb = NULL;
+    }
+    if (breadcrumb)
+        m_breadcrumb = strdup(breadcrumb);
+
     char *full_filename = NULL;
-    if (strstr(filename, ".p8") == NULL && strstr(filename, ".P8") == NULL) {
-        size_t len = strlen(filename) + 4;
-        full_filename = (char *)malloc(len);
-        if (!full_filename) {
-            luaL_error(L, "out of memory");
+    char *resolved_path = NULL;
+
+    /* Check if filename starts with '#' for BBS download */
+    if (filename[0] == '#') {
+#ifdef ENABLE_BBS_DOWNLOAD
+        const char *cart_id = filename + 1;  /* Skip the '#' */
+        resolved_path = p8_download_bbs_cart(cart_id);
+        if (!resolved_path) {
+            luaL_error(L, "failed to download cart from bbs");
             return 0;
         }
-        snprintf(full_filename, len, "%s.p8", filename);
-        filename = full_filename;
+#else
+        luaL_error(L, "bbs download not supported");
+        return 0;
+#endif
+    } else {
+        /* Clear BBS cart ID for non-BBS loads */
+        if (m_bbs_cart_id) {
+            free(m_bbs_cart_id);
+            m_bbs_cart_id = NULL;
+        }
+
+        if (strstr(filename, ".p8") == NULL && strstr(filename, ".P8") == NULL) {
+            size_t len = strlen(filename) + 4;
+            full_filename = (char *)malloc(len);
+            if (!full_filename) {
+                luaL_error(L, "out of memory");
+                return 0;
+            }
+            snprintf(full_filename, len, "%s.p8", filename);
+            filename = full_filename;
+        }
+
+        resolved_path = p8_resolve_relative_path(filename);
     }
-
-    char *resolved_path = p8_resolve_relative_path(filename);
-
-    if (full_filename)
-        free(full_filename);
 
     if (!resolved_path)
         luaL_error(L, "out of memory");
 
-    if (access(resolved_path, F_OK) != 0) {
+    /* Only check file access if not a BBS cart (which was already downloaded) */
+    if (filename[0] != '#' && access(resolved_path, F_OK) != 0) {
         fprintf(stderr, "could not access %s\n", filename);
         free(resolved_path);
         return 0;
     }
+
+    if (full_filename)
+        free(full_filename);
 
     const char *param = NULL;
     if (nargs >= 3)
@@ -1509,6 +1545,18 @@ case STAT_MEM_USAGE: {
         break;
     case STAT_PCM_APP_BUFFER:
         lua_pushinteger(L, audio_pcm_app_buffer());
+        break;
+    case STAT_BREADCRUMB:
+        if (m_breadcrumb)
+            lua_pushstring(L, m_breadcrumb);
+        else
+            lua_pushstring(L, "");
+        break;
+    case STAT_BBS_CART_ID:
+        if (m_bbs_cart_id)
+            lua_pushstring(L, m_bbs_cart_id);
+        else
+            lua_pushstring(L, "");
         break;
     default:
         if ((n >= 46 && n <= 56) || (n >= 16 && n <= 26)) {

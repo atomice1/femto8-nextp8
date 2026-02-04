@@ -15,4 +15,4 @@ SDL_LIBS := $(filter-out -lSDLmain -lmingw32 -mwindows,$(SDL_LIBS_RAW))
 
 LDFLAGS += -mconsole
 
-LIBS += $(SDL_LIBS) -lpsapi -lws2_32 -lwinmm
+LIBS += $(SDL_LIBS) -lpsapi -lws2_32 -lwinmm -lssl -lcrypto

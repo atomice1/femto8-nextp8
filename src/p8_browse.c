@@ -19,6 +19,9 @@
 #include <unistd.h>
 
 #include "p8_browse.h"
+#ifdef ENABLE_BBS_DOWNLOAD
+#include "p8_cache.h"
+#endif
 #include "p8_dialog.h"
 #include "p8_emu.h"
 #include "p8_lua_helper.h"
@@ -245,25 +248,70 @@ const char *browse_for_cart(void)
     p8_dialog_control_t controls[] = {
         DIALOG_LABEL_INVERTED(""),
         DIALOG_LISTBOX_CUSTOM_FULLSCREEN(NULL, NULL, nitems, &selected_index, render_file_item),
+#ifdef ENABLE_BBS_DOWNLOAD
+        DIALOG_LABEL_INVERTED("\216: select file  \227: bbs download"),
+#else
         DIALOG_LABEL_INVERTED("\216: select file"),
+#endif
     };
 
     p8_dialog_t dialog;
     p8_dialog_init(&dialog, NULL, controls, 3, P8_WIDTH);
     dialog.draw_border = false;
     dialog.padding = 0;
-    
+
+    p8_dialog_action_t result = { DIALOG_RESULT_NONE, 0 };
+    p8_dialog_set_showing(&dialog, true);
+
     for (;;) {
         selected_index = 0;
         controls[0].label = pwd;
         controls[1].data.listbox.item_count = nitems;
 
-        p8_dialog_action_t result = p8_dialog_run(&dialog);
-        
-        if (result.type == DIALOG_RESULT_CANCELLED) {
+        // Main dialog loop
+        do {
+            p8_dialog_draw(&dialog);
+            p8_flip();
+
+            result = p8_dialog_update(&dialog);
+
+#ifdef ENABLE_BBS_DOWNLOAD
+            /* Handle X key press for BBS download */
+            if (result.type == DIALOG_RESULT_NONE && (m_buttonsp[0] & BUTTON_MASK_ACTION2)) {
+                /* Show BBS cart ID input dialog */
+                char cart_id_buffer[64] = {'\0'};
+                
+                p8_dialog_control_t bbs_controls[] = {
+                    DIALOG_LABEL("enter bbs cart id:"),
+                    DIALOG_INPUTBOX("", cart_id_buffer, sizeof(cart_id_buffer)),
+                    DIALOG_SPACING(),
+                    DIALOG_BUTTONBAR()
+                };
+                
+                p8_dialog_t bbs_dialog;
+                p8_dialog_init(&bbs_dialog, "download from bbs", bbs_controls, 4, 120);
+                
+                p8_dialog_action_t bbs_result = p8_dialog_run(&bbs_dialog);
+                p8_dialog_cleanup(&bbs_dialog);
+
+                p8_dialog_draw(&dialog);
+
+                if (bbs_result.type == DIALOG_RESULT_ACCEPTED) {
+                    const char *cart_id = (cart_id_buffer[0] == '#') ? (cart_id_buffer + 1) : cart_id_buffer;
+                    cart_path = p8_download_bbs_cart(cart_id);
+                    if (cart_path)
+                        break;
+                }
+            }
+#endif
+        } while (result.type == DIALOG_RESULT_NONE);
+
+        if (cart_path)
             break;
-        }
-        
+
+        if (result.type == DIALOG_RESULT_CANCELLED)
+            break;
+
         if (result.type == DIALOG_RESULT_ACCEPTED && selected_index >= 0 && selected_index < nitems) {
             struct dir_entry *dir_entry = &dir_contents[selected_index];
             const char *full_path = make_full_path(pwd, dir_entry->file_name);
@@ -274,7 +322,6 @@ const char *browse_for_cart(void)
             if (dir_entry->is_dir) {
                 list_dir(full_path);
                 free((char *)full_path);
-                selected_index = 0;
             } else {
                 cart_path = full_path;
                 break;
@@ -282,7 +329,11 @@ const char *browse_for_cart(void)
         }
     }
 
+    p8_dialog_set_showing(&dialog, false);
     p8_dialog_cleanup(&dialog);
+
+    overlay_clear();
+    p8_flip();
 
     clear_dir_contents();
     free(dir_contents);
