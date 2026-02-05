@@ -30,6 +30,7 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 128
 #define ENABLE_AUDIO
+#define ENABLE_BBS_DOWNLOAD
 #define DEFAULT_CARTS_PATH "0:/machines/nextp8/carts"
 #define CARTDATA_PATH "0:/machines/nextp8/cdata"
 #define CACHE_PATH "0:/machines/nextp8/cache"
