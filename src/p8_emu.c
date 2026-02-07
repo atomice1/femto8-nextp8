@@ -1145,17 +1145,23 @@ void p8_update_input()
     for (unsigned i = 0; i < 8; ++i) {
         if (keyboard_matrix32[i] != keyboard_matrix_prev[i])
             need_update = true;
-        keyboard_matrix_prev[i] = keyboard_matrix32[i];
     }
     if (need_update) {
         bool shifted = is_down(keyboard_matrix, KEY_LEFT_SHIFT) ||
                        is_down(keyboard_matrix, KEY_RIGHT_SHIFT);
         for (unsigned i=0;i<256;++i) {
             bool down = is_down(keyboard_matrix, i);
-            if (down)
-                m_keypress = scancode_to_name[shifted?1:0][i];
+            bool prev_down = is_down((uint8_t *)keyboard_matrix_prev, i);
+            if (down && !prev_down) {
+                // Key press event
+                char ch = scancode_to_name[shifted?1:0][i];
+                if (ch != '\0')
+                    m_keypress = ch;
+            }
             m_scancodes[nextp8_scancode_to_sdl_scancode[i]] = down;
         }
+        for (unsigned i = 0; i < 8; ++i)
+            keyboard_matrix_prev[i] = keyboard_matrix32[i];
     }
 
     int16_t mouse_x_accum = *(volatile int16_t *) _MOUSE_X;
