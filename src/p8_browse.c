@@ -199,15 +199,14 @@ static void draw_file_name(const char *str, int x, int y, int col)
     }
 }
 
-static void render_file_item(void *user_data, int index, bool selected, int x, int y, int width, int height)
+static void render_file_item(void *user_data, int index, bool selected, int x, int y, int width, int height, int fg_color, int bg_color)
 {
+    (void)user_data;
     struct dir_entry *dir_entry = &dir_contents[index];
-    int fg_color = selected ? 1 : 7;
-    int bg_color = selected ? 10 : 1;
-    
+
     if (selected)
         overlay_draw_rectfill(x, y - 1, x + width - 1, y + height - 1, bg_color);
-    
+
     // Clip to avoid drawing filename over " <dir>" suffix
     int clip_x, clip_y, clip_w, clip_h;
     overlay_clip_get(&clip_x, &clip_y, &clip_w, &clip_h);
@@ -218,7 +217,7 @@ static void render_file_item(void *user_data, int index, bool selected, int x, i
 
     // Draw filename with case conversion
     draw_file_name(dir_entry->file_name, x, y, fg_color);
-    
+
     overlay_clip_set(clip_x, clip_y, clip_w, clip_h);
 
     // Draw " <dir>" suffix for directories
@@ -233,12 +232,12 @@ const char *browse_for_cart(void)
     if (setjmp(jmpbuf_restart)) {
         return NULL;
     }
-    
+
     if (access(DEFAULT_CARTS_PATH, F_OK) == 0)
         list_dir(DEFAULT_CARTS_PATH);
     else
         list_dir(FALLBACK_CARTS_PATH);
-    
+
     const char *cart_path = NULL;
     int selected_index = 0;
 
@@ -257,6 +256,7 @@ const char *browse_for_cart(void)
     for (;;) {
         selected_index = 0;
         controls[0].label = pwd;
+        controls[1].data.listbox.item_count = nitems;
 
         p8_dialog_action_t result = p8_dialog_run(&dialog);
         
