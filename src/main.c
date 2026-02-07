@@ -35,6 +35,8 @@ int main(int argc, char *argv[])
     _set_postcode(POST_CODE_ENTER_MAIN);
 #endif
 
+    setvbuf(stdout, NULL, _IONBF, 0); // Disable buffering for stdout
+
     const char *file_name = NULL;
     const char *param_string = NULL;
     bool skip_compat = false;
