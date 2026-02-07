@@ -23,6 +23,10 @@
 #include "p8_cache.h"
 #endif
 #include "p8_dialog.h"
+#ifdef NEXTP8
+#include "wifi/p8_wifi.h"
+#include "wifi/p8_wifi_config.h"
+#endif
 #include "p8_emu.h"
 #include "p8_lua_helper.h"
 #include "p8_overlay_helper.h"
@@ -278,23 +282,54 @@ const char *browse_for_cart(void)
 #ifdef ENABLE_BBS_DOWNLOAD
             /* Handle X key press for BBS download */
             if (result.type == DIALOG_RESULT_NONE && (m_buttonsp[0] & BUTTON_MASK_ACTION2)) {
+#ifdef NEXTP8
+                /* Check if Wi-Fi is connected, show config dialog if not */
+                wifi_ap_info_t current_ap;
+                if (wifi_get_status(&current_ap) < 0) {
+                    /* Not connected - show Wi-Fi config dialog */
+                    if (!wifi_show_config_dialog()) {
+                        /* User cancelled - don't show BBS dialog */
+                        continue;
+                    }
+                }
+
+                /* Wait for connection to be established */
+                if (!wifi_wait_for_connected()) {
+                    /* User cancelled or connection failed */
+                    continue;
+                }
+#endif
                 /* Show BBS cart ID input dialog */
                 char cart_id_buffer[64] = {'\0'};
-                
+
                 p8_dialog_control_t bbs_controls[] = {
                     DIALOG_LABEL("enter bbs cart id:"),
                     DIALOG_INPUTBOX("", cart_id_buffer, sizeof(cart_id_buffer)),
                     DIALOG_SPACING(),
+#ifdef NEXTP8
+                    DIALOG_BUTTON("Wi-Fi Config", 100),
+                    DIALOG_SPACING(),
+#endif
                     DIALOG_BUTTONBAR()
                 };
-                
+
                 p8_dialog_t bbs_dialog;
+#ifdef NEXTP8
+                p8_dialog_init(&bbs_dialog, "download from bbs", bbs_controls, 7, 120);
+#else
                 p8_dialog_init(&bbs_dialog, "download from bbs", bbs_controls, 4, 120);
-                
+#endif
+
                 p8_dialog_action_t bbs_result = p8_dialog_run(&bbs_dialog);
                 p8_dialog_cleanup(&bbs_dialog);
 
-                p8_dialog_draw(&dialog);
+#ifdef NEXTP8
+                /* Handle Wi-Fi config button */
+                if (bbs_result.type == DIALOG_RESULT_BUTTON && bbs_result.action_id == 100) {
+                    wifi_show_config_dialog();
+                    continue;  /* Show BBS dialog again */
+                }
+#endif
 
                 if (bbs_result.type == DIALOG_RESULT_ACCEPTED) {
                     const char *cart_id = (cart_id_buffer[0] == '#') ? (cart_id_buffer + 1) : cart_id_buffer;

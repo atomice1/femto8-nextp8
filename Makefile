@@ -34,10 +34,10 @@ CFLAGS   += -Wall $(DEFINES) $(fpic) $(INCFLAGS) $(SDL_CFLAGS) -g -O3
 CXXFLAGS += -Wall $(DEFINES) $(fpic) $(INCFLAGS) $(SDL_CFLAGS) -g -O3 -fno-threadsafe-statics
 
 # Source directories
-SRC_DIRS := src src/lua src/data src/lodepng src/lexaloffle
+SRC_DIRS := src src/lua src/data src/lodepng src/lexaloffle src/wifi
 
 # Create build directories
-$(shell mkdir -p $(BUILD_DIR)/lua $(BUILD_DIR)/lexaloffle $(BUILD_DIR)/lodepng)
+$(shell mkdir -p $(BUILD_DIR)/lua $(BUILD_DIR)/lexaloffle $(BUILD_DIR)/lodepng $(BUILD_DIR)/wifi)
 
 # Collect all source files
 SOURCES_LUA := $(wildcard src/lua/*.c) src/p8_lua.c
