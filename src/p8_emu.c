@@ -730,12 +730,15 @@ void p8_render()
     uint8_t *pal = &m_memory[MEMORY_PALETTES + PALTYPE_SCREEN * 16];
     memcpy((uint8_t *)_PALETTE_BASE, pal, _PALETTE_SIZE);
     memcpy((uint8_t *)_BACK_BUFFER_BASE, screen_mem, _FRAME_BUFFER_SIZE);
-    static bool prev_dialog_showing = false;
-    if (m_dialog_showing || prev_dialog_showing != m_dialog_showing)
+    static int dialog_showing_clear_n = 0;
+    if (m_dialog_showing || dialog_showing_clear_n > 0)
         memcpy((uint8_t *)_OVERLAY_BACK_BUFFER_BASE, m_overlay_memory, MEMORY_SCREEN_SIZE);
     else
         memcpy((uint8_t *)_OVERLAY_BACK_BUFFER_BASE, m_overlay_memory, 512); // optimization: only copy first 8 rows if pause menu not showing
-    prev_dialog_showing = m_dialog_showing;
+    if (m_dialog_showing)
+        dialog_showing_clear_n = 2;
+    else if (dialog_showing_clear_n > 0)
+        dialog_showing_clear_n--;
     *(volatile uint8_t *) _VFRONTREQ = vfrontreq = vback;
 }
 #endif
