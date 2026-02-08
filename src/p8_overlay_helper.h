@@ -200,8 +200,6 @@ static inline void overlay_clear(void)
     memset(m_overlay_memory, OVERLAY_TRANSPARENT_COLOR, MEMORY_SCREEN_SIZE);
 }
 
-#include <stdio.h>
-
 static inline void overlay_draw_icon(const uint8_t *icon, int x, int y)
 {
     assert((x & 1) == 0);
