@@ -185,8 +185,8 @@ void audio_init()
     *(uint16_t *)_P8AUDIO_MUSIC_BASE_LO = ((uint32_t)m_memory + MEMORY_MUSIC) & 0xFFFF;
     *(uint16_t *)_P8AUDIO_CTRL = 1; // enable audio subsystem
 
-    // 5512.5 Hz = 11000000 / 5512.5 = 1995.464...
-    *(volatile uint16_t *)_DA_PERIOD = 1995;
+    // 5512.5 Hz
+    *(volatile uint16_t *)_DA_PERIOD = _DA_CLKS_PER_SECOND * 2 / 11025;
     *(volatile uint16_t *)_DA_CONTROL = (1 << 0) | (1 << 8);
 #else
     _queue_init(&m_sound_queue);
