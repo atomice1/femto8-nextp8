@@ -274,7 +274,7 @@ void audio_music(int32_t index, int32_t fadems, int32_t mask)
     *(volatile uint8_t *)_P8AUDIO_HWFX41 = *(uint8_t *)(m_memory + 0x5f41);
     *(volatile uint8_t *)_P8AUDIO_HWFX42 = *(uint8_t *)(m_memory + 0x5f42);
     *(volatile uint8_t *)_P8AUDIO_HWFX43 = *(uint8_t *)(m_memory + 0x5f43);
-    *(volatile uint16_t *)_P8AUDIO_MUSIC_FADE = fadems & 0xffff;
+    *(volatile uint16_t *)_P8AUDIO_MUSIC_FADE = (fadems * 2205 / 1000) & 0xffff;
     *(volatile uint16_t *)_P8AUDIO_MUSIC_CMD = ((index & 0x3f) << 7) | ((mask & 0xf) << 3);
 #else
     soundcommand_t sound_command;
