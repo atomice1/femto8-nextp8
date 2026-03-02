@@ -23,11 +23,13 @@
 #define PATCH_VERSION  0
 #define DEV_BUILD      1
 
-static const uint32_t femto8_version   = _MAKE_VERSION(API_VERSION, MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION);
-static const uint32_t femto8_timestamp = _TIMESTAMP;
+const uint32_t nextp8_version   = _MAKE_VERSION(API_VERSION, MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION);
+const uint32_t nextp8_timestamp = _TIMESTAMP;
 #endif
 
 #define VERSION "1.0.00"
+
+const char *femto8_version = VERSION;
 
 int main(int argc, char *argv[])
 {
@@ -70,24 +72,24 @@ int main(int argc, char *argv[])
         _show_message(
             "This is a development build of\n"
             "nextp8. Not all carts may work.\n"
-            "Audio may be glitchy.\n"
             "\n"
             "nextp8 comes with NO WARRANTY.\n"
             "\n"
-            "nextp8 %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
-            "femto8 " VERSION "\n"
-            "HW %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
-            "BSP %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
-            "Loader %u.%u.%u %u%02u%02u %02u:%02u:%02u\n",
-            _EXTRACT_MAJOR(femto8_version),
-            _EXTRACT_MINOR(femto8_version),
-            _EXTRACT_PATCH(femto8_version),
-            _EXTRACT_YEAR(femto8_timestamp),
-            _EXTRACT_MONTH(femto8_timestamp),
-            _EXTRACT_DAY(femto8_timestamp),
-            _EXTRACT_HOUR(femto8_timestamp),
-            _EXTRACT_MINUTE(femto8_timestamp),
-            _EXTRACT_SECOND(femto8_timestamp),
+            "NEXTP8 %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
+            "FEMTO8 %s\n"
+            "HW     %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
+            "BSP    %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
+            "LOADER %u.%u.%u %u%02u%02u %02u:%02u:%02u\n",
+            _EXTRACT_MAJOR(nextp8_version),
+            _EXTRACT_MINOR(nextp8_version),
+            _EXTRACT_PATCH(nextp8_version),
+            _EXTRACT_YEAR(nextp8_timestamp),
+            _EXTRACT_MONTH(nextp8_timestamp),
+            _EXTRACT_DAY(nextp8_timestamp),
+            _EXTRACT_HOUR(nextp8_timestamp),
+            _EXTRACT_MINUTE(nextp8_timestamp),
+            _EXTRACT_SECOND(nextp8_timestamp),
+            femto8_version,
             _EXTRACT_MAJOR(hw_version),
             _EXTRACT_MINOR(hw_version),
             _EXTRACT_PATCH(hw_version),

@@ -1600,3 +1600,62 @@ char *p8_download_bbs_cart(const char *cart_id)
     }
 }
 #endif
+
+void p8_show_version_dialog(void)
+{
+#ifdef NEXTP8
+    uint32_t hw_timestamp = *(uint32_t *)_BUILD_TIMESTAMP_HI;
+    uint32_t hw_version = *(uint32_t *)_HW_VERSION_HI;
+    uint32_t loader_version = _loader_data->loader_version;
+    uint32_t loader_timestamp = _loader_data->loader_timestamp;
+    extern uint32_t nextp8_version;
+    extern uint32_t nextp8_timestamp;
+    extern const char *femto8_version;
+
+    char ram_string[12];
+    char hw_version_string[50];
+    char bsp_version_string[50];
+    char loader_version_string[50];
+    char nextp8_version_string[50];
+    char femto8_version_string[50];
+    unsigned ram_mb = _loader_data->memtop >> 20;
+    strcpy(ram_string, "ram    0 mb");
+    ram_string[7] = ram_mb + '0';
+    _format_version(nextp8_version_string, sizeof(nextp8_version_string), "nextp8", nextp8_version, nextp8_timestamp);
+    _format_version(hw_version_string, sizeof(hw_version_string), "hw    ", hw_version, hw_timestamp);
+    _format_version(bsp_version_string, sizeof(bsp_version_string), "bsp   ", _bsp_version, _bsp_timestamp);
+    _format_version(loader_version_string, sizeof(loader_version_string), "loader", loader_version, loader_timestamp);
+    sprintf(femto8_version_string, "femto8 %s", femto8_version);
+
+    p8_dialog_control_t controls[] = {
+        DIALOG_LABEL(nextp8_version_string),
+        DIALOG_LABEL(femto8_version_string),
+        DIALOG_LABEL(hw_version_string),
+        DIALOG_LABEL(bsp_version_string),
+        DIALOG_LABEL(loader_version_string),
+        DIALOG_LABEL(ram_string),
+        DIALOG_SPACING(),
+        DIALOG_BUTTONBAR_OK_ONLY()
+    };
+
+    p8_dialog_t dialog;
+    p8_dialog_init(&dialog, "nextp8 version", controls, sizeof(controls) / sizeof(controls[0]), 128);
+    p8_dialog_run(&dialog);
+    p8_dialog_cleanup(&dialog);
+#else
+    extern const char *femto8_version;
+    char femto8_version_string[50];
+    sprintf(femto8_version_string, "femto8 %s", femto8_version);
+
+    p8_dialog_control_t controls[] = {
+        DIALOG_LABEL(femto8_version_string),
+        DIALOG_SPACING(),
+        DIALOG_BUTTONBAR_OK_ONLY()
+    };
+
+    p8_dialog_t dialog;
+    p8_dialog_init(&dialog, "femto8 version", controls, sizeof(controls) / sizeof(controls[0]), 0);
+    p8_dialog_run(&dialog);
+    p8_dialog_cleanup(&dialog);
+#endif
+}

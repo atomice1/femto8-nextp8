@@ -232,6 +232,93 @@ static void render_file_item(void *user_data, int index, bool selected, int x, i
         overlay_draw_simple_text(" <dir>", x + width - GLYPH_WIDTH * 6, y, fg_color);
 }
 
+#ifdef ENABLE_BBS_DOWNLOAD
+static p8_dialog_result_t show_bbs_download_dialog(char *cart_id_buffer, size_t cart_id_buffer_len)
+{
+#ifdef NEXTP8
+    /* Check if Wi-Fi is connected, show config dialog if not */
+    wifi_ap_info_t current_ap;
+    if (wifi_get_status(&current_ap) < 0) {
+        /* Not connected - show Wi-Fi config dialog */
+        if (!wifi_show_config_dialog()) {
+            /* User cancelled - don't show BBS dialog */
+            return DIALOG_RESULT_CANCELLED;
+        }
+    }
+
+    /* Wait for connection to be established */
+    if (!wifi_wait_for_connected()) {
+        /* User cancelled or connection failed */
+        return DIALOG_RESULT_CANCELLED;
+    }
+#endif
+    cart_id_buffer[0] = '\0';
+    p8_dialog_control_t bbs_controls[] = {
+        DIALOG_LABEL("enter bbs cart id:"),
+        DIALOG_INPUTBOX("", cart_id_buffer, cart_id_buffer_len),
+        DIALOG_SPACING(),
+#ifdef NEXTP8
+        DIALOG_BUTTON("wi-fi config", 100),
+        DIALOG_SPACING(),
+#endif
+        DIALOG_BUTTONBAR()
+    };
+
+    p8_dialog_t bbs_dialog;
+#ifdef NEXTP8
+    p8_dialog_init(&bbs_dialog, "download from bbs", bbs_controls, 7, 120);
+#else
+    p8_dialog_init(&bbs_dialog, "download from bbs", bbs_controls, 4, 120);
+#endif
+
+    p8_dialog_set_showing(&bbs_dialog, true);
+    p8_dialog_action_t bbs_result;
+    do {
+        p8_dialog_draw(&bbs_dialog);
+        p8_flip();
+
+        bbs_result = p8_dialog_update(&bbs_dialog);
+
+#ifdef NEXTP8
+        /* Handle Wi-Fi config button */
+        if (bbs_result.type == DIALOG_RESULT_BUTTON && bbs_result.action_id == 100) {
+            wifi_show_config_dialog();
+            continue;
+        }
+#endif
+    } while (bbs_result.type == DIALOG_RESULT_NONE);
+    p8_dialog_set_showing(&bbs_dialog, false);
+    p8_dialog_cleanup(&bbs_dialog);
+
+    printf("result: %d\n", bbs_result.type);
+    return bbs_result.type;
+}
+#endif
+
+static int show_menu(void)
+{
+    p8_dialog_control_t controls[] = {
+        DIALOG_MENUITEM("show version", 1),
+#ifdef ENABLE_BBS_DOWNLOAD
+        DIALOG_MENUITEM("bbs download", 2),
+#endif
+#ifdef NEXTP8
+        DIALOG_MENUITEM("wi-fi config", 3),
+#endif
+        DIALOG_MENUITEM("back", 4)
+    };
+
+    p8_dialog_t dialog;
+    p8_dialog_init(&dialog, NULL, controls, sizeof(controls) / sizeof(controls[0]), 0);
+    p8_dialog_action_t result = p8_dialog_run(&dialog);
+    p8_dialog_cleanup(&dialog);
+
+    if (result.type == DIALOG_RESULT_BUTTON)
+        return result.action_id;
+    else
+        return 0;
+}
+
 const char *browse_for_cart(void)
 {
     p8_init();
@@ -252,18 +339,15 @@ const char *browse_for_cart(void)
     p8_dialog_control_t controls[] = {
         DIALOG_LABEL_INVERTED(""),
         DIALOG_LISTBOX_CUSTOM_FULLSCREEN(NULL, NULL, nitems, &selected_index, render_file_item),
-#ifdef ENABLE_BBS_DOWNLOAD
         DIALOG_LABEL_INVERTED("\216: select file  \227: bbs download"),
-#else
-        DIALOG_LABEL_INVERTED("\216: select file"),
-#endif
     };
 
     p8_dialog_t dialog;
-    p8_dialog_init(&dialog, NULL, controls, 3, P8_WIDTH);
+    p8_dialog_init(&dialog, NULL, controls, sizeof(controls) / sizeof(controls[0]), P8_WIDTH);
     dialog.draw_border = false;
     dialog.padding = 0;
 
+    char cart_id_buffer[64] = {'\0'};
     p8_dialog_action_t result = { DIALOG_RESULT_NONE, 0 };
     p8_dialog_set_showing(&dialog, true);
 
@@ -279,66 +363,31 @@ const char *browse_for_cart(void)
 
             result = p8_dialog_update(&dialog);
 
+            if (result.type == DIALOG_RESULT_NONE && ((m_buttonsp[0] & BUTTON_MASK_ACTION2) != 0)) {
+                int action_id = show_menu();
+                switch (action_id) {
+                    case 1:
+                        p8_show_version_dialog();
+                        break;
 #ifdef ENABLE_BBS_DOWNLOAD
-            /* Handle X key press for BBS download */
-            if (result.type == DIALOG_RESULT_NONE && (m_buttonsp[0] & BUTTON_MASK_ACTION2)) {
-#ifdef NEXTP8
-                /* Check if Wi-Fi is connected, show config dialog if not */
-                wifi_ap_info_t current_ap;
-                if (wifi_get_status(&current_ap) < 0) {
-                    /* Not connected - show Wi-Fi config dialog */
-                    if (!wifi_show_config_dialog()) {
-                        /* User cancelled - don't show BBS dialog */
-                        continue;
-                    }
-                }
-
-                /* Wait for connection to be established */
-                if (!wifi_wait_for_connected()) {
-                    /* User cancelled or connection failed */
-                    continue;
-                }
+                    case 2:
+                        if (show_bbs_download_dialog(cart_id_buffer, sizeof(cart_id_buffer)) == DIALOG_RESULT_ACCEPTED) {
+                            const char *cart_id = (cart_id_buffer[0] == '#') ? (cart_id_buffer + 1) : cart_id_buffer;
+                            cart_path = p8_download_bbs_cart(cart_id);
+                        }
+                        break;
 #endif
-                /* Show BBS cart ID input dialog */
-                char cart_id_buffer[64] = {'\0'};
-
-                p8_dialog_control_t bbs_controls[] = {
-                    DIALOG_LABEL("enter bbs cart id:"),
-                    DIALOG_INPUTBOX("", cart_id_buffer, sizeof(cart_id_buffer)),
-                    DIALOG_SPACING(),
 #ifdef NEXTP8
-                    DIALOG_BUTTON("Wi-Fi Config", 100),
-                    DIALOG_SPACING(),
+                    case 3:
+                        wifi_show_config_dialog();
+                        break;
 #endif
-                    DIALOG_BUTTONBAR()
-                };
-
-                p8_dialog_t bbs_dialog;
-#ifdef NEXTP8
-                p8_dialog_init(&bbs_dialog, "download from bbs", bbs_controls, 7, 120);
-#else
-                p8_dialog_init(&bbs_dialog, "download from bbs", bbs_controls, 4, 120);
-#endif
-
-                p8_dialog_action_t bbs_result = p8_dialog_run(&bbs_dialog);
-                p8_dialog_cleanup(&bbs_dialog);
-
-#ifdef NEXTP8
-                /* Handle Wi-Fi config button */
-                if (bbs_result.type == DIALOG_RESULT_BUTTON && bbs_result.action_id == 100) {
-                    wifi_show_config_dialog();
-                    continue;  /* Show BBS dialog again */
-                }
-#endif
-
-                if (bbs_result.type == DIALOG_RESULT_ACCEPTED) {
-                    const char *cart_id = (cart_id_buffer[0] == '#') ? (cart_id_buffer + 1) : cart_id_buffer;
-                    cart_path = p8_download_bbs_cart(cart_id);
-                    if (cart_path)
+                    default:
                         break;
                 }
+                if (action_id == 2 && cart_path)
+                    break;
             }
-#endif
         } while (result.type == DIALOG_RESULT_NONE);
 
         if (cart_path)

@@ -115,7 +115,7 @@ int cache_download(const char *cart_id, char *filename_out, unsigned max_filenam
         }
     }
 
-    if (bytes_read < 0) {
+    if (bytes_read <= 0) {
         fclose(fp);
         unlink(temp_filename);
         bbs_close();
