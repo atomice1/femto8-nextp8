@@ -29,6 +29,7 @@
 #endif
 #include "p8_emu.h"
 #include "p8_lua_helper.h"
+#include "p8_options.h"
 #include "p8_overlay_helper.h"
 #include "p8_pause_menu.h"
 
@@ -298,14 +299,15 @@ static p8_dialog_result_t show_bbs_download_dialog(char *cart_id_buffer, size_t 
 static int show_menu(void)
 {
     p8_dialog_control_t controls[] = {
-        DIALOG_MENUITEM("show version", 1),
 #ifdef ENABLE_BBS_DOWNLOAD
-        DIALOG_MENUITEM("bbs download", 2),
+        DIALOG_MENUITEM("bbs download", 1),
 #endif
 #ifdef NEXTP8
-        DIALOG_MENUITEM("wi-fi config", 3),
+        DIALOG_MENUITEM("wi-fi config", 2),
 #endif
-        DIALOG_MENUITEM("back", 4)
+        DIALOG_MENUITEM("show version", 3),
+        DIALOG_MENUITEM("controls", 4),
+        DIALOG_MENUITEM("back", 5)
     };
 
     p8_dialog_t dialog;
@@ -366,11 +368,8 @@ const char *browse_for_cart(void)
             if (result.type == DIALOG_RESULT_NONE && ((m_buttonsp[0] & BUTTON_MASK_ACTION2) != 0)) {
                 int action_id = show_menu();
                 switch (action_id) {
-                    case 1:
-                        p8_show_version_dialog();
-                        break;
 #ifdef ENABLE_BBS_DOWNLOAD
-                    case 2:
+                    case 1:
                         if (show_bbs_download_dialog(cart_id_buffer, sizeof(cart_id_buffer)) == DIALOG_RESULT_ACCEPTED) {
                             const char *cart_id = (cart_id_buffer[0] == '#') ? (cart_id_buffer + 1) : cart_id_buffer;
                             cart_path = p8_download_bbs_cart(cart_id);
@@ -378,10 +377,16 @@ const char *browse_for_cart(void)
                         break;
 #endif
 #ifdef NEXTP8
-                    case 3:
+                    case 2:
                         wifi_show_config_dialog();
                         break;
 #endif
+                    case 3:
+                        p8_show_version_dialog();
+                        break;
+                    case 4:
+                        p8_show_controls_dialog();
+                        break;
                     default:
                         break;
                 }
