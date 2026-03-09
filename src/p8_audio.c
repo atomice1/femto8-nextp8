@@ -246,9 +246,9 @@ void audio_sound(int32_t index, int32_t channel, uint32_t start, uint32_t length
     *(volatile uint8_t *)_P8AUDIO_HWFX41 = *(uint8_t *)(m_memory + 0x5f41);
     *(volatile uint8_t *)_P8AUDIO_HWFX42 = *(uint8_t *)(m_memory + 0x5f42);
     *(volatile uint8_t *)_P8AUDIO_HWFX43 = *(uint8_t *)(m_memory + 0x5f43);
-    if (length == 0) length = 32 - start;
     *(volatile uint16_t *)_P8AUDIO_SFX_LEN = length & 0x3f;
-    *(volatile uint16_t *)_P8AUDIO_SFX_CMD = (index & 0x1f) | ((channel & 0x7) << 12) | ((start & 0x3f) << 6);
+    /* Bit 15 is the trigger bit; without it the RTL ignores the write. */
+    *(volatile uint16_t *)_P8AUDIO_SFX_CMD = 0x8000 | (index & 0x3f) | ((channel & 0x7) << 12) | ((start & 0x3f) << 6);
 #else
     soundcommand_t sound_command;
     sound_command.sound_mode = SOUNDMODE_SOUND;
@@ -296,7 +296,7 @@ void audio_music(int32_t index, int32_t fadems, int32_t mask)
 int32_t audio_stat(int32_t index)
 {
 #ifdef NEXTP8
-    if (index >= 46 && index <= 56)
+    if (index >= 46 && index <= 57)
         return *(volatile int16_t *)(_P8AUDIO_STAT46 + (index - 46) * 2);
     else if (index >= 16 && index <= 26)
         return *(volatile int16_t *)(_P8AUDIO_STAT46 + (index - 16) * 2);

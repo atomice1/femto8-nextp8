@@ -456,7 +456,7 @@ bool is_unsupported_stat(unsigned address) {
         address == STAT_MOUSE_XREL ||
         address == STAT_MOUSE_YREL ||
         (address >= 16 && address <= 26) ||
-        (address >= 46 && address <= 56) ||
+        (address >= 46 && address <= 57) ||
         address == STAT_PARAM ||
         (address >= STAT_YEAR_UTC && address <= STAT_SECOND_UTC) ||
         (address >= STAT_YEAR && address <= STAT_SECOND) ||

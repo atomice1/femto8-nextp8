@@ -1559,7 +1559,7 @@ case STAT_MEM_USAGE: {
             lua_pushstring(L, "");
         break;
     default:
-        if ((n >= 46 && n <= 56) || (n >= 16 && n <= 26)) {
+        if ((n >= 46 && n <= 57) || (n >= 16 && n <= 26)) {
             lua_pushinteger(L, audio_stat(n));
         } else {
             lua_pushinteger(L, 0);
