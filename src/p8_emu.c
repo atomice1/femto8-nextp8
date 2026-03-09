@@ -856,6 +856,8 @@ unsigned nextp8_scancode_to_sdl_scancode[NUM_SCANCODES] = {
 #define KEY_ENTER 0x5a
 #define KEY_BREAK 0x76
 #define KEY_P 0x4d
+#define KEY_PAGE_UP   0xfd
+#define KEY_PAGE_DOWN 0xfa
 
 #define JOY_UP      (1 << 0)
 #define JOY_DOWN    (1 << 1)
@@ -901,6 +903,10 @@ static uint16_t player0_mask(volatile uint8_t *keyboard_matrix, uint8_t joy0)
         mask |= BUTTON_MASK_PAUSE;
     if (is_down(keyboard_matrix, KEY_BREAK))
         mask |= BUTTON_MASK_ESCAPE;
+    if (is_down(keyboard_matrix, KEY_PAGE_UP))
+        mask |= BUTTON_MASK_PAGE_UP;
+    if (is_down(keyboard_matrix, KEY_PAGE_DOWN))
+        mask |= BUTTON_MASK_PAGE_DOWN;
     return mask;
 }
 
@@ -1027,6 +1033,12 @@ void p8_update_input()
             case SDLK_SPACE:
                 update_buttons(0, BUTTON_SPACE, true);
                 break;
+            case SDLK_PAGEUP:
+                update_buttons(0, BUTTON_PAGE_UP, true);
+                break;
+            case SDLK_PAGEDOWN:
+                update_buttons(0, BUTTON_PAGE_DOWN, true);
+                break;
             default:
                 break;
             }
@@ -1064,6 +1076,12 @@ void p8_update_input()
                 break;
             case SDLK_SPACE:
                 update_buttons(0, BUTTON_SPACE, false);
+                break;
+            case SDLK_PAGEUP:
+                update_buttons(0, BUTTON_PAGE_UP, false);
+                break;
+            case SDLK_PAGEDOWN:
+                update_buttons(0, BUTTON_PAGE_DOWN, false);
                 break;
             case INPUT_ESCAPE:
                 update_buttons(0, BUTTON_ESCAPE, false);
