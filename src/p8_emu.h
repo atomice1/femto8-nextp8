@@ -313,6 +313,7 @@ int p8_shutdown(void);
 void p8_render();
 void p8_reset(void);
 char *p8_resolve_relative_path(const char *filename);
+void __attribute__ ((noreturn)) p8_abort();
 void __attribute__ ((noreturn)) p8_restart();
 /* Error dialog severity levels */
 typedef enum {
