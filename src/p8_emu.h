@@ -33,7 +33,7 @@
 #define ENABLE_BBS_DOWNLOAD
 #define DEFAULT_CARTS_PATH "0:/machines/nextp8/carts"
 #define CARTDATA_PATH "0:/machines/nextp8/cdata"
-#define CACHE_PATH "0:/machines/nextp8/cache"
+#define CACHE_PATH DEFAULT_CARTS_PATH
 #else
 #define SDL
 #define ENABLE_AUDIO

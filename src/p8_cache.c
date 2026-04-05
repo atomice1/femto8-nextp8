@@ -84,7 +84,7 @@ int cache_download(const char *cart_id, char *filename_out, unsigned max_filenam
     }
 
     /* Check if already cached */
-    if (access(filename_out, R_OK) == 0) {
+    if (access(filename_out, R_OK) == 0 && strcmp(CACHE_PATH, DEFAULT_CARTS_PATH) != 0) {
         return 0;
     }
 
@@ -126,6 +126,7 @@ int cache_download(const char *cart_id, char *filename_out, unsigned max_filenam
     bbs_close();
 
     /* Rename temp file to final name */
+    unlink(filename_out); // Remove existing file if it exists
     if (rename(temp_filename, filename_out) < 0) {
         fprintf(stderr, "Failed to rename '%s' to '%s': %s\n", temp_filename, filename_out, strerror(errno));
         unlink(temp_filename);
