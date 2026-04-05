@@ -1949,6 +1949,25 @@ void lua_call_function(const char *name, int ret)
 
 void lua_update()
 {
+    if (!m_lua_update && !m_lua_update60)
+    {
+        lua_getglobal(L, "_update");
+        if (lua_isfunction(L, -1))
+        {
+            m_lua_update = lua_topointer(L, -1);
+            m_fps = 30;
+        }
+        lua_pop(L, 1);
+
+        lua_getglobal(L, "_update60");
+        if (lua_isfunction(L, -1))
+        {
+            m_lua_update60 = lua_topointer(L, -1);
+            m_fps = 60;
+        }
+        lua_pop(L, 1);
+    }
+
     if (m_lua_update60)
         lua_call_function("_update60", 0);
     else if (m_lua_update)
@@ -1957,6 +1976,14 @@ void lua_update()
 
 void lua_draw()
 {
+    if (!m_lua_draw)
+    {
+        lua_getglobal(L, "_draw");
+        if (lua_isfunction(L, -1))
+            m_lua_draw = lua_topointer(L, -1);
+        lua_pop(L, 1);
+    }
+
     if (m_lua_draw)
         lua_call_function("_draw", 0);
 }
@@ -1970,4 +1997,31 @@ void lua_init()
 {
     if (m_lua_init)
         lua_call_function("_init", 0);
+
+    if (!m_lua_update && !m_lua_update60)
+    {
+        lua_getglobal(L, "_update");
+        if (lua_isfunction(L, -1))
+        {
+            m_lua_update = lua_topointer(L, -1);
+            m_fps = 30;
+        }
+        lua_pop(L, 1);
+
+        lua_getglobal(L, "_update60");
+        if (lua_isfunction(L, -1))
+        {
+            m_lua_update60 = lua_topointer(L, -1);
+            m_fps = 60;
+        }
+        lua_pop(L, 1);
+    }
+
+    if (!m_lua_draw)
+    {
+        lua_getglobal(L, "_draw");
+        if (lua_isfunction(L, -1))
+            m_lua_draw = lua_topointer(L, -1);
+        lua_pop(L, 1);
+    }
 }
