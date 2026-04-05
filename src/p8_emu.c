@@ -160,7 +160,7 @@ const uint8_t disk_icon[32] = {
     0x00, 0x00, 0x00, 0x00,
 };
 
-static p8_clock_t p8_clock(void)
+p8_clock_t p8_clock(void)
 {
 #if defined(OS_FREERTOS)
     return xTaskGetTickCount();
@@ -173,7 +173,7 @@ static p8_clock_t p8_clock(void)
 #endif
 }
 
-static unsigned p8_clock_ms(p8_clock_t clocks)
+unsigned p8_clock_ms(p8_clock_t clocks)
 {
 #if defined(OS_FREERTOS)
     return clocks * portTICK_PERIOD_MS;
@@ -182,7 +182,7 @@ static unsigned p8_clock_ms(p8_clock_t clocks)
 #endif
 }
 
-static p8_clock_t p8_clock_delta(p8_clock_t start, p8_clock_t end)
+p8_clock_t p8_clock_delta(p8_clock_t start, p8_clock_t end)
 {
     return end - start;
 }
@@ -404,7 +404,7 @@ int p8_init_ram(uint8_t *buffer, int size)
     const char *lua_script = NULL;
     uint8_t *decompression_buffer = NULL;
 
-    parse_cart_ram(buffer, size, m_cart_memory, &lua_script, &decompression_buffer);
+    parse_cart_ram(buffer, size, m_cart_memory, &lua_script, &decompression_buffer, NULL);
 
     p8_init_common(NULL, lua_script);
 
@@ -1564,7 +1564,7 @@ void p8_show_disk_icon(bool show)
         overlay_draw_rectfill(P8_WIDTH - 8, 0, P8_WIDTH-1, 7, OVERLAY_TRANSPARENT_COLOR);
         p8_dialog_draw_stack();
     }
-    p8_flip();
+    p8_render();
 }
 
 void p8_show_error_dialog(const char **lines, int line_count, p8_error_severity_t severity)

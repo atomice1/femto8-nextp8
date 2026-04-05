@@ -16,8 +16,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
+#include <limits.h>
 #include <sys/stat.h>
-#include <sys/time.h>
 #include <unistd.h>
 
 #include "p8_browse.h"
@@ -34,12 +34,31 @@
 #include "p8_options.h"
 #include "p8_overlay_helper.h"
 #include "p8_pause_menu.h"
+#include "p8_preview.h"
 
 #ifdef NEXTP8
 #define FALLBACK_CARTS_PATH "0:/"
 #else
 #define FALLBACK_CARTS_PATH "."
 #endif
+
+#define PREVIEW_LABEL_DISPLAY_SIZE 64
+#define PREVIEW_DIALOG_CONTENT_WIDTH PREVIEW_LABEL_DISPLAY_SIZE
+#define PREVIEW_BORDER_SIZE 6
+#define PREVIEW_LOAD_DELAY_MS 250
+#define PREVIEW_SHOW_DELAY_MS 500
+#define PREVIEW_CHARS_PER_LINE (PREVIEW_DIALOG_CONTENT_WIDTH / GLYPH_WIDTH)
+
+static p8_preview_info_t preview_info;
+static int preview_item = -1;
+static bool preview_loaded = false;
+static p8_clock_t preview_highlight_time;
+static bool preview_showing = false;
+static p8_clock_t preview_last_button_time;
+static char preview_title_line1[128];
+static char preview_title_line2[128];
+static char preview_author_line1[128];
+static char preview_author_line2[128];
 
 struct dir_entry {
     const char *file_name;
@@ -192,6 +211,7 @@ static void list_dir(const char* path) {
     qsort(dir_contents, nitems, sizeof(dir_contents[0]), compare_dir_entry);
     p8_show_disk_icon(false);
 }
+
 static void draw_file_name(const char *str, int x, int y, int col)
 {
     int cursor_x = x;
@@ -209,6 +229,89 @@ static void draw_file_name(const char *str, int x, int y, int col)
     }
 }
 
+static int wrap_text(const char *text, int max_chars,
+                     char *line1, int line1_size,
+                     char *line2, int line2_size)
+{
+    int len = (int)strlen(text);
+    if (len <= max_chars) {
+        snprintf(line1, line1_size, "%s", text);
+        line2[0] = '\0';
+        return 1;
+    }
+
+    int break_pos = max_chars;
+    for (int i = max_chars - 1; i >= 0; i--) {
+        if (text[i] == ' ') {
+            break_pos = i;
+            break;
+        }
+    }
+    int copy1 = break_pos < line1_size - 1 ? break_pos : line1_size - 1;
+    memcpy(line1, text, copy1);
+    line1[copy1] = '\0';
+    const char *rest = text + break_pos;
+    if (*rest == ' ')
+        rest++;
+    snprintf(line2, line2_size, "%.*s", max_chars, rest);
+    return 2;
+}
+
+static inline void screen_pixel(int x, int y, int col)
+{
+    if (x < overlay_clip_x0 || y < overlay_clip_y0 || x >= overlay_clip_x1 || y >= overlay_clip_y1)
+        return;
+    uint8_t *dest = m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8) + (x >> 1) + y * 64;
+    if (x & 1)
+        *dest = ((col & 0xF) << 4) | (*dest & 0x0F);
+    else
+        *dest = (*dest & 0xF0) | (col & 0x0F);
+}
+
+static void draw_preview_label(int x, int y, int width, int height)
+{
+    if (!preview_info.has_label) {
+        int draw_w = width < PREVIEW_LABEL_DISPLAY_SIZE ? width : PREVIEW_LABEL_DISPLAY_SIZE;
+        int draw_h = height < PREVIEW_LABEL_DISPLAY_SIZE ? height : PREVIEW_LABEL_DISPLAY_SIZE;
+        const char *msg = "no label";
+        int text_w = (int)strlen(msg) * GLYPH_WIDTH;
+        int tx = x + (draw_w - text_w) / 2;
+        int ty = y + (draw_h - GLYPH_HEIGHT) / 2;
+        overlay_draw_simple_text(msg, tx, ty, 7);
+        return;
+    }
+
+    int draw_w = width < PREVIEW_LABEL_DISPLAY_SIZE ? width : PREVIEW_LABEL_DISPLAY_SIZE;
+    int draw_h = height < PREVIEW_LABEL_DISPLAY_SIZE ? height : PREVIEW_LABEL_DISPLAY_SIZE;
+    int ox = x + (width - draw_w) / 2;
+    memset(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8), 0, MEMORY_SCREEN_SIZE);
+    for (int dy = 0; dy < draw_h; dy++) {
+        for (int dx = 0; dx < draw_w; dx++) {
+            int px = ox + dx;
+            int py = y + dy;
+            int color = preview_info.label[(dy * P8_HEIGHT / PREVIEW_LABEL_DISPLAY_SIZE) * 128 + (dx * P8_WIDTH / PREVIEW_LABEL_DISPLAY_SIZE)];
+            if (color >= 16) {
+                screen_pixel(px, py, color - 16);
+                overlay_pixel(px, py, 0);
+            } else {
+                overlay_pixel(px, py, color);
+            }
+        }
+    }
+}
+
+static void preview_use_filename_as_title(const char *file_name)
+{
+    size_t len = strlen(file_name);
+    const char *dot = strrchr(file_name, '.');
+    if (dot)
+        len = dot - file_name;
+    if (len >= sizeof(preview_info.title))
+        len = sizeof(preview_info.title) - 1;
+    memcpy(preview_info.title, file_name, len);
+    preview_info.title[len] = '\0';
+}
+
 static void render_file_item(void *user_data, int index, bool selected, int x, int y, int width, int height, int fg_color, int bg_color)
 {
     (void)user_data;
@@ -220,10 +323,9 @@ static void render_file_item(void *user_data, int index, bool selected, int x, i
     // Clip to avoid drawing filename over " <dir>" suffix
     int clip_x, clip_y, clip_w, clip_h;
     overlay_clip_get(&clip_x, &clip_y, &clip_w, &clip_h);
-    if (dir_entry->is_dir)
-        overlay_clip_set(x, y, width - GLYPH_WIDTH * 6, height);
-    else
-        overlay_clip_set(x, y, width, height);
+
+    int item_w = dir_entry->is_dir ? width - GLYPH_WIDTH * 6 : width;
+    overlay_clip_intersect(x, y, item_w, height);
 
     // Draw filename with case conversion
     draw_file_name(dir_entry->file_name, x, y, fg_color);
@@ -327,6 +429,11 @@ const char *browse_for_cart(void)
 {
     p8_init();
     p8_reset();
+    // Remap screen palette to alternate palette so we can display full
+    // 32-colour labels.
+    for (int i = 0; i < 16; i++)
+        color_set(PALTYPE_SCREEN, i, 128 + i);
+
     if (setjmp(jmpbuf_restart)) {
         return NULL;
     }
@@ -351,6 +458,20 @@ const char *browse_for_cart(void)
     dialog.draw_border = false;
     dialog.padding = 0;
 
+    p8_dialog_control_t preview_controls[5] = {
+        DIALOG_CUSTOM_CONTROL(PREVIEW_LABEL_DISPLAY_SIZE, PREVIEW_LABEL_DISPLAY_SIZE, draw_preview_label),
+        DIALOG_LABEL(""),
+        DIALOG_LABEL(""),
+        DIALOG_LABEL(""),
+        DIALOG_LABEL(""),
+    };
+    p8_dialog_t preview_dialog;
+
+    preview_item = -1;
+    preview_loaded = false;
+    preview_showing = false;
+    preview_last_button_time = p8_clock();
+
     char cart_id_buffer[64] = {'\0'};
     p8_dialog_action_t result = { DIALOG_RESULT_NONE, 0 };
     p8_dialog_set_showing(&dialog, true);
@@ -360,12 +481,87 @@ const char *browse_for_cart(void)
         controls[0].label = pwd;
         controls[1].data.listbox.item_count = nitems;
 
+        // Reset preview state when directory changes
+        preview_item = -1;
+        preview_loaded = false;
+        preview_showing = false;
+        p8_preview_cache_clear();
+
         // Main dialog loop
         do {
             p8_dialog_draw(&dialog);
+
+            if (preview_showing)
+                p8_dialog_draw(&preview_dialog);
+
             p8_flip();
 
+            bool any_button = (m_buttonsp[0] != 0);
+
+            if (any_button) {
+                preview_last_button_time = p8_clock();
+
+                if (preview_showing) {
+                    preview_showing = false;
+                    p8_dialog_set_showing(&preview_dialog, false);
+                }
+
+                preview_loaded = false;
+                preview_item = -1;
+            }
+
             result = p8_dialog_update(&dialog);
+
+            if (selected_index != preview_item) {
+                preview_item = selected_index;
+                preview_loaded = false;
+                preview_highlight_time = p8_clock();
+            }
+
+            // Try to load preview after item has been highlighted long enough
+            if (!preview_loaded &&
+                !any_button && !preview_showing &&
+                selected_index >= 0 && selected_index < nitems &&
+                !dir_contents[selected_index].is_dir) {
+                unsigned highlight_ms = p8_clock_ms(p8_clock_delta(preview_highlight_time, p8_clock()));
+                if (highlight_ms >= PREVIEW_LOAD_DELAY_MS) {
+                    const char *full_path = make_full_path(pwd, dir_contents[selected_index].file_name);
+                    if (full_path) {
+                        preview_loaded = p8_preview_load(full_path, &preview_info);
+                        if (preview_loaded && preview_info.title[0] == '\0')
+                            preview_use_filename_as_title(dir_contents[selected_index].file_name);
+                        free((char *)full_path);
+                    }
+                }
+            }
+
+            // Show preview popup if loaded and enough time has elapsed
+            if (preview_loaded && !preview_showing && !any_button &&
+                (preview_info.has_label || preview_info.title[0] != '\0')) {
+                unsigned elapsed_ms = p8_clock_ms(p8_clock_delta(preview_last_button_time, p8_clock()));
+                if (elapsed_ms >= PREVIEW_SHOW_DELAY_MS) {
+                    int ncontrols = 1;
+                    int n_title = wrap_text(preview_info.title, PREVIEW_CHARS_PER_LINE,
+                                           preview_title_line1, sizeof(preview_title_line1),
+                                           preview_title_line2, sizeof(preview_title_line2));
+                    preview_controls[ncontrols++].label = preview_title_line1;
+                    if (n_title == 2)
+                        preview_controls[ncontrols++].label = preview_title_line2;
+                    if (preview_info.author[0] != '\0') {
+                        int n_author = wrap_text(preview_info.author, PREVIEW_CHARS_PER_LINE,
+                                                preview_author_line1, sizeof(preview_author_line1),
+                                                preview_author_line2, sizeof(preview_author_line2));
+                        preview_controls[ncontrols++].label = preview_author_line1;
+                        if (n_author == 2)
+                            preview_controls[ncontrols++].label = preview_author_line2;
+                    }
+                    p8_dialog_init(&preview_dialog, NULL, preview_controls, ncontrols,
+                                   PREVIEW_DIALOG_CONTENT_WIDTH + PREVIEW_BORDER_SIZE);
+                    preview_dialog.x = P8_WIDTH - preview_dialog.width;
+                    preview_showing = true;
+                    p8_dialog_set_showing(&preview_dialog, true);
+                }
+            }
 
             if (result.type == DIALOG_RESULT_NONE && ((m_buttonsp[0] & BUTTON_MASK_ACTION2) != 0)) {
                 int action_id = show_menu();
@@ -397,6 +593,11 @@ const char *browse_for_cart(void)
             }
         } while (result.type == DIALOG_RESULT_NONE);
 
+        if (preview_showing) {
+            preview_showing = false;
+            p8_dialog_set_showing(&preview_dialog, false);
+        }
+
         if (cart_path)
             break;
 
@@ -424,6 +625,8 @@ const char *browse_for_cart(void)
     p8_dialog_cleanup(&dialog);
 
     overlay_clear();
+    memset(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8), 0, MEMORY_SCREEN_SIZE);
+    reset_color();
     p8_flip();
 
     clear_dir_contents();

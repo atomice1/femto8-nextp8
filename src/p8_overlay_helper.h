@@ -13,10 +13,10 @@
 #include "pico_font.h"
 
 /* Overlay clip region (global state) */
-static int overlay_clip_x0 = 0;
-static int overlay_clip_y0 = 0;
-static int overlay_clip_x1 = P8_WIDTH;
-static int overlay_clip_y1 = P8_HEIGHT;
+extern int overlay_clip_x0;
+extern int overlay_clip_y0;
+extern int overlay_clip_x1;
+extern int overlay_clip_y1;
 
 static inline void overlay_clip_set(int x, int y, int w, int h)
 {
@@ -40,6 +40,18 @@ static inline void overlay_clip_get(int *x, int *y, int *w, int *h)
     *y = overlay_clip_y0;
     *w = overlay_clip_x1 - overlay_clip_x0;
     *h = overlay_clip_y1 - overlay_clip_y0;
+}
+
+static inline void overlay_clip_intersect(int x, int y, int w, int h)
+{
+    int new_x0 = MAX(overlay_clip_x0, x);
+    int new_y0 = MAX(overlay_clip_y0, y);
+    int new_x1 = MIN(overlay_clip_x1, x + w);
+    int new_y1 = MIN(overlay_clip_y1, y + h);
+    overlay_clip_x0 = new_x0;
+    overlay_clip_y0 = new_y0;
+    overlay_clip_x1 = new_x1;
+    overlay_clip_y1 = new_y1;
 }
 
 static inline void overlay_draw_hline(int x0, int x1, int y, int col)
@@ -204,11 +216,16 @@ static inline void overlay_draw_icon(const uint8_t *icon, int x, int y)
 {
     assert((x & 1) == 0);
     uint8_t *dest = m_overlay_memory + (x >> 1) + y * 64;
-    for (int r=0;r<8;++r) {
-        *dest++ = *icon++;
-        *dest++ = *icon++;
-        *dest++ = *icon++;
-        *dest++ = *icon++;
+    for (int r = 0; r < 8; ++r) {
+        for (int col = 0; col < 4; col++) {
+            uint8_t src = *icon++;
+            uint8_t dst = *dest;
+            uint8_t lo = src & 0xF;
+            uint8_t hi = src >> 4;
+            if (lo) dst = (dst & 0xF0) | lo;
+            if (hi) dst = (dst & 0x0F) | (hi << 4);
+            *dest++ = dst;
+        }
         dest += 60;
     }
 }

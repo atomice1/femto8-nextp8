@@ -82,7 +82,9 @@ typedef struct {
 } p8_dialog_control_t;
 
 /* Dialog Structure */
-typedef struct {
+typedef struct p8_dialog p8_dialog_t;
+
+struct p8_dialog {
     const char *title;                  // Dialog title (optional, can be NULL)
     p8_dialog_control_t *controls;      // Array of controls
     int control_count;                  // Number of controls
@@ -101,7 +103,7 @@ typedef struct {
     // Internal state
     int cursor_blink;                   // Cursor blink counter for input boxes
     bool input_mode;                    // True when actively editing an inputbox
-} p8_dialog_t;
+};
 
 /* Dialog Result */
 typedef enum {

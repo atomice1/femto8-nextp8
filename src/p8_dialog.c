@@ -238,7 +238,7 @@ static void draw_control(const p8_dialog_t *dialog, int control_idx, int x, int 
             overlay_draw_rect(x + 1, y, x + width - 2, y + GLYPH_HEIGHT + 3, border_color);
 
             // Draw background
-            overlay_draw_rectfill(x + 2, y + 1, x + width - 3, y + GLYPH_HEIGHT + 2, DIALOG_BG_NORMAL);
+            //overlay_draw_rectfill(x + 2, y + 1, x + width - 3, y + GLYPH_HEIGHT + 2, DIALOG_BG_NORMAL);
 
             // Draw text
             if (control->data.inputbox.buffer) {
@@ -316,9 +316,9 @@ static void draw_control(const p8_dialog_t *dialog, int control_idx, int x, int 
             // Draw border and background
             if (control->data.listbox.draw_border) {
                 overlay_draw_rect(x + 1, y, x + width - 2, y + list_height - 1, DIALOG_TEXT_NORMAL);
-                overlay_draw_rectfill(x + 2, y + 1, x + width - 4, y + list_height - 2, DIALOG_BG_NORMAL);
+                //overlay_draw_rectfill(x + 2, y + 1, x + width - 4, y + list_height - 2, DIALOG_BG_NORMAL);
             } else {
-                overlay_draw_rectfill(x, y, x + width - 1, y + list_height - 1, DIALOG_BG_NORMAL);
+                //overlay_draw_rectfill(x, y, x + width - 1, y + list_height - 1, DIALOG_BG_NORMAL);
             }
 
             // Draw items
@@ -347,7 +347,10 @@ static void draw_control(const p8_dialog_t *dialog, int control_idx, int x, int 
             int first_visible_line = scroll_offset / (GLYPH_HEIGHT + 1);
             int last_visible_lne = (scroll_offset + list_height + GLYPH_HEIGHT - 2) / (GLYPH_HEIGHT + 1);
 
-            overlay_clip_set(x + item_offset_x, y + item_offset_y, width - item_offset_x * 2, list_height - item_offset_y * 2);
+            int prev_clip_x, prev_clip_y, prev_clip_w, prev_clip_h;
+            overlay_clip_get(&prev_clip_x, &prev_clip_y, &prev_clip_w, &prev_clip_h);
+            overlay_clip_intersect(x + item_offset_x, y + item_offset_y,
+                                   width - item_offset_x * 2, list_height - item_offset_y * 2);
 
             for (int i = first_visible_line; i < last_visible_lne && i < control->data.listbox.item_count; i++) {
                 int item_y = y + item_offset_y + 1 + i * (GLYPH_HEIGHT + 1) - scroll_offset;
@@ -399,7 +402,7 @@ static void draw_control(const p8_dialog_t *dialog, int control_idx, int x, int 
                 }
             }
 
-            overlay_clip_reset();
+            overlay_clip_set(prev_clip_x, prev_clip_y, prev_clip_w, prev_clip_h);
             break;
         }
 
@@ -435,6 +438,10 @@ void p8_dialog_draw(const p8_dialog_t *dialog)
     int content_y = dialog->draw_border ? y + CONTROL_PADDING_Y : y;
     int content_x = dialog->draw_border ? x + CONTROL_PADDING_X : x;
     int content_width = dialog->draw_border ? width - CONTROL_PADDING_X * 2 : width;
+    int content_height = dialog->draw_border ? height - CONTROL_PADDING_Y * 2 : height;
+
+    // Clip to dialog bounds so text/controls don't overflow
+    overlay_clip_set(content_x, content_y, content_width, content_height);
 
     // Draw title if present
     if (dialog->title) {
@@ -456,6 +463,8 @@ void p8_dialog_draw(const p8_dialog_t *dialog)
             content_y += dialog->padding;
         }
     }
+
+    overlay_clip_reset();
 }
 
 /* Draw all currently showing dialogs in the stack (for refreshing underlying dialogs). */

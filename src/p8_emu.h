@@ -293,6 +293,9 @@ extern bool m_load_available;
 extern const char *m_param_string;
 
 void __attribute__ ((noreturn)) p8_abort();
+p8_clock_t p8_clock(void);
+unsigned p8_clock_ms(p8_clock_t clocks);
+p8_clock_t p8_clock_delta(p8_clock_t start, p8_clock_t end);
 void p8_close_cartdata(void);
 void p8_delayed_flush_cartdata(void);
 #ifdef ENABLE_BBS_DOWNLOAD
