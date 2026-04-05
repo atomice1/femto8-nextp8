@@ -282,19 +282,19 @@ static int p8_init_lcd(void)
     return 0;
 }
 
-static void p8_init_common(const char *file_name, const char *lua_script)
+static int p8_init_common(const char *file_name, const char *lua_script)
 {
     p8_show_disk_icon(false);
 
     if (lua_script == NULL) {
         if (file_name) fprintf(stderr, "%s: ", file_name);
         fprintf(stderr, "invalid cart\n");
-        exit(1);
+        return -1;
     }
 
     if (setjmp(jmpbuf_restart)) {
         if (!restart)
-            return;
+            return 0;
     }
 
     if (!restart && !skip_compat_check) {
@@ -302,7 +302,7 @@ static void p8_init_common(const char *file_name, const char *lua_script)
         if (ret != COMPAT_OK)
             p8_show_compatibility_error(ret);
         if (ret == COMPAT_NONE)
-            return;
+            return -1;
     }
     restart = false;
 
@@ -321,6 +321,7 @@ static void p8_init_common(const char *file_name, const char *lua_script)
 
     if (!skip_main_loop_if_no_callbacks || lua_has_main_loop_callbacks())
         p8_main_loop();
+    return 0;
 }
 
 int p8_init_file_with_param(const char *file_name, const char *param)
@@ -380,9 +381,10 @@ int p8_init_file_with_param(const char *file_name, const char *param)
     lua_load_api();
 
     printf("Loading %s\n", file_name);
-    parse_cart_file(file_name, m_cart_memory, &lua_script, &file_buffer, NULL);
+    if (parse_cart_file(file_name, m_cart_memory, &lua_script, &file_buffer, NULL) != 0)
+        return -1;
 
-    p8_init_common(file_name, lua_script);
+    int ret = p8_init_common(file_name, lua_script);
 
 #ifdef OS_FREERTOS
     rh_free(file_buffer);
@@ -390,7 +392,7 @@ int p8_init_file_with_param(const char *file_name, const char *param)
     free(file_buffer);
 #endif
 
-    return 0;
+    return ret;
 }
 
 int p8_init_ram(uint8_t *buffer, int size)
@@ -406,7 +408,7 @@ int p8_init_ram(uint8_t *buffer, int size)
 
     parse_cart_ram(buffer, size, m_cart_memory, &lua_script, &decompression_buffer, NULL);
 
-    p8_init_common(NULL, lua_script);
+    int init_ret = p8_init_common(NULL, lua_script);
 
 #ifdef OS_FREERTOS
     rh_free(decompression_buffer);
@@ -414,7 +416,7 @@ int p8_init_ram(uint8_t *buffer, int size)
     free(decompression_buffer);
 #endif
 
-    return 0;
+    return init_ret;
 }
 
 int p8_shutdown()
