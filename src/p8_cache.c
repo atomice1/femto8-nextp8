@@ -65,6 +65,7 @@ int cache_download(const char *cart_id, char *filename_out, unsigned max_filenam
     FILE *fp = NULL;
     unsigned char buffer[CACHE_BUFFER_SIZE];
     ssize_t bytes_read;
+    size_t total_bytes_read;
 
     assert(sizeof(temp_filename) >= max_filename_length);
 
@@ -90,10 +91,8 @@ int cache_download(const char *cart_id, char *filename_out, unsigned max_filenam
 
     /* Download from BBS */
     /* BBS cat=7 is for carts, play_src=2 is for direct cart download */
-    if (bbs_start_get_cart(7, 2, cart_id) < 0) {
-        printf("fail 3\n");
+    if (bbs_start_get_cart(7, 2, cart_id) < 0)
         return -1;
-    }
 
     /* Create temporary file */
     snprintf(temp_filename, sizeof(temp_filename), "%s.tmp", filename_out);
@@ -105,7 +104,9 @@ int cache_download(const char *cart_id, char *filename_out, unsigned max_filenam
     }
 
     /* Download data */
+    total_bytes_read = 0;
     while ((bytes_read = bbs_recv(buffer, CACHE_BUFFER_SIZE)) > 0) {
+        total_bytes_read += bytes_read;
         if (fwrite(buffer, 1, bytes_read, fp) != bytes_read) {
             fclose(fp);
             unlink(temp_filename);
@@ -115,7 +116,7 @@ int cache_download(const char *cart_id, char *filename_out, unsigned max_filenam
         }
     }
 
-    if (bytes_read <= 0) {
+    if (bytes_read < 0 || total_bytes_read == 0) {
         fclose(fp);
         unlink(temp_filename);
         bbs_close();

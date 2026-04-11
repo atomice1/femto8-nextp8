@@ -373,7 +373,7 @@ static p8_dialog_result_t show_bbs_download_dialog(char *cart_id_buffer, size_t 
 
     p8_dialog_t bbs_dialog;
 #ifdef NEXTP8
-    p8_dialog_init(&bbs_dialog, "download from bbs", bbs_controls, 7, 120);
+    p8_dialog_init(&bbs_dialog, "download from bbs", bbs_controls, 6, 120);
 #else
     p8_dialog_init(&bbs_dialog, "download from bbs", bbs_controls, 4, 120);
 #endif
@@ -390,6 +390,7 @@ static p8_dialog_result_t show_bbs_download_dialog(char *cart_id_buffer, size_t 
         /* Handle Wi-Fi config button */
         if (bbs_result.type == DIALOG_RESULT_BUTTON && bbs_result.action_id == 100) {
             wifi_show_config_dialog();
+            bbs_result.type = DIALOG_RESULT_NONE; // Keep BBS dialog open after returning from Wi-Fi config
             continue;
         }
 #endif
@@ -397,7 +398,6 @@ static p8_dialog_result_t show_bbs_download_dialog(char *cart_id_buffer, size_t 
     p8_dialog_set_showing(&bbs_dialog, false);
     p8_dialog_cleanup(&bbs_dialog);
 
-    printf("result: %d\n", bbs_result.type);
     return bbs_result.type;
 }
 #endif
@@ -440,11 +440,6 @@ const char *browse_for_cart(void)
         return NULL;
     }
 
-    if (access(DEFAULT_CARTS_PATH, F_OK) == 0)
-        list_dir(DEFAULT_CARTS_PATH);
-    else
-        list_dir(FALLBACK_CARTS_PATH);
-
     const char *cart_path = NULL;
     int selected_index = 0;
 
@@ -452,7 +447,7 @@ const char *browse_for_cart(void)
     p8_dialog_control_t controls[] = {
         DIALOG_LABEL_INVERTED(""),
         DIALOG_LISTBOX_CUSTOM_FULLSCREEN(NULL, NULL, nitems, &selected_index, render_file_item),
-        DIALOG_LABEL_INVERTED("\216: select file  \227: bbs download"),
+        DIALOG_LABEL_INVERTED("\216:select file \227:bbs download"),
     };
 
     p8_dialog_t dialog;
@@ -477,6 +472,12 @@ const char *browse_for_cart(void)
     char cart_id_buffer[64] = {'\0'};
     p8_dialog_action_t result = { DIALOG_RESULT_NONE, 0 };
     p8_dialog_set_showing(&dialog, true);
+    p8_dialog_draw(&dialog);
+
+    if (access(DEFAULT_CARTS_PATH, F_OK) == 0)
+        list_dir(DEFAULT_CARTS_PATH);
+    else
+        list_dir(FALLBACK_CARTS_PATH);
 
     for (;;) {
         selected_index = 0;
@@ -590,7 +591,7 @@ const char *browse_for_cart(void)
                     default:
                         break;
                 }
-                if (action_id == 2 && cart_path)
+                if (action_id == 1 && cart_path)
                     break;
             }
         } while (result.type == DIALOG_RESULT_NONE);

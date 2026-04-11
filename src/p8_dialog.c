@@ -516,6 +516,10 @@ p8_dialog_action_t p8_dialog_update(p8_dialog_t *dialog)
     // Update cursor blink
     dialog->cursor_blink++;
 
+    // Store and clear keypress
+    uint8_t keypress = m_keypress;
+    m_keypress = 0;
+
     if (dialog->focused_control >= 0) {
         // Handle input mode (for input boxes)
         if (dialog->controls[dialog->focused_control].type == DIALOG_INPUTBOX) {
@@ -527,25 +531,24 @@ p8_dialog_action_t p8_dialog_update(p8_dialog_t *dialog)
                     // No more controls, accept the dialog
                     result.type = DIALOG_RESULT_ACCEPTED;
                 }
+
                 return result;
             }
             // Handle printable characters
-            else if (m_keypress >= 32 && m_keypress <= 126) {
+            else if (keypress >= 32 && keypress <= 126) {
                 int len = strlen(control->data.inputbox.buffer);
                 if (len < control->data.inputbox.buffer_size - 1) {
-                    control->data.inputbox.buffer[len] = m_keypress;
+                    control->data.inputbox.buffer[len] = keypress;
                     control->data.inputbox.buffer[len + 1] = '\0';
                 }
-                m_keypress = 0;
                 return result;
             }
             // Handle backspace
-            else if (m_keypress == 8) {
+            else if (keypress == 8) {
                 int len = strlen(control->data.inputbox.buffer);
                 if (len > 0) {
                     control->data.inputbox.buffer[len - 1] = '\0';
                 }
-                m_keypress = 0;
                 return result;
             }
         } else {
