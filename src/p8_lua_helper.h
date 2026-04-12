@@ -172,8 +172,8 @@ static inline void draw_hline(int x0, int y, int x1, int col, int fillp)
 {
     uint16_t fillp_reg = m_memory[MEMORY_FILLP] | (m_memory[MEMORY_FILLP + 1] << 8);
     bool fillp_graphics_secondary = (m_memory[MEMORY_FILLP_ATTR] & 4) != 0;
-    if ((col & 0x1000) == 0 && fillp_reg == 0 && !fillp_graphics_secondary) {
-        // Optimized version for common case: no fillp.
+    if ((col & 0x1000) == 0 && fillp_reg == 0 && !fillp_graphics_secondary && m_memory[MEMORY_RW_MASK] == 0xff) {
+        // Optimized version for common case: no fillp, no rw mask.
         int cx, cy;
         camera_get(&cx, &cy);
         x0 -= cx;
@@ -284,8 +284,8 @@ static inline void draw_rectfill(int x0, int y0, int x1, int y1, int col, int fi
 {
     uint16_t fillp_reg = m_memory[MEMORY_FILLP] | (m_memory[MEMORY_FILLP + 1] << 8);
     bool fillp_graphics_secondary = (m_memory[MEMORY_FILLP_ATTR] & 4) != 0;
-    if ((col & 0x1000) == 0 && fillp_reg == 0 && !fillp_graphics_secondary) {
-        // Optimized version for common case: no fillp.
+    if ((col & 0x1000) == 0 && fillp_reg == 0 && !fillp_graphics_secondary && m_memory[MEMORY_RW_MASK] == 0xff) {
+        // Optimized version for common case: no fillp, no rw mask.
         int cx, cy;
         camera_get(&cx, &cy);
         x0 -= cx;
@@ -418,7 +418,7 @@ static inline void draw_scaled_sprite(int sx, int sy, int sw, int sh, int dx, in
         return;
 
     bool fillp_sprites = (m_memory[MEMORY_FILLP_ATTR] & 2) != 0;
-    if (!fillp_sprites) {
+    if (!fillp_sprites && m_memory[MEMORY_RW_MASK] == 0xff) {
         int cx, cy;
         camera_get(&cx, &cy);
         dx -= cx;
@@ -427,7 +427,7 @@ static inline void draw_scaled_sprite(int sx, int sy, int sw, int sh, int dx, in
         clip_get(&x0, &y0, &x1, &y1);
         if (dx >= x0 && dy >= y0 && dx + SPRITE_WIDTH <= x1 && dy + SPRITE_HEIGHT <= y1 &&
             dx >= 0 && dy >= 0 && dx + SPRITE_WIDTH <= P8_WIDTH && dy + SPRITE_HEIGHT <= P8_HEIGHT) {
-            // Optimized version for common case: no fillp, fully on screen
+            // Optimized version for common case: no fillp, no rw mask, fully on screen
             int base_sprite_offset = gfx_addr_remap(MEMORY_SPRITES);
             int base_screen_offset = gfx_addr_remap(MEMORY_SCREEN);
             if (dw > sw && dh > sh) {
@@ -515,7 +515,7 @@ static inline void draw_sprite(int n, int left, int top, bool flip_x, bool flip_
         return;
 
     bool fillp_sprites = (m_memory[MEMORY_FILLP_ATTR] & 2) != 0;
-    if (!fillp_sprites) {
+    if (!fillp_sprites && m_memory[MEMORY_RW_MASK] == 0xff) {
         int cx, cy;
         camera_get(&cx, &cy);
         int dx = left - cx;
@@ -524,7 +524,7 @@ static inline void draw_sprite(int n, int left, int top, bool flip_x, bool flip_
         clip_get(&x0, &y0, &x1, &y1);
         if (dx >= x0 && dy >= y0 && (dx + SPRITE_WIDTH) <= x1 && (dy + SPRITE_HEIGHT) <= y1 &&
             dx >= 0 && dy >= 0 && dx + SPRITE_WIDTH <= P8_WIDTH && dy + SPRITE_HEIGHT <= P8_HEIGHT) {
-            // Optimized version for common case: no fillp, fully on screen
+            // Optimized version for common case: no fillp, no rw mask, fully on screen
             int base_sprite_offset = gfx_addr_remap(MEMORY_SPRITES);
             int base_screen_offset = gfx_addr_remap(MEMORY_SCREEN);
             for (int x = 0; x < SPRITE_WIDTH; x++)
@@ -658,7 +658,17 @@ static inline void gfx_set(int x, int y, int location, int size, int col)
         return;
 
     int offset = gfx_addr_remap(location) + (x >> 1) + y * 64;
-    m_memory[offset] = IS_EVEN(x) ? (m_memory[offset] & 0xF0) | (col & 0xF) : (col << 4) | (m_memory[offset] & 0xF);
+    uint8_t rw_mask = m_memory[MEMORY_RW_MASK];
+    if (location == MEMORY_SCREEN && rw_mask != 0xff) {
+        uint8_t write_mask = rw_mask & 0xf;
+        uint8_t read_mask = (rw_mask >> 4) & 0xf;
+        uint8_t dst = IS_EVEN(x) ? m_memory[offset] & 0xf : m_memory[offset] >> 4;
+        uint8_t src = col & 0xf;
+        uint8_t result = (dst & ~write_mask) | (src & write_mask & read_mask);
+        m_memory[offset] = IS_EVEN(x) ? (m_memory[offset] & 0xF0) | result : (result << 4) | (m_memory[offset] & 0xF);
+    } else {
+        m_memory[offset] = IS_EVEN(x) ? (m_memory[offset] & 0xF0) | (col & 0xF) : (col << 4) | (m_memory[offset] & 0xF);
+    }
 }
 
 static inline void camera_get(int *x, int *y)
