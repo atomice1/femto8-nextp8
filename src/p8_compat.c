@@ -440,7 +440,9 @@ bool is_unsupported_address(unsigned address) {
         address == MEMORY_MISCFLAGS ||
         (address >= MEMORY_BUTTON_STATE && address < MEMORY_BUTTON_STATE + 8) ||
         (address >= 0x5f80 && address < 0x6000) /* unimplemented, but causes no compatibility issues */ ||
-        address == MEMORY_SCREEN_TRANSFORM)
+        address == MEMORY_SCREEN_TRANSFORM ||
+        address == MEMORY_HIGH_COLOUR_MODE ||
+        (address >= MEMORY_PALETTE_SECONDARY && address < MEMORY_PALETTE_SECONDARY + 32))
         return false;
     return true;
 }
