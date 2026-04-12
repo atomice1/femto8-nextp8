@@ -734,6 +734,12 @@ void p8_render()
     uint8_t *pal = &m_memory[MEMORY_PALETTES + PALTYPE_SCREEN * 16];
     memcpy((uint8_t *)_PALETTE_BASE, pal, _PALETTE_SIZE);
     memcpy((uint8_t *)_BACK_BUFFER_BASE, screen_mem, _FRAME_BUFFER_SIZE);
+    *(volatile uint8_t *)_HIGH_COLOUR_MODE = m_memory[MEMORY_HIGH_COLOUR_MODE];
+    *(volatile uint8_t *)_SCREEN_TRANSFORM = m_memory[MEMORY_SCREEN_TRANSFORM];
+    if (m_memory[MEMORY_HIGH_COLOUR_MODE] != 0) {
+        uint8_t *secondary_palette = &m_memory[MEMORY_PALETTE_SECONDARY];
+        memcpy((uint8_t *)_SECONDARY_PALETTE_BASE, secondary_palette, 32);
+    }
     static int dialog_showing_clear_n = 0;
     if (m_dialog_showing || dialog_showing_clear_n > 0)
         memcpy((uint8_t *)_OVERLAY_BACK_BUFFER_BASE, m_overlay_memory, MEMORY_SCREEN_SIZE);
