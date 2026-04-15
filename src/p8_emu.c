@@ -123,6 +123,9 @@ uint16_t m_buttons[PLAYER_COUNT];
 uint16_t m_buttonsp[PLAYER_COUNT];
 uint16_t m_button_first_repeat[PLAYER_COUNT];
 unsigned m_button_down_time[PLAYER_COUNT][BUTTON_INTERNAL_COUNT];
+#ifdef SDL
+uint16_t m_buttons_latch[PLAYER_COUNT];
+#endif
 
 static bool m_prev_pointer_lock;
 
@@ -1368,12 +1371,21 @@ void p8_update_input()
                     }
                 }
             } else  {
+#ifdef SDL
+                // Catch a press-and-release within one frame via latch
+                if ((m_buttons_latch[p] & (1 << i)) && !m_button_down_time[p][i]) {
+                    m_buttonsp[p] |= 1 << i;
+                }
+#endif
                 if (m_button_down_time[p][i]) {
                     m_button_down_time[p][i] = 0;
                     m_button_first_repeat[p] &= ~(1 << i);
                 }
             }
         }
+#ifdef SDL
+        m_buttons_latch[p] = 0;
+#endif
     }
 
     if (!m_dialog_showing) {
@@ -1465,17 +1477,28 @@ void p8_pump_events(void)
 #if defined(SDL)
     SDL_PumpEvents();
 
+    // SDL_QUIT must be consumed and acted on immediately.
     SDL_Event event;
-    while (SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_QUITMASK | SDL_KEYDOWNMASK) > 0) {
-        if (event.type == SDL_QUIT)
-            p8_abort();
-        else if (event.type == SDL_KEYDOWN) {
-            if ((event.key.keysym.sym == SDLK_RETURN || event.key.keysym.sym == SDLK_p) &&
-                (m_buttons[0] & BUTTON_MASK_PAUSE) == 0) {
-                p8_show_pause_menu();
-            } else if (event.key.keysym.sym == INPUT_ESCAPE && (m_buttons[0] & BUTTON_MASK_ESCAPE) == 0) {
-                p8_abort();
+    while (SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_QUITMASK) > 0)
+        p8_abort();
+
+    // Consume all pending keydown events.  Handle pause/escape immediately,
+    // and re-queue everything else so p8_update_input processes it normally.
+    SDL_Event keyevents[64];
+    int n = SDL_PeepEvents(keyevents, 64, SDL_GETEVENT, SDL_KEYDOWNMASK);
+    for (int i = 0; i < n; i++) {
+        SDLKey sym = keyevents[i].key.keysym.sym;
+        bool is_pause = (sym == SDLK_RETURN || sym == SDLK_p);
+        bool is_escape = (sym == INPUT_ESCAPE);
+        if (is_pause || is_escape) {
+            if (!m_dialog_showing) {
+                if (is_pause)
+                    p8_show_pause_menu();
+                else if (is_escape)
+                    p8_abort();
             }
+        } else {
+            SDL_PushEvent(&keyevents[i]);
         }
     }
 #elif defined(NEXTP8)
