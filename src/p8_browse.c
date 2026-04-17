@@ -167,7 +167,7 @@ static void list_dir(const char* path) {
         return;
     }
 #endif
-    p8_show_disk_icon(true);
+    p8_show_io_icon(true);
     DIR *dir = opendir(path);
     if (dir == NULL) {
         fprintf(stderr, "%s: %s\n", path, strerror(errno));
@@ -209,7 +209,7 @@ static void list_dir(const char* path) {
         closedir(dir);
     }
     qsort(dir_contents, nitems, sizeof(dir_contents[0]), compare_dir_entry);
-    p8_show_disk_icon(false);
+    p8_show_io_icon(false);
 }
 
 static void draw_file_name(const char *str, int x, int y, int col)
@@ -440,6 +440,11 @@ const char *browse_for_cart(void)
         return NULL;
     }
 
+    if (access(DEFAULT_CARTS_PATH, F_OK) == 0)
+        list_dir(DEFAULT_CARTS_PATH);
+    else
+        list_dir(FALLBACK_CARTS_PATH);
+
     const char *cart_path = NULL;
     int selected_index = 0;
 
@@ -473,11 +478,6 @@ const char *browse_for_cart(void)
     p8_dialog_action_t result = { DIALOG_RESULT_NONE, 0 };
     p8_dialog_set_showing(&dialog, true);
     p8_dialog_draw(&dialog);
-
-    if (access(DEFAULT_CARTS_PATH, F_OK) == 0)
-        list_dir(DEFAULT_CARTS_PATH);
-    else
-        list_dir(FALLBACK_CARTS_PATH);
 
     for (;;) {
         selected_index = 0;
@@ -617,6 +617,7 @@ const char *browse_for_cart(void)
             if (dir_entry->is_dir) {
                 list_dir(full_path);
                 free((char *)full_path);
+                selected_index = 0;
             } else {
                 cart_path = full_path;
                 break;

@@ -11,4 +11,5 @@ DEFINES += -DLUA_USE_POSIX
 fpic := -fPIC
 
 # SDL_LIBS typically already includes -lpthread on Linux, but keeping -lpthread is harmless.
-LIBS += $(SDL_LIBS) -lpthread -lssl -lcrypto
+LIBS += $(SDL_LIBS) -lpthread -lm -lssl -lcrypto
+

@@ -258,6 +258,12 @@ enum {
     COMPAT_NONE
 };
 
+/* Error dialog severity levels */
+typedef enum {
+    P8_ERROR_WARNING,
+    P8_ERROR_ERROR
+} p8_error_severity_t;
+
 extern unsigned m_fps;
 extern unsigned m_actual_fps;
 extern unsigned m_frames;
@@ -326,14 +332,8 @@ void p8_reset(void);
 char *p8_resolve_relative_path(const char *filename);
 void __attribute__ ((noreturn)) p8_abort();
 void __attribute__ ((noreturn)) p8_restart();
-/* Error dialog severity levels */
-typedef enum {
-    P8_ERROR_WARNING,
-    P8_ERROR_ERROR
-} p8_error_severity_t;
-
 void p8_seed_rng_state(uint32_t seed);
-void p8_show_disk_icon(bool show);
+void p8_show_io_icon(bool show);
 void p8_show_error_dialog(const char **lines, int line_count, p8_error_severity_t severity);
 void p8_show_version_dialog(void);
 int p8_shutdown(void);

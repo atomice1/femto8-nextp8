@@ -187,14 +187,16 @@ bool p8_preview_load(const char *path, p8_preview_info_t *info_out)
         return true;
     }
 
-    p8_show_disk_icon(true);
+    p8_show_io_icon(true);
 
     p8_preview_info_t info;
     memset(&info, 0, sizeof(info));
 
     FILE *f = fopen(path, "rb");
-    if (!f)
+    if (!f) {
+        p8_show_io_icon(false);
         return false;
+    }
 
     fseek(f, 0, SEEK_END);
     long file_size = ftell(f);
@@ -202,12 +204,14 @@ bool p8_preview_load(const char *path, p8_preview_info_t *info_out)
 
     if (file_size <= 0 || file_size > 128 * 1024) {
         fclose(f);
+        p8_show_io_icon(false);
         return false;
     }
 
     uint8_t *buffer = malloc(file_size + 1);
     if (!buffer) {
         fclose(f);
+        p8_show_io_icon(false);
         return false;
     }
 
@@ -241,7 +245,7 @@ bool p8_preview_load(const char *path, p8_preview_info_t *info_out)
         *info_out = info;
     }
 
-    p8_show_disk_icon(false);
+    p8_show_io_icon(false);
 
     return ok;
 }

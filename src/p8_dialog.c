@@ -724,6 +724,7 @@ p8_dialog_action_t p8_dialog_run(p8_dialog_t *dialog)
     overlay_draw_rectfill(dialog->x, dialog->y,
                           dialog->x + dialog->width - 1,
                           dialog->y + dialog->height - 1, 0);
+    p8_flip();
 
     p8_dialog_set_showing(dialog, false);
 
@@ -733,7 +734,8 @@ p8_dialog_action_t p8_dialog_run(p8_dialog_t *dialog)
 /* Clean up dialog resources */
 void p8_dialog_cleanup(p8_dialog_t *dialog)
 {
-    (void)dialog;
+    if (m_dialog_nest_count > 0 && m_dialog_stack[m_dialog_nest_count - 1] == dialog)
+        p8_dialog_set_showing(dialog, false);
 }
 
 /* Set the dialog showing state */
@@ -742,6 +744,7 @@ void p8_dialog_set_showing(p8_dialog_t *dialog, bool showing)
     (void)dialog;
     if (!showing) {
         if (m_dialog_nest_count > 0) {
+            assert(m_dialog_stack[m_dialog_nest_count - 1] == dialog);
             m_dialog_nest_count--;
             m_dialog_stack[m_dialog_nest_count] = NULL;
         }

@@ -70,7 +70,6 @@ static inline void overlay_draw_hline(int x0, int x1, int y, int col)
 
     uint8_t *dest = m_overlay_memory + ((x0 >> 1) + y * 64);
 
-
     // Handle odd start
     if (x0 & 1) {
         *dest = (col << 4) | (*dest & 0xF);

@@ -6,7 +6,6 @@
  *      Author: bbaker
  */
 
-extern "C" {
 #include <assert.h>
 #include "p8_symbols.h"
 #include "pico_font.h"
@@ -42,7 +41,6 @@ extern "C" {
 #include "pico_font.h"
 #include "p8_parser.h"
 #include "p8_pause_menu.h"
-}
 #include "lua_api.h"
 #include "lua.h"
 #include "lualib.h"
@@ -99,10 +97,10 @@ int circ(lua_State *L)
     int y = lua_tointeger(L, 2);
     int r = lua_gettop(L) >= 3 ? lua_tointeger(L, 3) : 4;
     int col = lua_gettop(L) >= 4 ? lua_tointeger(L, 4) : pencolor_get() & 0xF;
-    int fillp = lua_gettop(L) >= 4 ? (lua_tonumber(L, 4).bits() & 0xffff) : 0;
+    int fillp = lua_gettop(L) >= 4 ? (fix32_bits(lua_tonumber(L, 4)) & 0xffff) : 0;
 
     if (lua_gettop(L) >= 3 && (m_memory[MEMORY_MISCFLAGS] & 0x2)) {
-        double r_real = lua_tonumber(L, 3);
+        double r_real = fix32_to_double(lua_tonumber(L, 3));
         if (r_real - r >= 0.5)
             r++;
     }
@@ -119,10 +117,10 @@ int circfill(lua_State *L)
     int y = lua_tointeger(L, 2);
     int r = lua_gettop(L) >= 3 ? lua_tointeger(L, 3) : 4;
     int col = lua_gettop(L) >= 4 ? lua_tointeger(L, 4) : pencolor_get() & 0xF;
-    int fillp = lua_gettop(L) >= 4 ? (lua_tonumber(L, 4).bits() & 0xffff) : 0;
+    int fillp = lua_gettop(L) >= 4 ? (fix32_bits(lua_tonumber(L, 4)) & 0xffff) : 0;
 
     if (lua_gettop(L) >= 3 && (m_memory[MEMORY_MISCFLAGS] & 0x2)) {
-        double r_real = lua_tonumber(L, 3);
+        double r_real = fix32_to_double(lua_tonumber(L, 3));
         if (r_real - r >= 0.5)
             r++;
     }
@@ -222,7 +220,7 @@ int fillp(lua_State *L)
         m_memory[MEMORY_FILLP + 1] = 0;
         m_memory[MEMORY_FILLP_ATTR] = 0;
     } else {
-        uint32_t n = lua_tonumber(L, 1).bits();
+        uint32_t n = fix32_bits(lua_tonumber(L, 1));
         m_memory[MEMORY_FILLP] = (n >> 16) & 0xff;
         m_memory[MEMORY_FILLP + 1] = (n >> 24) & 0xff;
         m_memory[MEMORY_FILLP_ATTR] = ((n & 0x8000) ? 1 : 0) | ((n & 0x4000) ? 2 : 0) | ((n & 0x2000) ? 4: 0);
@@ -281,7 +279,7 @@ int line(lua_State *L)
             x1 = lua_tointeger(L, 3);
             y1 = lua_tointeger(L, 4);
             col = lua_gettop(L) == 5 ? lua_tointeger(L, 5) : pencolor_get() & 0xF;
-            fillp = lua_gettop(L) >= 5 ? (lua_tonumber(L, 5).bits() & 0xffff) : 0;
+            fillp = lua_gettop(L) >= 5 ? (fix32_bits(lua_tonumber(L, 5)) & 0xffff) : 0;
         } else {
             valid = !m_memory[MEMORY_LINE_VALID];
             x0 = m_memory[MEMORY_LINE_X] | (m_memory[MEMORY_LINE_X + 1] << 8);
@@ -289,7 +287,7 @@ int line(lua_State *L)
             x1 = lua_tointeger(L, 1);
             y1 = lua_tointeger(L, 2);
             col = lua_gettop(L) == 3 ? lua_tointeger(L, 3) : pencolor_get() & 0xF;
-            fillp = lua_gettop(L) >= 3 ? (lua_tonumber(L, 3).bits() & 0xffff) : 0;
+            fillp = lua_gettop(L) >= 3 ? (fix32_bits(lua_tonumber(L, 3)) & 0xffff) : 0;
         }
 
         if (valid)
@@ -313,7 +311,7 @@ int oval(lua_State *L)
     int x1 = lua_tointeger(L, 3);
     int y1 = lua_tointeger(L, 4);
     int col = lua_gettop(L) >= 5 ? lua_tointeger(L, 5) : pencolor_get() & 0xF;
-    int fillp = lua_gettop(L) >= 5 ? (lua_tonumber(L, 5).bits() & 0xffff) : 0;
+    int fillp = lua_gettop(L) >= 5 ? (fix32_bits(lua_tonumber(L, 5)) & 0xffff) : 0;
 
     draw_oval(x0, y0, x1, y1, col, fillp);
 
@@ -328,7 +326,7 @@ int ovalfill(lua_State *L)
     int x1 = lua_tointeger(L, 3);
     int y1 = lua_tointeger(L, 4);
     int col = lua_gettop(L) >= 5 ? lua_tointeger(L, 5) : pencolor_get() & 0xF;
-    int fillp = lua_gettop(L) >= 5 ? (lua_tonumber(L, 5).bits() & 0xffff) : 0;
+    int fillp = lua_gettop(L) >= 5 ? (fix32_bits(lua_tonumber(L, 5)) & 0xffff) : 0;
 
     draw_ovalfill(x0, y0, x1, y1, col, fillp);
 
@@ -464,7 +462,7 @@ int pset(lua_State *L)
     int x = lua_tointeger(L, 1);
     int y = lua_tointeger(L, 2);
     int c = lua_gettop(L) == 3 ? lua_tointeger(L, 3) : pencolor_get() & 0xF;
-    int fillp = lua_gettop(L) >= 3 ? (lua_tonumber(L, 3).bits() & 0xffff) : 0;
+    int fillp = lua_gettop(L) >= 3 ? (fix32_bits(lua_tonumber(L, 3)) & 0xffff) : 0;
     pixel_set(x, y, c, fillp, DRAWTYPE_GRAPHIC);
 
     return 0;
@@ -478,7 +476,7 @@ int rect(lua_State *L)
     int x1 = lua_tointeger(L, 3);
     int y1 = lua_tointeger(L, 4);
     int col = lua_gettop(L) == 5 ? lua_tointeger(L, 5) : pencolor_get() & 0xF;
-    int fillp = lua_gettop(L) >= 5 ? (lua_tonumber(L, 5).bits() & 0xffff) : 0;
+    int fillp = lua_gettop(L) >= 5 ? (fix32_bits(lua_tonumber(L, 5)) & 0xffff) : 0;
 
     int left = MIN(x0, x1);
     int top = MIN(y0, y1);
@@ -498,7 +496,7 @@ int rectfill(lua_State *L)
     int x1 = lua_tointeger(L, 3);
     int y1 = lua_tointeger(L, 4);
     int col = lua_gettop(L) >= 5 ? lua_tointeger(L, 5) : pencolor_get() & 0xF;
-    int fillp = lua_gettop(L) >= 5 ? (lua_tonumber(L, 5).bits() & 0xffff) : 0;
+    int fillp = lua_gettop(L) >= 5 ? (fix32_bits(lua_tonumber(L, 5)) & 0xffff) : 0;
 
     int left = MIN(x0, x1);
     int top = MIN(y0, y1);
@@ -519,7 +517,7 @@ int rrect(lua_State *L)
     int h = lua_tointeger(L, 4);
     int r = lua_gettop(L) >= 5 ? lua_tointeger(L, 5) : 0;
     int col = lua_gettop(L) >= 6 ? lua_tointeger(L, 6) : pencolor_get() & 0xF;
-    int fillp = lua_gettop(L) >= 6 ? (lua_tonumber(L, 6).bits() & 0xffff) : 0;
+    int fillp = lua_gettop(L) >= 6 ? (fix32_bits(lua_tonumber(L, 6)) & 0xffff) : 0;
 
     int right = left + w-1;
     int bottom = top + h-1;
@@ -546,7 +544,7 @@ int rrectfill(lua_State *L)
     int h = lua_tointeger(L, 4);
     int r = lua_gettop(L) >= 5 ? lua_tointeger(L, 5) : 0;
     int col = lua_gettop(L) >= 6 ? lua_tointeger(L, 6) : pencolor_get() & 0xF;
-    int fillp = lua_gettop(L) >= 6 ? (lua_tonumber(L, 6).bits() & 0xffff) : 0;
+    int fillp = lua_gettop(L) >= 6 ? (fix32_bits(lua_tonumber(L, 6)) & 0xffff) : 0;
 
     int right = left + w;
     int bottom = top + h;
@@ -659,8 +657,8 @@ int tline(lua_State *L)
     int y1 = lua_tointeger(L, 4);
     lua_Number mx = lua_tonumber(L, 5);
     lua_Number my = lua_tonumber(L, 6);
-    lua_Number mdx = lua_to_or_default(L, number, 7, lua_Number(1) / lua_Number(8));
-    lua_Number mdy = lua_to_or_default(L, number, 8, lua_Number(0));
+    lua_Number mdx = lua_to_or_default(L, number, 7, fix32_div(fix32_from_int(1), fix32_from_int(8)));
+    lua_Number mdy = lua_to_or_default(L, number, 8, fix32_from_int(0));
     int layer = lua_to_or_default(L, integer, 9, 0);
 
     int cx, cy;
@@ -693,10 +691,10 @@ int tline(lua_State *L)
     uint32_t mask_x_bits = ((uint32_t)m_memory[MEMORY_TLINE_MASK_X] << (precision + 3)) - 1;
     uint32_t mask_y_bits = ((uint32_t)m_memory[MEMORY_TLINE_MASK_Y] << (precision + 3)) - 1;
 
-    uint32_t mx_bits = mx.bits();
-    uint32_t my_bits = my.bits();
-    uint32_t mdx_bits = mdx.bits();
-    uint32_t mdy_bits = mdy.bits();
+    uint32_t mx_bits = fix32_bits(mx);
+    uint32_t my_bits = fix32_bits(my);
+    uint32_t mdx_bits = fix32_bits(mdx);
+    uint32_t mdy_bits = fix32_bits(mdy);
 
     int dx = abs(x1 - x0);
     int sx = x0 < x1 ? 1 : -1;
@@ -1085,7 +1083,7 @@ int peek4(lua_State *L)
     luaL_checkstack(L, n, "too many values");
 
     for (unsigned i=0;i<n;++i)
-        lua_pushnumber(L, z8::fix32::frombits((m_memory[addr + i*4 + 3] << 24) | (m_memory[addr + i*4 + 2] << 16) | (m_memory[addr + i*4 + 1] << 8) | m_memory[addr + i*4]));
+        lua_pushnumber(L, fix32_from_bits((m_memory[addr + i*4 + 3] << 24) | (m_memory[addr + i*4 + 2] << 16) | (m_memory[addr + i*4 + 1] << 8) | m_memory[addr + i*4]));
 
     return n;
 }
@@ -1137,7 +1135,7 @@ int poke4(lua_State *L)
     addr = addr_remap(addr);
 
     for (int i=2;i<=lua_gettop(L);++i) {
-        uint32_t val = lua_tonumber(L, i).bits();
+        uint32_t val = lua_tonumber(L, i);
 
         m_memory[addr + (i-2)*4] = val;
         m_memory[addr + (i-2)*4 + 1] = val >> 8;
@@ -1174,12 +1172,13 @@ int reload(lua_State *L)
         free(full_filename);
         if (!resolved_path)
             return 0;
-        p8_show_disk_icon(true);
+        p8_show_io_icon(true);
         uint8_t *buffer = NULL;
         src_mem = (uint8_t *)malloc(CART_MEMORY_SIZE);
         if (parse_cart_file(resolved_path, src_mem, NULL, &buffer, NULL) != 0) {
             free(src_mem);
             free(resolved_path);
+            p8_show_io_icon(false);
             return 0;
         }
         free(buffer);
@@ -1191,7 +1190,7 @@ int reload(lua_State *L)
         memcpy(m_memory + destaddr, src_mem + srcaddr, len);
     if (file_name != NULL) {
         free(src_mem);
-        p8_show_disk_icon(false);
+        p8_show_io_icon(false);
     }
     return 0;
 }
@@ -1246,9 +1245,9 @@ int rnd(lua_State *L)
     }
     else
     {
-        uint32_t max_fixed = (lua_gettop(L) >= 1) ? lua_tonumber(L, 1).bits() : 0x10000;
+        uint32_t max_fixed = (lua_gettop(L) >= 1) ? fix32_bits(lua_tonumber(L, 1)) : 0x10000;
         uint32_t result_fixed = (max_fixed == 0) ? 0 : (hi % max_fixed);
-        lua_pushnumber(L, z8::fix32::frombits(result_fixed));
+        lua_pushnumber(L, fix32_from_bits(result_fixed));
     }
 
     return 1;
@@ -1282,7 +1281,7 @@ int dget(lua_State *L)
 {
     unsigned index = lua_tounsigned(L, 1);
 
-    lua_pushnumber(L, z8::fix32::frombits((m_memory[MEMORY_CARTDATA + index*4 + 3] << 24) | (m_memory[MEMORY_CARTDATA + index*4 + 2] << 16) | (m_memory[MEMORY_CARTDATA + index*4 + 1] << 8) | m_memory[MEMORY_CARTDATA + index*4]));
+    lua_pushnumber(L, fix32_from_bits((m_memory[MEMORY_CARTDATA + index*4 + 3] << 24) | (m_memory[MEMORY_CARTDATA + index*4 + 2] << 16) | (m_memory[MEMORY_CARTDATA + index*4 + 1] << 8) | m_memory[MEMORY_CARTDATA + index*4]));
 
     return 1;
 }
@@ -1291,7 +1290,7 @@ int dget(lua_State *L)
 int dset(lua_State *L)
 {
     unsigned index = lua_tounsigned(L, 1);
-    uint32_t value = lua_tonumber(L, 2).bits();
+    uint32_t value = fix32_bits(lua_tonumber(L, 2));
 
     m_memory[MEMORY_CARTDATA + index*4] = value;
     m_memory[MEMORY_CARTDATA + index*4 + 1] = value >> 8;
@@ -1356,7 +1355,7 @@ int sub(lua_State *L)
 // time()
 int _time(lua_State *L)
 {
-    lua_pushnumber(L, (float)m_frames / (float)m_fps);
+    lua_pushnumber(L, fix32_from_double((double)m_frames / (double)m_fps));
 
     return 1;
 }
@@ -1552,7 +1551,7 @@ case STAT_MEM_USAGE: {
     }
 #endif
 
-    lua_pushnumber(L, (lua_Number)kb);
+    lua_pushnumber(L, fix32_from_double(kb));
     break;
     }
     case STAT_CPU_USAGE:
@@ -1560,7 +1559,7 @@ case STAT_MEM_USAGE: {
         unsigned elapsed_time = p8_elapsed_time();
         const unsigned target_frame_time = 1000 / m_fps;
         float f = (float)elapsed_time / (float)target_frame_time;
-        lua_pushnumber(L, f);
+        lua_pushnumber(L, fix32_from_double(f));
         break;
     }
     case STAT_PARAM:
@@ -1914,33 +1913,33 @@ void lua_register_functions(lua_State *L)
     // ****************************************************************
     // *** P8SCII glyphs ***
     // ****************************************************************
-    lua_pushnumber(L, 0); lua_setglobal(L, "\x8b");  // 139 ⬅️ left
-    lua_pushnumber(L, 1); lua_setglobal(L, "\x91");  // 145 ➡️ right
-    lua_pushnumber(L, 2); lua_setglobal(L, "\x94");  // 148 ⬆️ up
-    lua_pushnumber(L, 3); lua_setglobal(L, "\x83");  // 131 ⬇️ down
-    lua_pushnumber(L, 4); lua_setglobal(L, "\x8e");  // 142 🅾️ O/Z
-    lua_pushnumber(L, 5); lua_setglobal(L, "\x97");  // 151 ❎ X
+    lua_pushinteger(L, 0); lua_setglobal(L, "\x8b");  // 139 ⬅️ left
+    lua_pushinteger(L, 1); lua_setglobal(L, "\x91");  // 145 ➡️ right
+    lua_pushinteger(L, 2); lua_setglobal(L, "\x94");  // 148 ⬆️ up
+    lua_pushinteger(L, 3); lua_setglobal(L, "\x83");  // 131 ⬇️ down
+    lua_pushinteger(L, 4); lua_setglobal(L, "\x8e");  // 142 🅾️ O/Z
+    lua_pushinteger(L, 5); lua_setglobal(L, "\x97");  // 151 ❎ X
 
-    lua_pushnumber(L, z8::fix32::frombits(0x00000000)); lua_setglobal(L, "\x80");  // 128 █
-    lua_pushnumber(L, z8::fix32::frombits(0x5a5a8000)); lua_setglobal(L, "\x81");  // 129 ▒
-    lua_pushnumber(L, z8::fix32::frombits(0x511f8000)); lua_setglobal(L, "\x82");  // 130 🐱
-    lua_pushnumber(L, z8::fix32::frombits(0x7d7d8000)); lua_setglobal(L, "\x84");  // 132 ░
-    lua_pushnumber(L, z8::fix32::frombits(0xb81d8000)); lua_setglobal(L, "\x85");  // 133 ✽
-    lua_pushnumber(L, z8::fix32::frombits(0xf99f8000)); lua_setglobal(L, "\x86");  // 134 ●
-    lua_pushnumber(L, z8::fix32::frombits(0x51bf8000)); lua_setglobal(L, "\x87");  // 135 ♥
-    lua_pushnumber(L, z8::fix32::frombits(0xb5bf8000)); lua_setglobal(L, "\x88");  // 136 ☉
-    lua_pushnumber(L, z8::fix32::frombits(0x999f8000)); lua_setglobal(L, "\x89");  // 137 웃
-    lua_pushnumber(L, z8::fix32::frombits(0xb11f8000)); lua_setglobal(L, "\x8a");  // 138 ⌂
-    lua_pushnumber(L, z8::fix32::frombits(0xa0e08000)); lua_setglobal(L, "\x8c");  // 140 😐
-    lua_pushnumber(L, z8::fix32::frombits(0x9b3f8000)); lua_setglobal(L, "\x8d");  // 141 ♪
-    lua_pushnumber(L, z8::fix32::frombits(0xb1bf8000)); lua_setglobal(L, "\x8f");  // 143 ◆
-    lua_pushnumber(L, z8::fix32::frombits(0xf5ff8000)); lua_setglobal(L, "\x90");  // 144 …
-    lua_pushnumber(L, z8::fix32::frombits(0xb15f8000)); lua_setglobal(L, "\x92");  // 146 ★
-    lua_pushnumber(L, z8::fix32::frombits(0x1b1f8000)); lua_setglobal(L, "\x93");  // 147 ⧗
-    lua_pushnumber(L, z8::fix32::frombits(0xf5bf8000)); lua_setglobal(L, "\x95");  // 149 ˇ
-    lua_pushnumber(L, z8::fix32::frombits(0x7adf8000)); lua_setglobal(L, "\x96");  // 150 ∧
-    lua_pushnumber(L, z8::fix32::frombits(0x0f0f8000)); lua_setglobal(L, "\x98");  // 152 ▤
-    lua_pushnumber(L, z8::fix32::frombits(0x55558000)); lua_setglobal(L, "\x99");  // 153 ▥
+    lua_pushnumber(L, fix32_from_bits(0x00000000)); lua_setglobal(L, "\x80");  // 128 █
+    lua_pushnumber(L, fix32_from_bits(0x5a5a8000)); lua_setglobal(L, "\x81");  // 129 ▒
+    lua_pushnumber(L, fix32_from_bits(0x511f8000)); lua_setglobal(L, "\x82");  // 130 🐱
+    lua_pushnumber(L, fix32_from_bits(0x7d7d8000)); lua_setglobal(L, "\x84");  // 132 ░
+    lua_pushnumber(L, fix32_from_bits(0xb81d8000)); lua_setglobal(L, "\x85");  // 133 ✽
+    lua_pushnumber(L, fix32_from_bits(0xf99f8000)); lua_setglobal(L, "\x86");  // 134 ●
+    lua_pushnumber(L, fix32_from_bits(0x51bf8000)); lua_setglobal(L, "\x87");  // 135 ♥
+    lua_pushnumber(L, fix32_from_bits(0xb5bf8000)); lua_setglobal(L, "\x88");  // 136 ☉
+    lua_pushnumber(L, fix32_from_bits(0x999f8000)); lua_setglobal(L, "\x89");  // 137 웃
+    lua_pushnumber(L, fix32_from_bits(0xb11f8000)); lua_setglobal(L, "\x8a");  // 138 ⌂
+    lua_pushnumber(L, fix32_from_bits(0xa0e08000)); lua_setglobal(L, "\x8c");  // 140 😐
+    lua_pushnumber(L, fix32_from_bits(0x9b3f8000)); lua_setglobal(L, "\x8d");  // 141 ♪
+    lua_pushnumber(L, fix32_from_bits(0xb1bf8000)); lua_setglobal(L, "\x8f");  // 143 ◆
+    lua_pushnumber(L, fix32_from_bits(0xf5ff8000)); lua_setglobal(L, "\x90");  // 144 …
+    lua_pushnumber(L, fix32_from_bits(0xb15f8000)); lua_setglobal(L, "\x92");  // 146 ★
+    lua_pushnumber(L, fix32_from_bits(0x1b1f8000)); lua_setglobal(L, "\x93");  // 147 ⧗
+    lua_pushnumber(L, fix32_from_bits(0xf5bf8000)); lua_setglobal(L, "\x95");  // 149 ˇ
+    lua_pushnumber(L, fix32_from_bits(0x7adf8000)); lua_setglobal(L, "\x96");  // 150 ∧
+    lua_pushnumber(L, fix32_from_bits(0x0f0f8000)); lua_setglobal(L, "\x98");  // 152 ▤
+    lua_pushnumber(L, fix32_from_bits(0x55558000)); lua_setglobal(L, "\x99");  // 153 ▥
 }
 
 static void lua_event_pump_hook(lua_State *L, lua_Debug *ar)

@@ -141,18 +141,7 @@ static int16_t mouse_y_accum_prev = 0;
 static int16_t mouse_z_accum_prev = 0;
 #endif
 
-const uint8_t turtle_icon[32] = {
-    0x11, 0x11, 0x11, 0x11,
-    0x11, 0x11, 0x11, 0x11,
-    0x11, 0x44, 0x11, 0xbb,
-    0x41, 0x44, 0xb4, 0x3b,
-    0x93, 0x99, 0x19, 0x11,
-    0xb1, 0xbb, 0xbb, 0x11,
-    0x1b, 0x11, 0xb1, 0x11,
-    0x11, 0x11, 0x11, 0x11,
-};
-
-const uint8_t disk_icon[32] = {
+const uint8_t io_icon[32] = {
     0x00, 0x77, 0x77, 0x77,
     0x00, 0x17, 0x11, 0x71,
     0x00, 0x17, 0x77, 0x71,
@@ -287,7 +276,7 @@ static int p8_init_lcd(void)
 
 static int p8_init_common(const char *file_name, const char *lua_script)
 {
-    p8_show_disk_icon(false);
+    p8_show_io_icon(false);
 
     if (lua_script == NULL) {
         if (file_name) fprintf(stderr, "%s: ", file_name);
@@ -386,7 +375,7 @@ int p8_init_file_with_param(const char *file_name, const char *param)
         }
     }
 
-    p8_show_disk_icon(true);
+    p8_show_io_icon(true);
     lua_load_api();
 
     printf("Loading %s\n", file_name);
@@ -409,7 +398,7 @@ int p8_init_ram(uint8_t *buffer, int size)
     if (!m_initialized)
         p8_init();
 
-    p8_show_disk_icon(true);
+    p8_show_io_icon(true);
     lua_load_api();
 
     const char *lua_script = NULL;
@@ -1691,10 +1680,10 @@ static void p8_show_compatibility_error(int severity)
         p8_show_error_dialog(lines_none, 3, P8_ERROR_ERROR);
 }
 
-void p8_show_disk_icon(bool show)
+void p8_show_io_icon(bool show)
 {
     if (show) {
-        overlay_draw_icon(disk_icon, P8_WIDTH - 8, 0);
+        overlay_draw_icon(io_icon, P8_WIDTH - 8, 0);
     } else {
         overlay_draw_rectfill(P8_WIDTH - 8, 0, P8_WIDTH-1, 7, OVERLAY_TRANSPARENT_COLOR);
         p8_dialog_draw_stack();
@@ -1729,11 +1718,11 @@ void p8_show_error_dialog(const char **lines, int line_count, p8_error_severity_
 char *p8_download_bbs_cart(const char *cart_id)
 {
     /* Download cart from BBS */
-    p8_show_disk_icon(true);
+    p8_show_io_icon(true);
     printf("Downloading cart %s from BBS...\n", cart_id);
     char cached_filename[256] = {'\0'};
     int ret = cache_download(cart_id, cached_filename, sizeof(cached_filename));
-    p8_show_disk_icon(false);
+    p8_show_io_icon(false);
     if (ret < 0) {
         printf("Failed to download cart %s from BBS, error %d\n", cart_id, errno);
         /* Show error dialog */
