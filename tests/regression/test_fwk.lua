@@ -172,6 +172,8 @@ function restore()
     memcpy(0, 0x8000, 0x5e00)
     memcpy(0x5f00, 0xdf00, 0x80)
     memcpy(0x6000, 0xe000, 0x2000)
+    sfx(-1)
+    music(-1)
 end
 
 function sleep(seconds)
@@ -196,6 +198,10 @@ function test_case(name, f)
     end
     if not status then
         current_test_case_failed = true
+        current_test_suite_failed = true
+        current_test_suite_fail_count += 1
+        test_suite_fail_count += 1
+        total_test_case_fail_count += 1
         printh(current_test_case_name .. ": " .. err)
     end
     restore()

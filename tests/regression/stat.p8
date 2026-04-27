@@ -48,7 +48,7 @@ function test_cpu_usage()
     test_case("cpu_usage_range", function()
         local cpu = stat(1)
         check_type(cpu, "number")
-        check_range(cpu, 0, 10)
+        check_range(cpu, 0, 1)
     end)
     
     test_case("cpu_usage_progresses", function()
@@ -66,7 +66,7 @@ function test_cpu_usage()
     test_case("system_cpu_usage", function()
         local syscpu = stat(2)
         check_type(syscpu, "number")
-        check_range(syscpu, 0, 10)
+        check_range(syscpu, 0, 1)
     end)
     
     test_case("system_cpu_increases_with_work", function()
@@ -377,7 +377,7 @@ function test_bbs_info()
     -- stat(101): BBS ID
     test_case("bbs_id_type", function()
         local id = stat(101)
-        local valid = type(id) == "number" or type(id) == "nil"
+        local valid = type(id) == "string" or type(id) == "nil"
         check_eq(valid, true)
     end)
 end

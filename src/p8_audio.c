@@ -258,6 +258,48 @@ void audio_sound(int32_t index, int32_t channel, uint32_t start, uint32_t length
     sound_command.sound.start = start;
     sound_command.sound.end = start + length;
 
+    if (index == -1)
+    {
+        if (channel >= 0 && channel < CHANNEL_COUNT)
+            m_channels[channel].sound_mode = SOUNDMODE_NONE;
+    }
+    else if (index >= 0 && index <= SOUND_COUNT)
+    {
+        uint8_t speed = m_memory[MEMORY_SFX + 68 * index + 64 + 1];
+        int sample_per_tick = (SAMPLE_RATE / 128) * (speed + 1);
+
+        if (channel == -2)
+        {
+            for (int i = 0; i < CHANNEL_COUNT; i++)
+            {
+                soundstate_t *state = &m_channels[i];
+                if (state->sound_index == index)
+                    state->sound_mode = SOUNDMODE_NONE;
+            }
+        }
+        else if (channel == -1)
+        {
+            for (int i = 0; i < CHANNEL_COUNT; i++)
+            {
+                if (m_channels[i].sound_mode == SOUNDMODE_NONE)
+                {
+                    channel = i;
+                    break;
+                }
+            }
+        }
+
+        if (channel >= 0 && channel < CHANNEL_COUNT)
+        {
+            soundstate_t *state = &m_channels[channel];
+            state->sound_mode = SOUNDMODE_SOUND;
+            state->sound_index = index;
+            state->sample = start;
+            state->end = start + length;
+            state->position = start * sample_per_tick;
+        }
+    }
+
 #ifndef OS_BAREMETAL
     pthread_mutex_lock(&m_sound_queue_mutex);
 #endif
@@ -284,6 +326,37 @@ void audio_music(int32_t index, int32_t fadems, int32_t mask)
     sound_command.music.fadems = fadems;
     sound_command.music.mask = mask;
 
+    if (index == -1)
+    {
+        for (int i = 0; i < CHANNEL_COUNT; i++)
+            m_channels[i].sound_mode = SOUNDMODE_NONE;
+        m_music_state.pattern = -1;
+        m_music_state.channel_mask = 0;
+    }
+    else
+    {
+        m_music_state.pattern = index;
+        m_music_state.channel_mask = mask;
+
+        for (int i = 0; i < CHANNEL_COUNT; i++)
+        {
+            uint8_t channel_data = m_memory[MEMORY_MUSIC + 4 * m_music_state.pattern + i];
+            bool enabled = (channel_data & (1 << 6)) == 0;
+            if (enabled)
+            {
+                m_channels[i].sound_mode = SOUNDMODE_MUSIC;
+                m_channels[i].sound_index = channel_data & 0x7F;
+                m_channels[i].sample = 0;
+                m_channels[i].position = 0;
+                m_channels[i].end = 31;
+            }
+            else
+            {
+                m_channels[i].sound_mode = SOUNDMODE_NONE;
+            }
+        }
+    }
+
 #ifndef OS_BAREMETAL
     pthread_mutex_lock(&m_sound_queue_mutex);
 #endif
@@ -301,6 +374,66 @@ int32_t audio_stat(int32_t index)
         return *(volatile int16_t *)(_P8AUDIO_STAT46 + (index - 46) * 2);
     else if (index >= 16 && index <= 26)
         return *(volatile int16_t *)(_P8AUDIO_STAT46 + (index - 16) * 2);
+#else
+    if (index >= 16 && index <= 19)
+    {
+        int channel = index - 16;
+        if (m_channels[channel].sound_mode == SOUNDMODE_NONE)
+            return -1;
+        return m_channels[channel].sound_index;
+    }
+    if (index >= 20 && index <= 23) {
+        int channel = index - 20;
+        if (m_channels[channel].sound_mode == SOUNDMODE_NONE)
+            return -1;
+        return m_channels[channel].position;
+    }
+    if (index >= 46 && index <= 49) {
+        int channel = index - 46;
+        if (m_channels[channel].sound_mode == SOUNDMODE_NONE)
+            return -1;
+        return m_channels[channel].sound_index;
+    }
+    if (index >= 50 && index <= 53) {
+        int channel = index - 50;
+        if (m_channels[channel].sound_mode == SOUNDMODE_NONE)
+            return -1;
+        return m_channels[channel].position;
+    }
+    if (index == 24 || index == 54) {
+        bool any_music = false;
+        for (int i = 0; i < CHANNEL_COUNT; ++i) {
+            if (m_channels[i].sound_mode == SOUNDMODE_MUSIC) {
+                any_music = true;
+                break;
+            }
+        }
+        return any_music ? m_music_state.pattern : -1;
+    }
+    if (index == 25 || index == 55) {
+        bool any_music = false;
+        for (int i = 0; i < CHANNEL_COUNT; ++i) {
+            if (m_channels[i].sound_mode == SOUNDMODE_MUSIC) {
+                any_music = true;
+                break;
+            }
+        }
+        return any_music ? m_music_state.pattern : -1;
+    }
+    if (index == 26 && index == 56) {
+        int ticks = 0;
+        for (int i = 0; i < CHANNEL_COUNT; ++i)
+            if (m_channels[i].sound_mode == SOUNDMODE_MUSIC)
+                ticks = MAX(ticks, m_channels[i].sample);
+        return ticks;
+    }
+    if (index == 57) {
+        for (int i = 0; i < CHANNEL_COUNT; ++i) {
+            if (m_channels[i].sound_mode == SOUNDMODE_MUSIC)
+                return 1;
+        }
+        return 0;
+    }
 #endif
     return 0;
 }

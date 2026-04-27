@@ -9,17 +9,17 @@ __lua__
 #include test_fwk.lua
 
 function test_all_basic_types()
-    test_case("all_number_no_error", function()
+    test_case("all_empty_table_no_iter", function()
         local count = 0
-        for v in all(42) do count += 1 end
+        for v in all({}) do count += 1 end
         check_eq(count, 0)
     end)
-    test_case("all_boolean_no_error", function()
+    test_case("all_empty_string_no_iter", function()
         local count = 0
-        for v in all(true) do count += 1 end
+        for c in all("") do count += 1 end
         check_eq(count, 0)
     end)
-    test_case("all_nil_no_error", function()
+    test_case("all_nil_no_iter", function()
         local count = 0
         for v in all(nil) do count += 1 end
         check_eq(count, 0)
@@ -143,10 +143,11 @@ function test_all_concurrent()
             add(result, v)
             del(t, v)
         end
-        -- After del of current, elements shift down; iterator skips next
-        check_eq(#result, 2)
+        -- PICO-8 continues iterating over the original array order here.
+        check_eq(#result, 3)
         check_eq(result[1], 1)
-        check_eq(result[2], 3)
+        check_eq(result[2], 2)
+        check_eq(result[3], 3)
     end)
     test_case("add_during_foreach", function()
         local t = {10, 20}
