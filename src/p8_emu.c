@@ -1469,6 +1469,17 @@ void p8_pump_events(void)
         bool is_pause = (sym == SDLK_RETURN || sym == SDLK_p);
         bool is_escape = (sym == INPUT_ESCAPE);
         if (is_pause || is_escape) {
+            if (sym == SDLK_RETURN) {
+                m_buttons[0] |= BUTTON_MASK_PAUSE | BUTTON_MASK_RETURN;
+                m_button_down_time[0][BUTTON_PAUSE] = UINT_MAX;
+                m_button_down_time[0][BUTTON_RETURN] = UINT_MAX;
+            } else if (sym == SDLK_p) {
+                m_buttons[0] |= BUTTON_MASK_PAUSE;
+                m_button_down_time[0][BUTTON_PAUSE] = UINT_MAX;
+            } else if (sym == INPUT_ESCAPE) {
+                m_buttons[0] |= BUTTON_MASK_ESCAPE;
+                m_button_down_time[0][BUTTON_ESCAPE] = UINT_MAX;
+            }
             if (!m_dialog_showing) {
                 if (is_pause)
                     p8_show_pause_menu();
@@ -1642,26 +1653,6 @@ void p8_close_cartdata(void)
         fclose(cartdata);
         cartdata = NULL;
     }
-}
-
-static void p8_show_compatibility_error(int severity)
-{
-    const char *lines_some[] = {
-        "this cart may not be",
-        "fully compatible with",
-        PROGNAME
-    };
-
-    const char *lines_none[] = {
-        "this cart is not",
-        "compatible with",
-        PROGNAME
-    };
-
-    if (severity <= COMPAT_SOME)
-        p8_show_error_dialog(lines_some, 3, P8_ERROR_WARNING);
-    else
-        p8_show_error_dialog(lines_none, 3, P8_ERROR_ERROR);
 }
 
 void p8_show_io_icon(bool show)

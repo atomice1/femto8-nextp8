@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
         _fatal_error("Incompatible hardware version");
 #if DEV_BUILD
     if (_loader_data->reset_type != _RESET_TYPE_APP_RESTART &&
-        !skip_main_loop && !skip_compat) {
+        !skip_main_loop) {
         uint32_t loader_version = _loader_data->loader_version;
         uint32_t loader_timestamp = _loader_data->loader_timestamp;
         _show_message(
