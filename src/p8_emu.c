@@ -70,7 +70,6 @@ static inline int color_index(uint8_t c)
 
 static int p8_init_lcd(void);
 static void p8_main_loop();
-static void p8_show_compatibility_error(int severity);
 
 uint8_t *m_memory = NULL;
 uint8_t *m_cart_memory = NULL;
