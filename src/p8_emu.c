@@ -31,7 +31,6 @@
 #endif
 #include "p8_audio.h"
 #include "p8_cache.h"
-#include "p8_compat.h"
 #include "p8_dialog.h"
 #include "p8_emu.h"
 #include "p8_lua.h"
@@ -97,7 +96,6 @@ char *current_cart_dir = NULL;
 char *m_breadcrumb = NULL;
 char *m_bbs_cart_id = NULL;
 
-static bool skip_compat_check = false;
 static bool skip_main_loop_if_no_callbacks = false;
 
 const char *m_param_string = "";
@@ -289,16 +287,7 @@ static int p8_init_common(const char *file_name, const char *lua_script)
             return 0;
     }
 
-    if (!skip_compat_check) {
-        int ret = check_compatibility(file_name, lua_script);
-        if (ret != COMPAT_OK)
-            p8_show_compatibility_error(ret);
-        if (ret == COMPAT_NONE)
-            return -1;
-    }
     restart = false;
-    // Skip compat check after first cart
-    skip_compat_check = true;
 
     memcpy(m_memory, m_cart_memory, CART_MEMORY_SIZE);
 
@@ -1598,11 +1587,6 @@ void __attribute__ ((noreturn)) p8_load_new(const char *filename, const char *pa
     load_requested = true;
 
     longjmp(jmpbuf_load, 1);
-}
-
-void p8_set_skip_compat_check(bool skip)
-{
-    skip_compat_check = skip;
 }
 
 void p8_set_skip_main_loop_if_no_callbacks(bool skip)
