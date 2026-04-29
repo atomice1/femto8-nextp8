@@ -512,7 +512,7 @@ static inline void draw_scaled_sprite(int sx, int sy, int sw, int sh, int dx, in
                         uint8_t color = color_get(PALTYPE_DRAW, index);
 
                         int sx1, sy1;
-                        if ((color & 0x10) == 0) {
+                        if ((color & 0xf0) == 0) {
                             int tx = x, ty = y;
                             do {
                                 x = tx;
@@ -547,7 +547,7 @@ static inline void draw_scaled_sprite(int sx, int sy, int sw, int sh, int dx, in
                         uint8_t index = IS_EVEN(src_x) ? m_memory[sprite_offset] & 0xF : m_memory[sprite_offset] >> 4;
                         uint8_t color = color_get(PALTYPE_DRAW, index);
 
-                        if ((color & 0x10) == 0) {
+                        if ((color & 0xf0) == 0) {
                             int screen_offset = base_screen_offset + ((dx + x) >> 1) + (dy + y) * 64;
                             m_memory[screen_offset] = IS_EVEN(dx + x) ? (m_memory[screen_offset] & 0xF0) | (color & 0xF) : (color << 4) | (m_memory[screen_offset] & 0xF);
                         }
@@ -567,7 +567,7 @@ static inline void draw_scaled_sprite(int sx, int sy, int sw, int sh, int dx, in
             uint8_t index = gfx_get(src_x, src_y, MEMORY_SPRITES, MEMORY_SPRITES_SIZE);
             uint8_t color = color_get(PALTYPE_DRAW, (int)index);
 
-            if ((color & 0x10) == 0)
+            if ((color & 0xf0) == 0)
                 pixel_set(dx + x, dy + y, index, 0, DRAWTYPE_SPRITE);
         }
     }
@@ -607,7 +607,7 @@ static inline void draw_sprite(int n, int left, int top, bool flip_x, bool flip_
                 {
                     uint8_t index = sprite_even ? m_memory[sprite_offset] & 0xF : m_memory[sprite_offset] >> 4;
                     uint8_t color = color_get(PALTYPE_DRAW, index);
-                    if ((color & 0x10) == 0)
+                    if ((color & 0xf0) == 0)
                         m_memory[screen_offset] = screen_even ? (m_memory[screen_offset] & 0xF0) | (color & 0xF) : (color << 4) | (m_memory[screen_offset] & 0xF);
                     screen_offset += flip_y ? -64 : 64;
                     sprite_offset += 64;
@@ -626,7 +626,7 @@ static inline void draw_sprite(int n, int left, int top, bool flip_x, bool flip_
             uint8_t index = gfx_get(sx + x, sy + y, MEMORY_SPRITES, MEMORY_SPRITES_SIZE);
             uint8_t color = color_get(PALTYPE_DRAW, index);
 
-            if ((color & 0x10) == 0)
+            if ((color & 0xf0) == 0)
                 pixel_set(left + fx, top + fy, index, 0, DRAWTYPE_SPRITE);
         }
     }
