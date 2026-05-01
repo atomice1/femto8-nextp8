@@ -556,11 +556,112 @@ function test_camera()
     end)
 end
 
-test_suite("on_screen",      test_on_screen)
-test_suite("partial_1to1",   test_partial_1to1)
-test_suite("partial_scaled", test_partial_scaled)
-test_suite("fully_off",      test_fully_off)
-test_suite("camera",         test_camera)
+------------------------------------------------------------------------
+-- spr() with fractional w/h
+-- PICO-8 allows spr(n, x, y, w, h) where w/h are in sprite units (multiples
+-- of 8).  A fractional value like 0.75 means 0.75*8=6 pixels wide/tall.
+-- The original femto8 spr() did lua_tointeger for w/h, truncating 0.75 → 0,
+-- so nothing was drawn.  The fix uses lua_tonumber and routes fractional
+-- values through draw_scaled_sprite at 1:1 scale.
+------------------------------------------------------------------------
+
+function test_spr_fractional()
+    -- spr(0, 10, 10, 0.75, 0.75): draw top-left 6x6 of sprite 0
+    -- source pixels (0..5, 0..5) of the concentric-square sprite
+    test_case("frac_0.75x0.75", function()
+        ssetup()
+        spr(0, 10, 10, 0.75, 0.75)
+        -- top row (src y=0): all border = color 1
+        check_pixel(10, 10, sp(0,0))   -- src(0,0)=1
+        check_pixel(15, 10, sp(5,0))   -- src(5,0)=1
+        -- left col (src x=0): border
+        check_pixel(10, 11, sp(0,1))   -- src(0,1)=1
+        check_pixel(10, 14, sp(0,4))   -- src(0,4)=1
+        -- inner ring row 1 (src y=1): color 2 in the middle
+        check_pixel(11, 11, sp(1,1))   -- src(1,1)=2
+        check_pixel(14, 11, sp(4,1))   -- src(4,1)=2
+        -- center (src y=2, x=2): color 3
+        check_pixel(12, 12, sp(2,2))   -- src(2,2)=3
+        check_pixel(14, 14, sp(4,4))   -- src(4,4)=3
+        -- row y=15 is OUTSIDE the 6-pixel-tall dest (dy+6=16); must be bg
+        check_pixel(10, 16, 15)
+        check_pixel(15, 16, 15)
+        -- col x=16 is OUTSIDE the 6-pixel-wide dest (dx+6=16); must be bg
+        check_pixel(16, 10, 15)
+        check_pixel(16, 15, 15)
+        -- adjacent pixels before dest must be bg
+        check_pixel( 9, 10, 15)
+        check_pixel(10,  9, 15)
+    end)
+
+    -- spr(0, 10, 10, 0.5, 1): draw left 4 columns, all 8 rows
+    test_case("frac_0.5w_full_h", function()
+        ssetup()
+        spr(0, 10, 10, 0.5, 1)
+        -- src cols 0..3, rows 0..7
+        check_pixel(10, 10, sp(0,0))   -- 1
+        check_pixel(13, 10, sp(3,0))   -- 1
+        check_pixel(10, 17, sp(0,7))   -- 1
+        check_pixel(13, 17, sp(3,7))   -- 1
+        check_pixel(11, 11, sp(1,1))   -- 2
+        check_pixel(12, 12, sp(2,2))   -- 3
+        -- col x=14 (dx+4) is outside; must be bg
+        check_pixel(14, 10, 15)
+        check_pixel(14, 17, 15)
+        -- row y=18 is outside; must be bg
+        check_pixel(10, 18, 15)
+    end)
+
+    -- spr(0, 10, 10, 1, 0.5): draw all 8 cols, top 4 rows
+    test_case("frac_full_w_0.5h", function()
+        ssetup()
+        spr(0, 10, 10, 1, 0.5)
+        -- src rows 0..3, cols 0..7
+        check_pixel(10, 10, sp(0,0))   -- 1
+        check_pixel(17, 10, sp(7,0))   -- 1
+        check_pixel(10, 13, sp(0,3))   -- 1
+        check_pixel(17, 13, sp(7,3))   -- 1
+        check_pixel(11, 11, sp(1,1))   -- 2
+        check_pixel(12, 12, sp(2,2))   -- 3
+        -- row y=14 (dy+4) is outside; must be bg
+        check_pixel(10, 14, 15)
+        check_pixel(17, 14, 15)
+        -- col x=18 is outside; must be bg
+        check_pixel(18, 10, 15)
+    end)
+
+    -- spr(0, 10, 10, 1, 1): integer w/h must still use the fast path (no regression)
+    test_case("integer_1x1", function()
+        ssetup()
+        spr(0, 10, 10, 1, 1)
+        check_pixel(10, 10, sp(0,0))  -- 1
+        check_pixel(17, 17, sp(7,7))  -- 1
+        check_pixel(11, 11, sp(1,1))  -- 2
+        check_pixel(12, 12, sp(2,2))  -- 3
+        check_pixel( 9, 10, 15)
+        check_pixel(18, 10, 15)
+        check_pixel(10,  9, 15)
+        check_pixel(10, 18, 15)
+    end)
+
+    -- spr(0, 10, 10) default w=h=1 (omitted args) still works
+    test_case("default_args", function()
+        ssetup()
+        spr(0, 10, 10)
+        check_pixel(10, 10, sp(0,0))  -- 1
+        check_pixel(17, 17, sp(7,7))  -- 1
+        check_pixel(12, 12, sp(2,2))  -- 3
+        check_pixel(18, 10, 15)
+        check_pixel(10, 18, 15)
+    end)
+end
+
+test_suite("on_screen",        test_on_screen)
+test_suite("partial_1to1",     test_partial_1to1)
+test_suite("partial_scaled",   test_partial_scaled)
+test_suite("fully_off",        test_fully_off)
+test_suite("camera",           test_camera)
+test_suite("spr_fractional",   test_spr_fractional)
 summary()
 __gfx__
 11111111000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000

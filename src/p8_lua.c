@@ -675,25 +675,43 @@ int spr(lua_State *L)
     int n = lua_tointeger(L, 1);
     int x = lua_tointeger(L, 2);
     int y = lua_tointeger(L, 3);
-    int w = 1;
-    int h = 1;
     bool flip_x = false, flip_y = false;
 
     if (lua_gettop(L) > 3)
     {
         assert(lua_gettop(L) >= 5);
 
-        w = lua_tointeger(L, 4);
-        h = lua_tointeger(L, 5);
+        lua_Number w_raw = lua_tonumber(L, 4);
+        lua_Number h_raw = lua_tonumber(L, 5);
 
         if (lua_gettop(L) >= 6)
             flip_x = lua_toboolean(L, 6);
 
         if (lua_gettop(L) >= 7)
             flip_y = lua_toboolean(L, 7);
-    }
 
-    draw_sprites(n, x, y, w, h, flip_x, flip_y);
+        // fix32 stores integers with no fractional bits (lower 16 bits == 0)
+        if ((w_raw & 0xFFFF) == 0 && (h_raw & 0xFFFF) == 0)
+        {
+            // Integer w/h: draw a w x h grid of sprites (standard path)
+            int w = fix32_to_int(w_raw);
+            int h = fix32_to_int(h_raw);
+            draw_sprites(n, x, y, w, h, flip_x, flip_y);
+        }
+        else
+        {
+            // Fractional w/h: compute pixel dimensions and draw at 1:1 scale
+            int sw = (int)(fix32_to_double(w_raw) * SPRITE_WIDTH + 0.5);
+            int sh = (int)(fix32_to_double(h_raw) * SPRITE_HEIGHT + 0.5);
+            int ssx = (n & 0xF) * SPRITE_WIDTH;
+            int ssy = (n >> 4) * SPRITE_HEIGHT;
+            draw_scaled_sprite(ssx, ssy, sw, sh, x, y, 1.0f, 1.0f, flip_x, flip_y);
+        }
+    }
+    else
+    {
+        draw_sprites(n, x, y, 1, 1, flip_x, flip_y);
+    }
 
     return 0;
 }
