@@ -416,6 +416,38 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
                                 x += 8;
                             }
                             break;
+                        case '@':
+                            // \^@addrnnnn[data] — poke nnnn bytes to address addr
+                            // addr and nnnn are 4 hex chars each
+                            if (i + 8 < str_len) {
+                                int addr  = (hexy(str[i+1]) << 12) | (hexy(str[i+2]) << 8) |
+                                            (hexy(str[i+3]) <<  4) |  hexy(str[i+4]);
+                                int count = (hexy(str[i+5]) << 12) | (hexy(str[i+6]) << 8) |
+                                            (hexy(str[i+7]) <<  4) |  hexy(str[i+8]);
+                                i += 8;
+                                for (int k = 0; k < count && i + 1 < str_len; k++) {
+                                    uint8_t byte = str[++i];
+                                    if ((unsigned)(addr + k) < MEMORY_SIZE)
+                                        m_memory[addr + k] = byte;
+                                }
+                            }
+                            break;
+                        case '!':
+                            // \^!addr[data] — poke all remaining characters to address addr
+                            // addr is 4 hex chars; remaining string bytes are data (not printed)
+                            if (i + 4 < str_len) {
+                                int addr = (hexy(str[i+1]) << 12) | (hexy(str[i+2]) << 8) |
+                                           (hexy(str[i+3]) <<  4) |  hexy(str[i+4]);
+                                i += 4;
+                                int k = 0;
+                                while (i + 1 < str_len) {
+                                    uint8_t byte = str[++i];
+                                    if ((unsigned)(addr + k) < MEMORY_SIZE)
+                                        m_memory[addr + k] = byte;
+                                    k++;
+                                }
+                            }
+                            break;
                         case 'o':
                             if (i + 3 < str_len) {
                                 uint8_t colour_char = str[++i];
