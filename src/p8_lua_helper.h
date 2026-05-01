@@ -870,7 +870,7 @@ static inline void reset_color()
     for (int i = 0; i < 16; i++)
     {
         color_set(PALTYPE_DRAW, i, i == 0 ? i | 0x10 : i);
-        color_set(PALTYPE_SCREEN, i, i == 0 ? i | 0x10 : i);
+        color_set(PALTYPE_SCREEN, i, i);
     }
     color_set(PALTYPE_SECONDARY, 0, 0x00);
     color_set(PALTYPE_SECONDARY, 1, 0x01);

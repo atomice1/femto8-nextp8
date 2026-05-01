@@ -363,6 +363,34 @@ int pal(lua_State *L)
         }
         lua_pop(L, 1);
     }
+    else if (lua_gettop(L) == 1)
+    {
+        int p = lua_tointeger(L, 1);
+        if (p == PALTYPE_DRAW) {
+            for (int i=0;i<16;++i)
+                color_set(PALTYPE_DRAW, i, i == 0 ? i | 0x10 : i);
+        } else if (p == PALTYPE_SCREEN) {
+            for (int i=0;i<16;++i)
+                color_set(PALTYPE_SCREEN, i, i);
+        } else if (p == PALTYPE_SECONDARY) {
+            color_set(PALTYPE_SECONDARY, 0, 0x00);
+            color_set(PALTYPE_SECONDARY, 1, 0x01);
+            color_set(PALTYPE_SECONDARY, 2, 0x12);
+            color_set(PALTYPE_SECONDARY, 3, 0x13);
+            color_set(PALTYPE_SECONDARY, 4, 0x24);
+            color_set(PALTYPE_SECONDARY, 5, 0x15);
+            color_set(PALTYPE_SECONDARY, 6, 0xd6);
+            color_set(PALTYPE_SECONDARY, 7, 0x67);
+            color_set(PALTYPE_SECONDARY, 8, 0x48);
+            color_set(PALTYPE_SECONDARY, 9, 0x49);
+            color_set(PALTYPE_SECONDARY, 10, 0x9a);
+            color_set(PALTYPE_SECONDARY, 11, 0x3b);
+            color_set(PALTYPE_SECONDARY, 12, 0xdc);
+            color_set(PALTYPE_SECONDARY, 13, 0x5d);
+            color_set(PALTYPE_SECONDARY, 14, 0x8e);
+            color_set(PALTYPE_SECONDARY, 15, 0xef);
+        }
+    }
     else
     {
         int c0 = lua_tointeger(L, 1);
@@ -387,7 +415,10 @@ int palt(lua_State *L)
 {
     if (lua_gettop(L) == 0)
     {
-        reset_color();
+        for (int col=0;col<16;++col) {
+            uint8_t c = color_get(PALTYPE_DRAW, col);
+            color_set(PALTYPE_DRAW, col, c & 0xf);
+        }
     }
     else if (lua_gettop(L) == 1)
     {
