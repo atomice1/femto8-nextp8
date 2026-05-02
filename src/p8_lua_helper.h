@@ -808,10 +808,14 @@ static inline void color_set(int type, int index, int col)
 
 static inline void clip_set(int x, int y, int w, int h)
 {
+    int x1 = x + w;
+    int y1 = y + h;
+    if (x1 < 0) x1 = 0;
+    if (y1 < 0) y1 = 0;
     m_memory[MEMORY_CLIPRECT] = x;
     m_memory[MEMORY_CLIPRECT + 1] = y;
-    m_memory[MEMORY_CLIPRECT + 2] = x + w;
-    m_memory[MEMORY_CLIPRECT + 3] = y + h;
+    m_memory[MEMORY_CLIPRECT + 2] = (uint8_t)x1;
+    m_memory[MEMORY_CLIPRECT + 3] = (uint8_t)y1;
 }
 
 static inline void clip_get(int *x0, int *y0, int *x1, int *y1)
