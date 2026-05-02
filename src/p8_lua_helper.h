@@ -80,6 +80,23 @@ static inline int dash_direction_y(int facing)
     return 0;
 }
 
+// Returns true if the world-space bounding box [wx0,wy0]..[wx1,wy1] is entirely
+// outside the effective clip region (clip rect intersected with screen bounds).
+static inline bool is_bbox_offscreen(int wx0, int wy0, int wx1, int wy1)
+{
+    int cx, cy;
+    camera_get(&cx, &cy);
+    int ccx0, ccy0, ccx1, ccy1;
+    clip_get(&ccx0, &ccy0, &ccx1, &ccy1);
+    if (ccx0 < 0) ccx0 = 0;
+    if (ccy0 < 0) ccy0 = 0;
+    if (ccx1 > P8_WIDTH)  ccx1 = P8_WIDTH;
+    if (ccy1 > P8_HEIGHT) ccy1 = P8_HEIGHT;
+    int sx0 = wx0 - cx, sy0 = wy0 - cy;
+    int sx1 = wx1 - cx, sy1 = wy1 - cy;
+    return sx1 < ccx0 || sx0 >= ccx1 || sy1 < ccy0 || sy0 >= ccy1;
+}
+
 static inline void draw_oval_segment(int xc, int yc, int x, int y, int r, int xr, int yr, int col, int fillp, int mask)
 {
     if (mask & 1)
@@ -105,6 +122,7 @@ static inline void draw_oval_mask(int xc, int yc, int xr, int yr, int col, int f
     int r = MAX(xr, yr);
     if (r <= 0)
         return;
+    if (is_bbox_offscreen(xc - xr, yc - yr, xc + xr, yc + yr)) return;
     int x = 0, y = abs(r);
     int d = 3 - 2 * abs(r);
 
@@ -138,6 +156,7 @@ static inline void draw_circ(int xc, int yc, int r, int col, int fillp)
 
 static inline void draw_line(int x0, int y0, int x1, int y1, int col, int fillp)
 {
+    if (is_bbox_offscreen(MIN(x0, x1), MIN(y0, y1), MAX(x0, x1), MAX(y0, y1))) return;
     int dx = abs(x1 - x0);
     int sx = x0 < x1 ? 1 : -1;
     int dy = -abs(y1 - y0);
@@ -188,6 +207,8 @@ static inline void draw_hline(int x0, int y, int x1, int col, int fillp)
         if (x1 > cx1) x1 = cx1;
         if (x0 < 0) x0 = 0;
         if (x1 > P8_WIDTH - 1) x1 = P8_WIDTH - 1;
+
+        if (x0 > x1) return;  // entirely off-screen after clipping
 
         int base_screen_offset = gfx_addr_remap(MEMORY_SCREEN);
         int screen_offset = base_screen_offset + (x0 >> 1) + y * 64;
@@ -258,6 +279,7 @@ static inline void draw_ovalfill_mask(int xc, int yc, int xr, int yr, int col, i
     int r = MAX(xr, yr);
     if (r <= 0)
         return;
+    if (!fillp_invert_enabled(col) && is_bbox_offscreen(xc - xr, yc - yr, xc + xr, yc + yr)) return;
 
     if (fillp_invert_enabled(col)) {
         int left = xc - xr;
@@ -306,6 +328,7 @@ static inline void draw_circfill(int xc, int yc, int r, int col, int fillp)
 
 static inline void draw_rect(int x0, int y0, int x1, int y1, int col, int fillp)
 {
+    if (is_bbox_offscreen(x0, y0, x1, y1)) return;
     draw_hline(x0, y0, x1, col, fillp);
     draw_hline(x0, y1, x1, col, fillp);
     draw_vline(x0, y0, y1, col, fillp);
@@ -341,6 +364,8 @@ static inline void draw_rectfill(int x0, int y0, int x1, int y1, int col, int fi
         if (y0 < 0) y0 = 0;
         if (x1 > P8_WIDTH - 1) x1 = P8_WIDTH - 1;
         if (y1 > P8_HEIGHT - 1) y1 = P8_HEIGHT - 1;
+
+        if (x0 > x1 || y0 > y1) return;  // entirely off-screen after clipping
 
         int base_screen_offset = gfx_addr_remap(MEMORY_SCREEN);
         int c = color_get(PALTYPE_DRAW, col);

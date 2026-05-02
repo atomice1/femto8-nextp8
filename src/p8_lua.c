@@ -593,6 +593,8 @@ int rrect(lua_State *L)
     int bottom = top + h-1;
     r = MAX(0, MIN(r, MIN(w, h) / 2));
 
+    if (is_bbox_offscreen(left, top, right, bottom)) return 0;
+
     draw_hline(left+r, top, right-r, col, fillp);
     draw_hline(left+r, bottom, right-r, col, fillp);
     draw_vline(left, top+r, bottom-r, col, fillp);
@@ -623,6 +625,8 @@ int rrectfill(lua_State *L)
     int right = left + w;
     int bottom = top + h;
     r = MAX(0, MIN(r, MIN(w, h) / 2));
+
+    if (!invert && is_bbox_offscreen(left, top, right, bottom)) return 0;
 
     if (invert) {
         int cx, cy;
