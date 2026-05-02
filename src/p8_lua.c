@@ -1365,7 +1365,9 @@ int rnd(lua_State *L)
 // srand(val)
 int _srand(lua_State *L)
 {
-    unsigned n = lua_tounsigned(L, 1);
+    // Use the full 32-bit raw fix32 representation so that srand(0x5b04.17cb)
+    // seeds with 0x5b0417cb, not just the integer part 0x5b04.
+    uint32_t n = (uint32_t)fix32_bits(lua_tonumber(L, 1));
 
     p8_seed_rng_state(n);
 
