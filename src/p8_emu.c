@@ -1512,9 +1512,9 @@ void p8_seed_rng_state(uint32_t seed)
     } else {
         seed &= 0x7fffffff;
 
-        uint32_t seed_fixed = seed << 16;
-        hi = seed_fixed ^ 0xbead29ba;
-        lo = seed_fixed;
+        // seed is already a full 32-bit fix32 value; use it directly.
+        hi = seed ^ 0xbead29ba;
+        lo = seed;
     }
 
     for (int i = 0; i < 32; i++) {
@@ -1544,7 +1544,8 @@ void p8_reset(void)
     pencolor_set(6);
     reset_color();
     clip_set(0, 0, P8_WIDTH, P8_HEIGHT);
-    p8_seed_rng_state(time(NULL));
+    // time(NULL) is a plain integer; shift left 16 to make it a fix32 integer.
+    p8_seed_rng_state((uint32_t)time(NULL) << 16);
 }
 
 void __attribute__ ((noreturn)) p8_abort()
