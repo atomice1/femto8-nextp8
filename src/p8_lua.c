@@ -92,8 +92,8 @@ int camera(lua_State *L)
 
     camera_set(cx, cy);
 
-    lua_pushnumber(L, prev_cx);
-    lua_pushnumber(L, prev_cy);
+    lua_pushinteger(L, prev_cx);
+    lua_pushinteger(L, prev_cy);
     return 2;
 }
 
@@ -146,6 +146,9 @@ int circfill(lua_State *L)
 // clip(x, y, w, h)
 int clip(lua_State *L)
 {
+    int prev_x0, prev_y0, prev_x1, prev_y1;
+    clip_get(&prev_x0, &prev_y0, &prev_x1, &prev_y1);
+
     if (lua_gettop(L) == 0)
         clip_set(0, 0, P8_WIDTH, P8_HEIGHT);
     else
@@ -156,21 +159,24 @@ int clip(lua_State *L)
         int h = lua_tointeger(L, 4);
         bool clip_previous = lua_gettop(L) >= 5 ? lua_toboolean(L, 5) : false;
 
-        int prev_x0 = 0, prev_y0 = 0, prev_x1 = P8_WIDTH, prev_y1 = P8_HEIGHT;
-        if (clip_previous)
-            clip_get(&prev_x0, &prev_y0, &prev_x1, &prev_y1);
+        int clamp_x0 = 0, clamp_y0 = 0, clamp_x1 = P8_WIDTH, clamp_y1 = P8_HEIGHT;
+        if (clip_previous) { clamp_x0 = prev_x0; clamp_y0 = prev_y0; clamp_x1 = prev_x1; clamp_y1 = prev_y1; }
 
         int x1 = x0 + w;
         int y1 = y0 + h;
-        x0 = MAX(x0, prev_x0);
-        y0 = MAX(y0, prev_y0);
-        x1 = MIN(x1, prev_x1);
-        y1 = MIN(y1, prev_y1);
+        x0 = MAX(x0, clamp_x0);
+        y0 = MAX(y0, clamp_y0);
+        x1 = MIN(x1, clamp_x1);
+        y1 = MIN(y1, clamp_y1);
 
         clip_set(x0, y0, x1-x0, y1-y0);
     }
 
-    return 0;
+    lua_pushinteger(L, prev_x0);
+    lua_pushinteger(L, prev_y0);
+    lua_pushinteger(L, prev_x1 - prev_x0);
+    lua_pushinteger(L, prev_y1 - prev_y0);
+    return 4;
 }
 
 // cls([color])
@@ -186,16 +192,21 @@ int cls(lua_State *L)
 // color(col)
 int color(lua_State *L)
 {
+    int prev = pencolor_get();
     int col = lua_gettop(L) == 1 ? lua_tointeger(L, 1) : 6;
 
     pencolor_set(col);
 
-    return 0;
+    lua_pushinteger(L, prev);
+    return 1;
 }
 
 // cursor([x,] [y,] [col])
 int cursor(lua_State *L)
 {
+    int prev_x, prev_y;
+    cursor_get(&prev_x, &prev_y);
+
     int x = lua_gettop(L) >= 1 ? lua_tointeger(L, 1) : 0;
     int y = lua_gettop(L) >= 2 ? lua_tointeger(L, 2) : 0;
     int color = lua_gettop(L) >= 3 ? lua_tointeger(L, 3) : -1;
@@ -203,7 +214,9 @@ int cursor(lua_State *L)
     cursor_set(x, y, (color == -1) ? -1 : color);
     left_margin_set(x);
 
-    return 0;
+    lua_pushinteger(L, prev_x);
+    lua_pushinteger(L, prev_y);
+    return 2;
 }
 
 // fget(n, [f])
@@ -418,14 +431,18 @@ int pal(lua_State *L)
         int c1 = lua_tointeger(L, 2);
         int p = lua_gettop(L) == 3 ? lua_tointeger(L, 3) : PALTYPE_DRAW;
 
+        uint8_t old_val = color_get(p, c0);
         uint8_t new_val;
         if (p == PALTYPE_DRAW) {
-            uint8_t old_val = color_get(p, c0);
             new_val = (c1 & 0xf) | (old_val & 0xf0);
         } else {
             new_val = c1 & 0xff;
         }
         color_set(p, c0, new_val);
+
+        // Return the old mapped color for this slot
+        lua_pushinteger(L, old_val & 0xf);
+        return 1;
     }
 
     return 0;
@@ -456,8 +473,12 @@ int palt(lua_State *L)
         int col = lua_tointeger(L, 1);
         int t = lua_toboolean(L, 2);
         uint8_t c = color_get(PALTYPE_DRAW, col);
+        bool prev_transparent = (c & 0x10) != 0;
 
         color_set(PALTYPE_DRAW, col, t ? (c | 0x10) : (c & 0xF));
+
+        lua_pushboolean(L, prev_transparent);
+        return 1;
     }
 
     return 0;
@@ -976,14 +997,20 @@ int btnp(lua_State *L)
 int music(lua_State *L)
 {
 #ifdef ENABLE_AUDIO
+    int prev = audio_stat(54);  // stat(54) = current music pattern, -1 if none
+
     int n = lua_tointeger(L, 1);
     int fadems = lua_to_or_default(L, integer, 2, 1);
     int channelmask = lua_to_or_default(L, integer, 3, 0);
 
     audio_music(n, fadems, channelmask);
-#endif
 
-    return 0;
+    lua_pushinteger(L, prev);
+    return 1;
+#else
+    lua_pushinteger(L, -1);
+    return 1;
+#endif
 }
 
 // sfx(n, [channel,] [offset,] [length])
@@ -1108,25 +1135,37 @@ int mset(lua_State *L)
 // cstore(destaddr, sourceaddr, len, [filename])
 int cstore(lua_State *L)
 {
+    unsigned destaddr = lua_gettop(L) >= 1 ? lua_tounsigned(L, 1) : 0;
     fprintf(stderr, "warning: cstore() is not implemented\n");
-    return 0;
+    lua_pushinteger(L, destaddr);
+    return 1;
 }
 
 // memcpy(destaddr, sourceaddr, len)
 int _memcpy(lua_State *L)
 {
     unsigned destaddr = lua_tounsigned(L, 1);
+    unsigned orig_destaddr = destaddr;
     unsigned sourceaddr = lua_tounsigned(L, 2);
     unsigned len = lua_tounsigned(L, 3);
 
     if (len < 1 || destaddr == sourceaddr)
-        return 0;
+    {
+        lua_pushinteger(L, orig_destaddr);
+        return 1;
+    }
 
     if (sourceaddr < 0 || (sourceaddr + len) > (1 << 16))
-        return 0;
+    {
+        lua_pushinteger(L, orig_destaddr);
+        return 1;
+    }
 
     if (destaddr < 0 || (destaddr + len) > (1 << 16))
-        return 0;
+    {
+        lua_pushinteger(L, orig_destaddr);
+        return 1;
+    }
 
     while (len > 0) {
         unsigned chunk = MIN(MIN(len, 0x2000 - (sourceaddr & 0x1fff)), 0x2000 - (destaddr & 0x1fff));
@@ -1138,7 +1177,8 @@ int _memcpy(lua_State *L)
         len -= chunk;
     }
 
-    return 0;
+    lua_pushinteger(L, orig_destaddr);
+    return 1;
 }
 
 // memset(destaddr, val, len)
@@ -1223,7 +1263,8 @@ int poke(lua_State *L)
     if (addr >= MEMORY_CARTDATA && addr + 1 <= MEMORY_CARTDATA + MEMORY_CARTDATA_SIZE)
         p8_delayed_flush_cartdata();
 
-    return 0;
+    lua_pushinteger(L, 0);
+    return 1;
 }
 
 // poke2(addr, val1, ...)
@@ -1243,7 +1284,8 @@ int poke2(lua_State *L)
     if (addr >= MEMORY_CARTDATA && addr + 2 <= MEMORY_CARTDATA + MEMORY_CARTDATA_SIZE)
         p8_delayed_flush_cartdata();
 
-    return 0;
+    lua_pushinteger(L, 0);
+    return 1;
 }
 
 // poke4(addr, val1, ...)
@@ -1265,7 +1307,8 @@ int poke4(lua_State *L)
     if (addr >= MEMORY_CARTDATA && addr + 4 <= MEMORY_CARTDATA + MEMORY_CARTDATA_SIZE)
         p8_delayed_flush_cartdata();
 
-    return 0;
+    lua_pushinteger(L, 0);
+    return 1;
 }
 
 // reload(destaddr, sourceaddr, len, [filename])
@@ -1273,6 +1316,7 @@ int reload(lua_State *L)
 {
     int nargs = lua_gettop(L);
     unsigned destaddr = nargs >= 1 ? lua_tounsigned(L, 1) : 0;
+    unsigned orig_destaddr = destaddr;
     unsigned srcaddr  = nargs >= 2 ? lua_tounsigned(L, 2) : 0;
     unsigned len      = nargs >= 3 ? lua_tounsigned(L, 3) : 0x4300;
     destaddr = addr_remap(destaddr);
@@ -1289,8 +1333,10 @@ int reload(lua_State *L)
         }
         char *resolved_path = p8_resolve_relative_path(file_name);
         free(full_filename);
-        if (!resolved_path)
-            return 0;
+        if (!resolved_path) {
+            lua_pushinteger(L, orig_destaddr);
+            return 1;
+        }
         p8_show_io_icon(true);
         uint8_t *buffer = NULL;
         src_mem = (uint8_t *)malloc(CART_MEMORY_SIZE);
@@ -1298,7 +1344,8 @@ int reload(lua_State *L)
             free(src_mem);
             free(resolved_path);
             p8_show_io_icon(false);
-            return 0;
+            lua_pushinteger(L, orig_destaddr);
+            return 1;
         }
         free(buffer);
         free(resolved_path);
@@ -1311,7 +1358,8 @@ int reload(lua_State *L)
         free(src_mem);
         p8_show_io_icon(false);
     }
-    return 0;
+    lua_pushinteger(L, orig_destaddr);
+    return 1;
 }
 
 // ****************************************************************
@@ -1375,13 +1423,18 @@ int rnd(lua_State *L)
 // srand(val)
 int _srand(lua_State *L)
 {
+    // Capture the current RNG state as the "previous seed" (lo word is the seed)
+    uint32_t prev_lo = m_memory[MEMORY_RNG_STATE+4] | (m_memory[MEMORY_RNG_STATE+5] << 8) |
+                       (m_memory[MEMORY_RNG_STATE+6] << 16) | (m_memory[MEMORY_RNG_STATE+7] << 24);
+
     // Use the full 32-bit raw fix32 representation so that srand(0x5b04.17cb)
     // seeds with 0x5b0417cb, not just the integer part 0x5b04.
     uint32_t n = (uint32_t)fix32_bits(lua_tonumber(L, 1));
 
     p8_seed_rng_state(n);
 
-    return 0;
+    lua_pushnumber(L, fix32_from_bits(prev_lo));
+    return 1;
 }
 
 // ****************************************************************
@@ -1411,7 +1464,8 @@ int dget(lua_State *L)
 int dset(lua_State *L)
 {
     unsigned index = lua_tounsigned(L, 1);
-    uint32_t value = fix32_bits(lua_tonumber(L, 2));
+    lua_Number val_num = lua_tonumber(L, 2);
+    uint32_t value = fix32_bits(val_num);
 
     m_memory[MEMORY_CARTDATA + index*4] = value;
     m_memory[MEMORY_CARTDATA + index*4 + 1] = value >> 8;
@@ -1420,7 +1474,8 @@ int dset(lua_State *L)
 
     p8_delayed_flush_cartdata();
 
-    return 0;
+    lua_pushnumber(L, val_num);
+    return 1;
 }
 
 // ****************************************************************
@@ -1630,7 +1685,8 @@ int printh(lua_State *L)
     printf("%s\r\n", str);
     fflush(stdout);
 
-    return 0;
+    lua_pushboolean(L, 1);
+    return 1;
 }
 
 // stat(n)
