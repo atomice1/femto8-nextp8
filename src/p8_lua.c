@@ -84,12 +84,17 @@ static unsigned addr_remap(unsigned address)
 // camera([x,] [y])
 int camera(lua_State *L)
 {
+    int prev_cx, prev_cy;
+    camera_get(&prev_cx, &prev_cy);
+
     int cx = lua_gettop(L) >= 1 ? lua_tointeger(L, 1) : 0;
     int cy = lua_gettop(L) >= 2 ? lua_tointeger(L, 2) : 0;
 
     camera_set(cx, cy);
 
-    return 0;
+    lua_pushnumber(L, prev_cx);
+    lua_pushnumber(L, prev_cy);
+    return 2;
 }
 
 // circ(x, y, [r,] [col])
