@@ -852,13 +852,17 @@ int tline(lua_State *L)
         uint32_t tmx = mx_bits & mask_x_bits;
         uint32_t tmy = my_bits & mask_y_bits;
 
-        int tx = (tmx >> precision) + offset_x;
-        int ty = (tmy >> precision) + offset_y;
+        int tx_raw = ((int32_t)tmx) >> precision;
+        int ty_raw = ((int32_t)tmy) >> precision;
+        int tx = tx_raw + offset_x;
+        int ty = ty_raw + offset_y;
 
         int celx = tx >> 3;
         int cely = ty >> 3;
         int index = 0;
-        if (!map_invalid && celx >= 0 && cely >= 0) {
+        // Bounds check uses pre-offset coordinates (PICO-8 behaviour: offset doesn't
+        // make a negative texture coordinate valid for map lookup).
+        if (!map_invalid && (tx_raw >> 3) >= 0 && (ty_raw >> 3) >= 0) {
             uint8_t ms = (cely >= 32 && map_start_upper < 0x80) ? map_start_lower : map_start_upper;
             int adj_cely = (cely >= 32 && map_start_upper < 0x80) ? cely - 32 : cely;
             int address = (ms << 8) + celx + adj_cely * map_width;
@@ -866,7 +870,6 @@ int tline(lua_State *L)
                 !(address >= 0x3000 && address < 0x8000))
                 index = m_memory[address];
         }
-
         if ((index != 0 || sprite_0_opaque) && (layer == 0 || ((layer & sprite_flags_base[index]) == layer))) {
             int spx = (index & 0xF) * 8 + (tx & 7);
             int spy = (index >> 4) * 8 + (ty & 7);
