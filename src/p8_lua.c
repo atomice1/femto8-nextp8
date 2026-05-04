@@ -2196,11 +2196,11 @@ void lua_print_error(const char *where)
     {
         const char *message = lua_tostring(L, -1);
         printf("%s\r\n", message);
-        // Extract line number from error string like "...[string ...]:1292:"
+        // Extract line number from error string like "...:1292:"
         const char *colon = message;
         int lineno = 0;
         while (*colon) {
-            if (*colon == ']' && *(colon+1) == ':') {
+            if (*colon != ']' && *(colon+1) == ':') {
                 lineno = atoi(colon + 2);
                 if (lineno > 0) break;
             }
