@@ -947,10 +947,7 @@ int btn(lua_State *L)
         int i = lua_tointeger(L, 1);
         int p = lua_gettop(L) >= 2 ? lua_tointeger(L, 2) : 0;
 
-        if (p >= PLAYER_COUNT)
-            p = 0;
-
-        if (i < BUTTON_COUNT)
+        if (i < BUTTON_COUNT && p < PLAYER_COUNT)
             lua_pushboolean(L, is_button_set(p, i, false));
         else
             lua_pushboolean(L, false);
@@ -973,10 +970,7 @@ int btnp(lua_State *L)
         int i = lua_tointeger(L, 1);
         int p = lua_gettop(L) >= 2 ? lua_tointeger(L, 2) : 0;
 
-        if (p >= PLAYER_COUNT)
-            p = 0;
-
-        if (i < BUTTON_COUNT)
+        if (i < BUTTON_COUNT && p < PLAYER_COUNT)
             lua_pushboolean(L, is_button_set(p, i, true));
         else
             lua_pushboolean(L, false);
