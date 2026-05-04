@@ -700,11 +700,9 @@ int sget(lua_State *L)
 // spr(n, x, y, [w,] [h,] [flip_x,] [flip_y])
 int spr(lua_State *L)
 {
-    assert(lua_isnumber(L, 2) && lua_isnumber(L, 3));
-
     int n = lua_tointeger(L, 1);
-    int x = lua_tointeger(L, 2);
-    int y = lua_tointeger(L, 3);
+    int x = lua_gettop(L) >= 2 ? lua_tointeger(L, 2) : 0;
+    int y = lua_gettop(L) >= 3 ? lua_tointeger(L, 3) : 0;
     bool flip_x = false, flip_y = false;
 
     if (lua_gettop(L) > 3)
