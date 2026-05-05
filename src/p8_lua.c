@@ -269,6 +269,13 @@ int holdframe(lua_State *L)
     return 0;
 }
 
+int _update_buttons(lua_State *L)
+{
+    (void)L;
+    p8_update_input();
+    return 0;
+}
+
 // fset(n, [f,] v)
 int fset(lua_State *L)
 {
@@ -1998,6 +2005,7 @@ void lua_register_functions(lua_State *L)
     // ****************************************************************
     lua_register(L, "btn", btn);
     lua_register(L, "btnp", btnp);
+    lua_register(L, "_update_buttons", _update_buttons);
     // ****************************************************************
     // *** Sound ***
     // ****************************************************************
