@@ -57,6 +57,8 @@ static char *m_clipboard = NULL;
 
 static int m_tline_precision = 13;
 
+static int m_load_result = 0;  /* stat(107): 1=success, -1=not found, -2=fetch failed, -3=no bbs */
+
 void lua_load_api();
 void lua_shutdown_api();
 void lua_print_error(const char *where);
@@ -1622,12 +1624,18 @@ int _load(lua_State *L)
         const char *cart_id = filename + 1;  /* Skip the '#' */
         resolved_path = p8_download_bbs_cart(cart_id);
         if (!resolved_path) {
-            luaL_error(L, "failed to download cart from bbs");
-            return 0;
+            m_load_result = -2;
+            fprintf(stderr, "load: could not fetch cart\n");
+            lua_pushboolean(L, 0);
+            lua_pushstring(L, "could not fetch cart");
+            return 2;
         }
 #else
-        luaL_error(L, "bbs download not supported");
-        return 0;
+        m_load_result = -3;
+        fprintf(stderr, "load: bbs download not supported\n");
+        lua_pushboolean(L, 0);
+        lua_pushstring(L, "bbs download not supported");
+        return 2;
 #endif
     } else {
         /* Clear BBS cart ID for non-BBS loads */
@@ -1650,14 +1658,20 @@ int _load(lua_State *L)
         resolved_path = p8_resolve_relative_path(filename);
     }
 
-    if (!resolved_path)
+    if (!resolved_path) {
+        free(full_filename);
         luaL_error(L, "out of memory");
+    }
 
     /* Only check file access if not a BBS cart (which was already downloaded) */
     if (filename[0] != '#' && access(resolved_path, F_OK) != 0) {
-        fprintf(stderr, "could not access %s\n", filename);
+        fprintf(stderr, "load: could not find cart %s\n", filename);
+        free(full_filename);
         free(resolved_path);
-        return 0;
+        m_load_result = -1;
+        lua_pushboolean(L, 0);
+        lua_pushstring(L, "could not find cart");
+        return 2;
     }
 
     if (full_filename)
@@ -1667,10 +1681,12 @@ int _load(lua_State *L)
     if (nargs >= 3)
         param = lua_tostring(L, 3);
 
+    m_load_result = 1;
     p8_load_new(resolved_path, param);
     free(resolved_path);
 
-    return 0;
+    lua_pushboolean(L, 1);
+    return 1;
 }
 
 // ****************************************************************
@@ -1867,6 +1883,9 @@ case STAT_MEM_USAGE: {
         break;
     case STAT_BBS_CART_ID:
         lua_pushstring(L, m_bbs_cart_id ? m_bbs_cart_id : "");
+        break;
+    case STAT_LOAD_RESULT:
+        lua_pushinteger(L, m_load_result);
         break;
     case STAT_CURRENT_PATH:
         if (current_cart_dir)
