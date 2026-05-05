@@ -214,7 +214,6 @@ static int pico8_tostr(lua_State *l) {
             /* PICO-8 0.1.12d changelog: "__tostring metatable method
              * observed by tostr() / print() / printh()" */
             if (luaL_callmeta(l, 1, "__tostring")) {
-                luaL_tolstring(l, 1, NULL);
                 return 1;
             }
             /* fall through */
