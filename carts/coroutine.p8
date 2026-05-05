@@ -9,6 +9,7 @@ function anim()
   for i=4,124,4 do
     x=i
     y=i
+    yield()
   end
 end
  

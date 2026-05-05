@@ -521,11 +521,12 @@ int pget(lua_State *L)
 // print(str, [x,] [y,] [col])
 int print(lua_State *L)
 {
-    size_t len;
-    const char *str = lua_tolstring(L, 1, &len);
+    size_t len = 0;
+    const char *str = lua_gettop(L) >= 1 ? lua_tolstring(L, 1, &len) : NULL;
+    if (!str) { str = ""; len = 0; }
     int right;
 
-    if (lua_gettop(L) >= 1 && lua_gettop(L) <= 2)
+    if (lua_gettop(L) <= 2)
     {
         int x, y;
         cursor_get(&x, &y);
@@ -549,8 +550,6 @@ int print(lua_State *L)
 
         draw_text(str, len, x, y, col, x, false, NULL, NULL, &right);
     }
-    else
-        assert(false);
 
     lua_pushinteger(L, right);
     return 1;
@@ -1668,7 +1667,13 @@ int _load(lua_State *L)
 // printh(str, [filename], [overwrite])
 int printh(lua_State *L)
 {
-    const char *str = lua_tostring(L, 1);
+    const char *str = lua_gettop(L) >= 1 ? lua_tostring(L, 1) : NULL;
+    if (!str) {
+        printf("\r\n");
+        fflush(stdout);
+        lua_pushboolean(L, 1);
+        return 1;
+    }
     const char *filename = lua_gettop(L) >= 2 ? lua_tostring(L, 2) : NULL;
 
     if (filename && strcmp(filename, "@clip") == 0)
@@ -1726,7 +1731,7 @@ int _stat(lua_State *L)
         lua_pushstring(L, m_param_string);
         break;
     case STAT_FRAMERATE:
-        lua_pushinteger(L, m_actual_fps);
+        lua_pushinteger(L, m_fps);
         break;
     case STAT_TARGET_FRAMERATE:
         lua_pushinteger(L, m_fps);
@@ -2153,7 +2158,7 @@ void lua_register_functions(lua_State *L)
     lua_pushinteger(L, 4); lua_setglobal(L, "\x8e");  // 142 🅾️ O/Z
     lua_pushinteger(L, 5); lua_setglobal(L, "\x97");  // 151 ❎ X
 
-    lua_pushnumber(L, fix32_from_bits(0x00000000)); lua_setglobal(L, "\x80");  // 128 █
+    lua_pushnumber(L, fix32_from_bits(0x00008000)); lua_setglobal(L, "\x80");  // 128 █
     lua_pushnumber(L, fix32_from_bits(0x5a5a8000)); lua_setglobal(L, "\x81");  // 129 ▒
     lua_pushnumber(L, fix32_from_bits(0x511f8000)); lua_setglobal(L, "\x82");  // 130 🐱
     lua_pushnumber(L, fix32_from_bits(0x7d7d8000)); lua_setglobal(L, "\x84");  // 132 ░
