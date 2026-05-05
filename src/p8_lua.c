@@ -57,6 +57,8 @@ char m_str_buffer[256] = {0};
 
 static int m_tline_precision = 13;
 
+static int m_load_result = 0;  /* stat(107): 1=success, -1=not found, -2=fetch failed, -3=no bbs */
+
 void lua_load_api();
 void lua_shutdown_api();
 void lua_print_error(const char *where);
@@ -1614,6 +1616,8 @@ int _load(lua_State *L)
         m_breadcrumb = strdup(breadcrumb);
 
     char *full_filename = NULL;
+    char *resolved_path = NULL;
+
     if (strstr(filename, ".p8") == NULL && strstr(filename, ".P8") == NULL) {
         size_t len = strlen(filename) + 4;
         full_filename = (char *)malloc(len);
@@ -1625,28 +1629,35 @@ int _load(lua_State *L)
         filename = full_filename;
     }
 
-    char *resolved_path = p8_resolve_relative_path(filename);
+    resolved_path = p8_resolve_relative_path(filename);
 
-    if (full_filename)
+    if (full_filename) {
         free(full_filename);
+    }
 
-    if (!resolved_path)
+    if (!resolved_path) {
         luaL_error(L, "out of memory");
+    }
 
     if (access(resolved_path, F_OK) != 0) {
-        fprintf(stderr, "could not access %s\n", filename);
+        fprintf(stderr, "load: could not find cart %s\n", filename);
         free(resolved_path);
-        return 0;
+        m_load_result = -1;
+        lua_pushboolean(L, -1);
+        lua_pushstring(L, "could not find cart");
+        return 2;
     }
 
     const char *param = NULL;
     if (nargs >= 3)
         param = lua_tostring(L, 3);
 
+    m_load_result = 1;
     p8_load_new(resolved_path, param);
     free(resolved_path);
 
-    return 0;
+    lua_pushboolean(L, 1);
+    return 1;
 }
 
 // ****************************************************************
@@ -1843,6 +1854,9 @@ int _stat(lua_State *L)
         break;
     case STAT_BBS_CART_ID:
         lua_pushstring(L, "");
+        break;
+    case STAT_LOAD_RESULT:
+        lua_pushinteger(L, m_load_result);
         break;
     case STAT_CURRENT_PATH:
         if (current_cart_dir)
