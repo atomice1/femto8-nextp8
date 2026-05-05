@@ -263,6 +263,12 @@ int flip(lua_State *L)
     return 0;
 }
 
+int holdframe(lua_State *L)
+{
+    (void)L;
+    return 0;
+}
+
 // fset(n, [f,] v)
 int fset(lua_State *L)
 {
@@ -1959,6 +1965,7 @@ void lua_register_functions(lua_State *L)
     lua_register(L, "fget", fget);
     lua_register(L, "fillp", fillp);
     lua_register(L, "flip", flip);
+    lua_register(L, "holdframe", holdframe);
     lua_register(L, "fset", fset);
     lua_register(L, "line", line);
     lua_register(L, "oval", oval);
