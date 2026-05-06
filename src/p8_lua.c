@@ -28,6 +28,7 @@
 #include <unistd.h>   // sysconf
 #include <stdio.h>    // fopen/fscanf
 #endif
+#include <errno.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -1167,7 +1168,7 @@ int cstore(lua_State *L)
                 snprintf(full_filename, flen, "%s.p8", file_name);
             file_name = full_filename;
         }
-        resolved_path = p8_resolve_relative_path(file_name);
+        resolved_path = p8_resolve_relative_path(file_name, true);
         free(full_filename);
     } else {
         if (!current_cart_path) {
@@ -1191,23 +1192,44 @@ int cstore(lua_State *L)
         return 1;
     }
 
-    p8_show_io_icon(true);
-
     // Load existing cart data (preserves sections not being patched, including Lua)
     uint8_t *work_mem = (uint8_t *)malloc(CART_MEMORY_SIZE);
     const char *existing_lua = NULL;
     uint8_t *file_buffer = NULL;
-    if (!work_mem || parse_cart_file(resolved_path, work_mem, &existing_lua, &file_buffer, NULL) != 0) {
-        // Target does not exist yet - start from zeroed memory, empty Lua
-        if (work_mem)
-            memset(work_mem, 0, CART_MEMORY_SIZE);
-        else {
+    if (!work_mem) {
+        luaL_error(L, "out of memory");
+        free(resolved_path);
+        lua_pushinteger(L, 0);
+        return 1;
+    }
+
+    p8_show_io_icon(true);
+
+    int ret = MKDIR(DEFAULT_CARTS_PATH);
+    if (ret == -1 && errno != EEXIST) {
+        fprintf(stderr, "cstore: failed to create carts directory: %s\n", strerror(errno));
+        free(resolved_path);
+        p8_show_io_icon(false);
+        lua_pushinteger(L, 0);
+        return 1;
+    }
+
+    if (access(resolved_path, F_OK) == -1) {
+        if (errno != ENOENT) {
+            fprintf(stderr, "cstore: failed to access existing cart: %s\n", strerror(errno));
             free(resolved_path);
             p8_show_io_icon(false);
             lua_pushinteger(L, 0);
             return 1;
         }
+        memset(work_mem, 0, CART_MEMORY_SIZE);
         existing_lua = "";
+    } else if (parse_cart_file(resolved_path, work_mem, &existing_lua, &file_buffer, NULL) != 0) {
+        fprintf(stderr, "cstore: failed to read existing cart\n");
+        free(resolved_path);
+        p8_show_io_icon(false);
+        lua_pushinteger(L, 0);
+        return 1;
     }
 
     // Patch the requested region from runtime memory
@@ -1418,13 +1440,12 @@ int reload(lua_State *L)
                 snprintf(full_filename, len, "%s.p8", file_name);
             file_name = full_filename;
         }
-        char *resolved_path = p8_resolve_relative_path(file_name);
+        char *resolved_path = p8_resolve_relative_path(file_name, false);
         free(full_filename);
         if (!resolved_path) {
             lua_pushinteger(L, orig_destaddr);
             return 1;
         }
-        p8_show_io_icon(true);
         uint8_t *buffer = NULL;
         src_mem = (uint8_t *)malloc(CART_MEMORY_SIZE);
         if (parse_cart_file(resolved_path, src_mem, NULL, &buffer, NULL) != 0) {
@@ -1754,7 +1775,7 @@ int _load(lua_State *L)
             filename = full_filename;
         }
 
-        resolved_path = p8_resolve_relative_path(filename);
+        resolved_path = p8_resolve_relative_path(filename, false);
     }
 
     if (!resolved_path) {

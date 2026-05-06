@@ -8,6 +8,11 @@
 #ifndef P8_EMU_H
 #define P8_EMU_H
 
+#if defined(_WIN32)
+#include <direct.h>   // _mkdir
+#else
+#include <sys/stat.h> // mkdir
+#endif
 #include <limits.h>
 #include <setjmp.h>
 #include <stdbool.h>
@@ -67,6 +72,12 @@
 #define IS_EVEN(n) (((n) ^ 1) == ((n) + 1))
 #define NIBBLE_SWAP(n) (((n) << 4) | ((n) >> 4))
 #define ARGB_TO_RGB565(argb) ((((argb) >> 8) & 0xF800) | (((argb) >> 5) & 0x07E0) | (((argb) >> 3) & 0x001F))
+
+#if defined(_WIN32)
+#define MKDIR(p) _mkdir(p)
+#else
+#define MKDIR(p) mkdir((p), 0777)
+#endif
 
 #ifndef SCREEN_WIDTH
 #define SCREEN_WIDTH 512
@@ -341,7 +352,7 @@ void p8_pump_events(void);
 int p8_shutdown(void);
 void p8_render();
 void p8_reset(void);
-char *p8_resolve_relative_path(const char *filename);
+char *p8_resolve_relative_path(const char *filename, bool for_cstore);
 void __attribute__ ((noreturn)) p8_abort();
 void __attribute__ ((noreturn)) p8_restart();
 void p8_seed_rng_state(uint32_t seed);

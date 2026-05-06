@@ -9,12 +9,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if defined(_WIN32)
-#include <direct.h>   // _mkdir
-#define MKDIR(p) _mkdir(p)
-#else
-#define MKDIR(p) mkdir((p), 0777)
-#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
