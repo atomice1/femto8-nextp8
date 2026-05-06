@@ -1432,7 +1432,7 @@ int reload(lua_State *L)
             free(src_mem);
             free(resolved_path);
             p8_show_io_icon(false);
-            lua_pushinteger(L, orig_destaddr);
+            lua_pushinteger(L, 0);
             return 1;
         }
         free(buffer);
@@ -1446,7 +1446,7 @@ int reload(lua_State *L)
         free(src_mem);
         p8_show_io_icon(false);
     }
-    lua_pushinteger(L, orig_destaddr);
+    lua_pushinteger(L, len);
     return 1;
 }
 
