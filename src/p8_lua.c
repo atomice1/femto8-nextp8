@@ -1552,6 +1552,28 @@ int _time(lua_State *L)
 // menuitem(index, [label, callback])
 int menuitem(lua_State *L)
 {
+    int index = luaL_checkinteger(L, 1);
+
+    if (index < 1 || index > MAX_CUSTOM_MENUITEMS)
+        return 0;
+
+    /* menuitem(i) with no label removes the item */
+    if (lua_gettop(L) < 2 || lua_isnil(L, 2)) {
+        p8_menuitem_clear(index);
+        return 0;
+    }
+
+    const char *label = lua_tostring(L, 2); /* may be nil/non-string */
+
+    if (lua_gettop(L) >= 3 && lua_isfunction(L, 3)) {
+        // Full set: update label and callback
+        lua_pushvalue(L, 3);
+        int callback_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+        p8_menuitem_set(index, label ? label : "", callback_ref);
+    } else {
+        // Label-only update: preserve existing callback
+        p8_menuitem_set_label(index, label ? label : "");
+    }
     return 0;
 }
 
@@ -2239,6 +2261,7 @@ void lua_load_api()
 void lua_shutdown_api()
 {
     if (L) {
+        p8_menuitem_reset_all();
         lua_close(L);
         L = NULL;
     }

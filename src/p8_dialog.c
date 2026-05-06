@@ -468,6 +468,17 @@ void p8_dialog_draw_stack(void)
         p8_dialog_draw(m_dialog_stack[i]);
 }
 
+/* Clear the dialog overlay region */
+void p8_dialog_clear(p8_dialog_t *dialog)
+{
+    int x = dialog->x;
+    int y = dialog->y;
+    int width = dialog->width;
+    int height = dialog->height;
+
+    overlay_draw_rectfill(x, y, x + width - 1, y + height - 1, 0);
+}
+
 /* Helper function to move to next selectable control */
 static bool move_to_next_control(p8_dialog_t *dialog, bool quick_mode)
 {
@@ -691,6 +702,20 @@ p8_dialog_action_t p8_dialog_update(p8_dialog_t *dialog)
         }
     }
 
+    // MENUITEM controls capture Left/Right and return them as a button event
+    // rather than navigating focus, so the cart callback receives them.
+    if (buttons & (BUTTON_MASK_LEFT | BUTTON_MASK_RIGHT)) {
+        if (dialog->focused_control >= 0) {
+            p8_dialog_control_t *ctrl = &dialog->controls[dialog->focused_control];
+            if (ctrl->type == DIALOG_MENUITEM) {
+                result.type = DIALOG_RESULT_BUTTON;
+                result.action_id = ctrl->data.button.action_id;
+                result.button_mask = buttons & (BUTTON_MASK_LEFT | BUTTON_MASK_RIGHT);
+                return result;
+            }
+        }
+    }
+
     // LEFT/RIGHT navigate to previous/next control
     if (buttons & BUTTON_MASK_LEFT) {
         move_to_prev_control(dialog, quick_mode);
@@ -749,6 +774,7 @@ void p8_dialog_set_showing(p8_dialog_t *dialog, bool showing)
             m_dialog_stack[m_dialog_nest_count] = NULL;
         }
         // Draw the dialogs underneath the closed one to refresh the screen
+        p8_dialog_clear(dialog);
         p8_dialog_draw_stack();
     } else if (showing) {
         assert(m_dialog_nest_count < MAX_DIALOG_NESTING);
