@@ -12,14 +12,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#if defined(_WIN32)
-#include <direct.h>   // _mkdir
-#define MKDIR(p) _mkdir(p)
-#else
-#include <sys/types.h>
-#include <sys/stat.h> // mkdir
-#define MKDIR(p) mkdir((p), 0777)
-#endif
 #include <unistd.h>
 #include <math.h>
 #include <assert.h>
@@ -1273,7 +1265,7 @@ void __attribute__ ((noreturn)) p8_restart()
     p8_abort();
 }
 
-char *p8_resolve_relative_path(const char *filename)
+char *p8_resolve_relative_path(const char *filename, bool for_cstore)
 {
     if (filename[0] == '/' || filename[1] == ':')
         return strdup(filename);
@@ -1281,11 +1273,19 @@ char *p8_resolve_relative_path(const char *filename)
     if (!current_cart_dir)
         return strdup(filename);
 
-    size_t len = strlen(current_cart_dir) + strlen(filename) + 2;
-    char *resolved_path = malloc(len);
-    if (resolved_path)
-        snprintf(resolved_path, len, "%s/%s", current_cart_dir, filename);
-    return resolved_path;
+    for (int pass=1;pass<=(for_cstore?1:2);pass++) {
+        const char *cart_dir = (pass == 1) ? DEFAULT_CARTS_PATH : current_cart_dir;
+        size_t len = strlen(cart_dir) + strlen(filename) + 2;
+        char *resolved_path = malloc(len);
+        if (resolved_path) {
+            snprintf(resolved_path, len, "%s/%s", cart_dir, filename);
+            if (pass == (for_cstore ? 1 : 2) || access(resolved_path, F_OK) == 0)
+                return resolved_path;
+            free(resolved_path);
+        }
+    }
+
+    return NULL;
 }
 
 void __attribute__ ((noreturn)) p8_load_new(const char *filename, const char *param)
