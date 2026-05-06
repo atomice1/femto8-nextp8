@@ -777,6 +777,65 @@ void p8_render()
 }
 #endif
 
+#ifdef SDL
+/* Translate SDL 1.2 platform-specific scancode to SDL2 (USB HID) scancode.
+ * SDL 1.2 scancode is platform-dependent:
+ *   Linux  : X11 keycode = evdev + 8  (range 8-255)
+ *   Windows: PS/2 Set 1 OEM code, (unsigned char) cast  (range 0-127)
+ *   macOS  : Mac virtual keycode  (range 0-127)
+ * m_scancodes[] and PICO-8 stat(28,k) use SDL2 scancodes. */
+#if defined(__linux__)
+static const unsigned s_sdl1_to_sdl2[256] = {
+    /* 0x00 */   0,   0,   0,   0,   0,   0,   0,   0,   0,  41,  30,  31,  32,  33,  34,  35,
+    /* 0x10 */  36,  37,  38,  39,  45,  46,  42,  43,  20,  26,   8,  21,  23,  28,  24,  12,
+    /* 0x20 */  18,  19,  47,  48,  40, 224,   4,  22,   7,   9,  10,  11,  13,  14,  15,  51,
+    /* 0x30 */  52,  53, 225,  49,  29,  27,   6,  25,   5,  17,  16,  54,  55,  56, 229,  85,
+    /* 0x40 */ 226,  44,  57,  58,  59,  60,  61,  62,  63,  64,  65,  66,  67,  83,  71,  95,
+    /* 0x50 */  96,  97,  86,  92,  93,  94,  87,  89,  90,  91,  98,  99,   0,   0, 100,  68,
+    /* 0x60 */  69,   0,   0,   0,   0,   0,   0,   0,  88, 228,  84,  70, 230,   0,  74,  82,
+    /* 0x70 */  75,  80,  79,  77,  81,  78,  73,  76,   0,   0,   0,   0,   0, 103,   0,  72,
+    /* 0x80 */   0,   0,   0,   0,   0, 227, 231, 101,   0,   0,   0,   0,   0,   0,   0,   0,
+    /* 0x90 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    /* 0xa0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    /* 0xb0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    /* 0xc0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    /* 0xd0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    /* 0xe0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    /* 0xf0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+};
+#elif defined(_WIN32)
+/* PS/2 Set 1 OEM scan codes (8-bit, extended-key bit stripped by SDL 1.2). */
+static const unsigned s_sdl1_to_sdl2[128] = {
+    /* 0x00 */   0,  41,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  45,  46,  42,  43,
+    /* 0x10 */  20,  26,   8,  21,  23,  28,  24,  12,  18,  19,  47,  48,  40, 224,   4,  22,
+    /* 0x20 */   7,   9,  10,  11,  13,  14,  15,  51,  52,  53, 225,  49,  29,  27,   6,  25,
+    /* 0x30 */   5,  17,  16,  54,  55,  56, 229,  85, 226,  44,  57,  58,  59,  60,  61,  62,
+    /* 0x40 */  63,  64,  65,  66,  67,  83,  71,  95,  96,  97,  86,  92,  93,  94,  87,  89,
+    /* 0x50 */  90,  91,  98,  99,  70,   0, 100,  68,  69,   0,   0,   0,   0,   0,   0,   0,
+    /* 0x60 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+    /* 0x70 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+};
+#elif defined(__APPLE__)
+/* Mac virtual keycodes (Carbon HIToolbox kVK_* constants). */
+static const unsigned s_sdl1_to_sdl2[128] = {
+    /* 0x00 */   4,  22,   7,   9,  11,  10,  29,  27,   6,  25,   0,   5,  20,  26,   8,  21,
+    /* 0x10 */  28,  23,  30,  31,  32,  33,  35,  34,  46,  38,  36,  45,  37,  39,  48,  18,
+    /* 0x20 */  24,  47,  12,  19,  40,  15,  13,  52,  14,  51,  49,  54,  56,  17,  16,  55,
+    /* 0x30 */  43,  44,  53,  42,   0,  41, 231, 227, 225,  57, 226, 224, 229, 230, 228,   0,
+    /* 0x40 */   0,  99,   0,  85,   0,  87,   0,  83,   0,   0,   0,  84,  88,   0,  86,   0,
+    /* 0x50 */   0,   0,  98,  89,  90,  91,  92,  93,  94,  95,   0,  96,  97,   0,   0,   0,
+    /* 0x60 */  62,  63,  64,  60,  65,  66,   0,  68,   0,   0,   0,   0,   0,  67,   0,  69,
+    /* 0x70 */   0,   0,  73,  74,  75,  76,  61,  77,  59,  78,  58,  80,  79,  81,  82,   0,
+};
+#else
+static const unsigned s_sdl1_to_sdl2[1] = {0};
+#endif
+static unsigned translate_scancode(unsigned raw) {
+    return (raw < sizeof(s_sdl1_to_sdl2)/sizeof(s_sdl1_to_sdl2[0]))
+        ? s_sdl1_to_sdl2[raw] : 0;
+}
+#endif /* SDL */
+
 void p8_update_input()
 {
     bool pointer_lock = (m_memory[MEMORY_DEVKIT_MODE] & 0x4) != 0;
@@ -880,9 +939,12 @@ void p8_update_input()
             default:
                 break;
             }
-            if (event.key.keysym.scancode < NUM_SCANCODES)
-                m_scancodes[event.key.keysym.scancode] = true;
-            m_keypress = (event.key.keysym.sym < 256) ? event.key.keysym.sym : 0;
+            {
+                unsigned sdl2_sc = translate_scancode(event.key.keysym.scancode);
+                if (sdl2_sc > 0 && sdl2_sc < NUM_SCANCODES)
+                    m_scancodes[sdl2_sc] = true;
+            }
+            m_keypress = (event.key.keysym.unicode < 256) ? event.key.keysym.unicode : 0;
             break;
         case SDL_KEYUP:
             switch (event.key.keysym.sym)
@@ -927,8 +989,11 @@ void p8_update_input()
             default:
                 break;
             }
-            if (event.key.keysym.scancode < NUM_SCANCODES)
-                m_scancodes[event.key.keysym.scancode] = false;
+            {
+                unsigned sdl2_sc = translate_scancode(event.key.keysym.scancode);
+                if (sdl2_sc > 0 && sdl2_sc < NUM_SCANCODES)
+                    m_scancodes[sdl2_sc] = false;
+            }
             break;
         case SDL_QUIT:
             p8_abort();
