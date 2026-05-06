@@ -354,9 +354,12 @@ int p8_init_file_with_param(const char *file_name, const char *param)
     if (!m_bbs_cart_id || m_bbs_cart_id[0] == '\0')
         current_cart_path = strdup(file_name);
 
-    /* For BBS carts, set current_cart_dir to "." */
+    /* For BBS carts, set current_cart_dir to DEFAULT_CARTS_PATH */
     if (m_bbs_cart_id && m_bbs_cart_id[0] != '\0') {
-        current_cart_dir = strdup(".");
+        if (access(DEFAULT_CARTS_PATH, F_OK) != -1)
+            current_cart_dir = strdup(DEFAULT_CARTS_PATH);
+        else
+            current_cart_dir = strdup(".");
     } else {
         const char *last_slash = strrchr(file_name, '/');
         if (last_slash) {
