@@ -1817,23 +1817,40 @@ int _load(lua_State *L)
 // printh(str, [filename], [overwrite])
 int printh(lua_State *L)
 {
-    const char *str = lua_gettop(L) >= 1 ? lua_tostring(L, 1) : NULL;
-    if (!str) {
-        printf("\r\n");
-        fflush(stdout);
+    const char *str;
+    const char *filename = NULL;
+    bool overwrite = false;
+
+    if (lua_getop(L) >= 1)
+        str = lua_tostring(L, 1);
+    if (lua_gettop(L) >= 2)
+        filename = lua_tostring(L, 2);
+    if (lua_gettop(L) >= 3)
+        overwrite = lua_toboolean(L, 3);
+
+    if (!str) str = "";
+
+    if (filename && strcmp(filename, "@clip") == 0) {
+        free(m_clipboard);
+        m_clipboard = strdup(str);
         lua_pushboolean(L, 1);
         return 1;
     }
-    const char *filename = lua_gettop(L) >= 2 ? lua_tostring(L, 2) : NULL;
 
-    if (filename && strcmp(filename, "@clip") == 0)
-    {
-        free(m_clipboard);
-        m_clipboard = strdup(str ? str : "");
+    FILE *f = NULL;
+    if (!filename) {
+        f = stdout;
+    } else {
+        f = fopen(filename, overwrite ? "w" : "a");
+        if (!f) {
+            lua_pushboolean(L, 0);
+            return 1;
+        }
     }
 
-    printf("%s\r\n", str);
-    fflush(stdout);
+    fprintf(f, "%s\n", str);
+    if (f != stdout)
+        fclose(f);
 
     lua_pushboolean(L, 1);
     return 1;
