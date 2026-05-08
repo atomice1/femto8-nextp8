@@ -187,7 +187,7 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
 {
     int right = x;
     int repeat = 1;
-    int bg = -1;
+    int bg = 0;
     int fg = col;
     int tab_width = 16;
     int wrap_boundary = 128;
@@ -256,7 +256,10 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
                     break;
                 case 2: // "\#"
                     if (i + 1 < str_len)
+                    {
                         bg = hexy(str[++i]);
+                        state.solid_bg = true;
+                    }
                     break;
                 case 3: // "\-"
                     if (i + 1 < str_len)
@@ -369,7 +372,9 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
                                     break;
                                 case 'i': state.invert = false; break;
                                 case 'b': state.border = !state.border; break;
-                                case '#': state.solid_bg = false; break;
+                                case '#':
+                                    state.solid_bg = false;
+                                    break;
                                 }
                             }
                             break;
@@ -385,9 +390,8 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
                                     for (int bit = 0; bit < 8; bit++) {
                                         if (byte & (1 << bit)) {
                                             pixel_set(draw_x + bit, draw_y + row, fg, 0, DRAWTYPE_DEFAULT);
-                                        } else if (bg != -1 || state.solid_bg) {
-                                            int draw_bg = state.solid_bg ? (bg != -1 ? bg : 0) : bg;
-                                            pixel_set(draw_x + bit, draw_y + row, draw_bg, 0, DRAWTYPE_DEFAULT);
+                                        } else if (state.solid_bg) {
+                                            pixel_set(draw_x + bit, draw_y + row, bg, 0, DRAWTYPE_DEFAULT);
                                         }
                                     }
                                 }
@@ -406,9 +410,8 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
                                     for (int bit = 0; bit < 8; bit++) {
                                         if (byte & (1 << bit)) {
                                             pixel_set(draw_x + bit, draw_y + row, fg, 0, DRAWTYPE_DEFAULT);
-                                        } else if (bg != -1 || state.solid_bg) {
-                                            int draw_bg = state.solid_bg ? (bg != -1 ? bg : 0) : bg;
-                                            pixel_set(draw_x + bit, draw_y + row, draw_bg, 0, DRAWTYPE_DEFAULT);
+                                        } else if (state.solid_bg) {
+                                            pixel_set(draw_x + bit, draw_y + row, bg, 0, DRAWTYPE_DEFAULT);
                                         }
                                     }
                                 }
@@ -572,7 +575,7 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
 
                     bool use_styled = state.wide || state.tall || state.invert || !state.border || state.outline_enabled || state.use_custom_font || (state.char_w != GLYPH_WIDTH) || (state.char_w2 != GLYPH_WIDTH) || (state.char_h != GLYPH_HEIGHT);
 
-                    int draw_bg = state.solid_bg ? (bg != -1 ? bg : 0) : bg;
+                    int draw_bg = state.solid_bg ? bg : -1;
                     if (use_styled) {
                         draw_char_styled(index, x, y, fg, draw_bg, &state);
                     } else if (draw_bg != -1) {
