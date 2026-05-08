@@ -396,7 +396,7 @@ int pal(lua_State *L)
     }
     else if (lua_istable(L, 1))
     {
-        int p = lua_gettop(L) == 2 ? lua_tointeger(L, 2) : PALTYPE_DRAW;
+        int p = lua_gettop(L) >= 2 ? lua_tointeger(L, 2) : PALTYPE_DRAW;
         lua_pushnil(L);
         while (lua_next(L, 1))
         {
