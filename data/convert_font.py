@@ -11,13 +11,17 @@ def convert_to_hex(packed_data):
 def write_to_file(hex_values, width):
     """Write hex values to a text file with newlines based on width."""
     with open("pico_font.h", 'w') as file:
+        file.write("#ifndef PICO_FONT_H\n")
+        file.write("#define PICO_FONT_H\n\n")
+        file.write("#include <stdint.h>\n\n")
         file.write(f"static const uint8_t font_map[] = {{\n")
         file.write('    ')
         for index, hex_val in enumerate(hex_values, start=1):
             file.write(hex_val)
             if index % (width // 2) == 0 and index != len(hex_values):
                 file.write('\n    ')
-        file.write("\n};")
+        file.write("\n};\n\n")
+        file.write("#endif // PICO_FONT_H\n")
 
 def main(input_png_path):
     # Open the PNG image
