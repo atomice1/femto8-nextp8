@@ -192,6 +192,7 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
     int tab_width = 16;
     int wrap_boundary = 128;
     bool wrap_enabled = m_memory[MEMORY_MISCFLAGS] & 0x80;
+    int last_advance = GLYPH_WIDTH;
 
     uint8_t text_attrs = m_memory[MEMORY_TEXT_ATTRS];
     bool use_defaults = (text_attrs & 0x1) != 0;
@@ -492,7 +493,7 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
                     }
                     break;
                 case 8: // "\b"
-                    x -= state.char_w;
+                    x -= last_advance;
                     break;
                 case 9: // "\t"
                     x = ((x / tab_width) + 1) * tab_width;
@@ -512,7 +513,7 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
                         int save_x = x;
                         int save_y = y;
 
-                        int dec_x = save_x - state.char_w * (state.wide ? 2 : 1) + offset_x;
+                        int dec_x = save_x - last_advance + offset_x;
                         int dec_y = save_y + offset_y;
 
                         uint8_t symbol_length = 0;
@@ -587,6 +588,7 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
                     }
 
                     x += char_width;
+                    last_advance = char_width;
 
                     for (int f = 0; f < state.delay_frames; f++) {
                         p8_flip();
