@@ -1817,11 +1817,11 @@ int _load(lua_State *L)
 // printh(str, [filename], [overwrite])
 int printh(lua_State *L)
 {
-    const char *str;
+    const char *str = NULL;
     const char *filename = NULL;
     bool overwrite = false;
 
-    if (lua_getop(L) >= 1)
+    if (lua_gettop(L) >= 1)
         str = lua_tostring(L, 1);
     if (lua_gettop(L) >= 2)
         filename = lua_tostring(L, 2);
@@ -2151,10 +2151,40 @@ int note_to_hz(lua_State *L)
 int serial(lua_State *L)
 {
     int channel = lua_tointeger(L, 1);
-    uint32_t address = lua_tounsigned(L, 2);
+    uint32_t address = addr_remap(lua_tounsigned(L, 2));
     uint32_t length = lua_gettop(L) >= 3 ? lua_tounsigned(L, 3) : 1;
+    if (length < 0)
+        length = 0;
 
     switch (channel) {
+    case 0x0ff: {
+        usleep(length);
+        break;
+    }
+    case 0x804: {
+        if (address >= MEMORY_SIZE)
+            length = 0;
+        else if (length > MEMORY_SIZE - address)
+            length = MEMORY_SIZE - address;
+
+        if (length > 0) {
+            size_t bytes_read = fread(m_memory + address, 1, length, stdin);
+            (void)bytes_read;
+        }
+        break;
+    }
+    case 0x805: {
+        if (address >= MEMORY_SIZE)
+            length = 0;
+        else if (length > MEMORY_SIZE - address)
+            length = MEMORY_SIZE - address;
+
+        if (length > 0)
+            fwrite(m_memory + address, 1, length, stdout);
+
+        fflush(stdout);
+        break;
+    }
     case 0x808:
         // PCM audio output
 #ifdef ENABLE_AUDIO
