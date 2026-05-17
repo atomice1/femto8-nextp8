@@ -405,6 +405,7 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
                                     }
                                 }
                                 x += 8;
+                                last_advance = 8;
                             }
                             break;
                         case ':':
@@ -426,6 +427,7 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
                                 }
                                 i += 16;
                                 x += 8;
+                                last_advance = 8;
                             }
                             break;
                         case '@':
