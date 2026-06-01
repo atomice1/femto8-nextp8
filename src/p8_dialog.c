@@ -370,6 +370,7 @@ static void draw_control(const p8_dialog_t *dialog, int control_idx, int x, int 
                     int item_x = x + item_offset_x;
                     int item_w = width - item_offset_x * 2;
                     control->data.listbox.render_callback(
+                        dialog,
                         control->data.listbox.user_data,
                         i,
                         is_selected,
@@ -399,7 +400,7 @@ static void draw_control(const p8_dialog_t *dialog, int control_idx, int x, int 
 
         case DIALOG_CUSTOM: {
             if (control->data.custom.draw_fn)
-                control->data.custom.draw_fn(x, y, width, get_control_height(control));
+                control->data.custom.draw_fn(dialog, control->data.custom.user_data, x, y, width, get_control_height(control));
             break;
         }
     }

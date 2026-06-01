@@ -198,7 +198,8 @@ static void list_dir(const char* path) {
     qsort(dir_contents, nitems, sizeof(dir_contents[0]), compare_dir_entry);
     p8_show_io_icon(false);
 }
-static void draw_file_name(const char *str, int x, int y, int col)
+
+void draw_file_name(const char *str, int x, int y, int col)
 {
     int cursor_x = x;
     for (const char *c = str; *c != '\0'; c++) {
@@ -217,8 +218,9 @@ static void draw_file_name(const char *str, int x, int y, int col)
     }
 }
 
-static void render_file_item(void *user_data, int index, bool selected, int x, int y, int width, int height, int fg_color, int bg_color)
+static void render_file_item(const p8_dialog_t *dialog, void *user_data, int index, bool selected, int x, int y, int width, int height, int fg_color, int bg_color)
 {
+    (void)dialog;
     (void)user_data;
     struct dir_entry *dir_entry = &dir_contents[index];
 
@@ -294,7 +296,7 @@ int browse_for_cart(char *cart_path, size_t cart_path_size)
     // Create dialog with custom listbox renderer
     p8_dialog_control_t controls[] = {
         DIALOG_LABEL_INVERTED(""),
-        DIALOG_LISTBOX_CUSTOM_FULLSCREEN(NULL, NULL, nitems, &selected_index, render_file_item),
+        DIALOG_LISTBOX_CUSTOM_FULLSCREEN(NULL, nitems, &selected_index, render_file_item, NULL),
         DIALOG_LABEL_INVERTED("\216: select file  \227: menu"),
     };
 
