@@ -2401,10 +2401,14 @@ void lua_init_script(const char *file_name, const char *script)
 
     char temp_file_name[PATH_MAX + 1];
     temp_file_name[0] = '@';
-    strtcpy(temp_file_name + 1, file_name, PATH_MAX);
+    if (file_name)
+        strtcpy(temp_file_name + 1, file_name, PATH_MAX);
+    else
+        temp_file_name[1] = '\0';
 
     size_t script_len = strnlen(script, LUA_SCRIPT_SIZE);
     int ret = luaL_loadbuffer(L, script, script_len, temp_file_name);
+
     if (ret)
     {
         lua_print_error("luaL_loadBuffer");
