@@ -132,7 +132,7 @@ void p8_show_pause_menu(void)
     p8_dialog_set_showing(&pause_dialog, true);
 
     int action_id = -1;
-    for (;;) {
+    while (!p8_is_quit_requested()) {
         p8_dialog_draw(&pause_dialog);
         p8_flip();
         p8_dialog_action_t result = p8_dialog_update(&pause_dialog);

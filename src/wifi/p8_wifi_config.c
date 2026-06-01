@@ -156,7 +156,7 @@ static bool wifi_wait_for_connected_internal(const char *ssid, const char *passw
     int poll_count = 0;
     const int max_polls = 100;  /* ~10 seconds at 100ms per poll */
 
-    while (poll_count < max_polls) {
+    while (poll_count < max_polls && !p8_is_quit_requested()) {
         /* Draw dialog */
         p8_dialog_draw(&waiting_dialog);
         p8_flip();

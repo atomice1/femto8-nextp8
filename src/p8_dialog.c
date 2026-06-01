@@ -741,7 +741,7 @@ p8_dialog_action_t p8_dialog_run(p8_dialog_t *dialog)
         p8_flip();  // p8_flip calls p8_update_input internally
 
         result = p8_dialog_update(dialog);
-    } while (result.type == DIALOG_RESULT_NONE);
+    } while (result.type == DIALOG_RESULT_NONE && !p8_is_quit_requested());
 
     p8_dialog_set_showing(dialog, false);
 

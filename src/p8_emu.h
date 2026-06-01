@@ -284,11 +284,10 @@ extern char m_bbs_cart_id[256];
 extern char m_clipboard[1024];
 extern char m_param_string[256];
 
-extern jmp_buf jmpbuf_restart;
-
 extern bool m_load_available;
 
 void __attribute__ ((noreturn)) p8_abort();
+void p8_quit();
 void p8_check_for_pause(void);
 p8_clock_t p8_clock(void);
 unsigned p8_clock_ms(p8_clock_t clocks);
@@ -303,6 +302,8 @@ void p8_flip(void);
 void p8_flush_cartdata(void);
 int p8_init(void);
 int p8_init_file_with_param(const char *file_name, const char *param);
+bool p8_is_cart_running(void);
+bool p8_is_quit_requested(void);
 void __attribute__ ((noreturn)) p8_load_new(const char *filename, const char *param);
 void p8_set_skip_main_loop_if_no_callbacks(bool skip);
 int p8_init_ram(uint8_t *buffer, int size);

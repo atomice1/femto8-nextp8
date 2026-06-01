@@ -413,7 +413,7 @@ static p8_dialog_result_t show_bbs_download_dialog(char *cart_id_buffer, size_t 
             continue;
         }
 #endif
-    } while (bbs_result.type == DIALOG_RESULT_NONE);
+    } while (bbs_result.type == DIALOG_RESULT_NONE && !p8_is_quit_requested());
     p8_dialog_set_showing(&bbs_dialog, false);
     p8_dialog_cleanup(&bbs_dialog);
 
@@ -467,12 +467,6 @@ int browse_for_cart(char *cart_path, size_t cart_path_size)
     for (int i = 0; i < 16; i++)
         color_set(PALTYPE_SCREEN, i, 128 + i);
 
-    if (setjmp(jmpbuf_restart)) {
-        free(filename_mem);
-        free(dir_contents);
-        return 0;
-    }
-
     if (access(DEFAULT_CARTS_PATH, F_OK) == 0)
         list_dir(DEFAULT_CARTS_PATH);
     else
@@ -511,7 +505,7 @@ int browse_for_cart(char *cart_path, size_t cart_path_size)
     p8_dialog_set_showing(&dialog, true);
     p8_dialog_draw(&dialog);
 
-    for (;;) {
+    while (!p8_is_quit_requested()) {
         selected_index = 0;
         controls[0].label = pwd;
         controls[1].data.listbox.item_count = nitems;
@@ -625,7 +619,7 @@ int browse_for_cart(char *cart_path, size_t cart_path_size)
             }
             if (any_button)
                 preview_last_button_time = p8_clock();
-        } while (result.type == DIALOG_RESULT_NONE);
+        } while (result.type == DIALOG_RESULT_NONE && !p8_is_quit_requested());
 
         if (preview_showing) {
             preview_showing = false;
