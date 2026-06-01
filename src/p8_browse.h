@@ -5,6 +5,8 @@
 #ifndef P8_BROWSE_H
 #define P8_BROWSE_H
 
-int browse_for_cart(char *cart_path, size_t cart_path_size);
+#include "p8_screen.h"
+
+extern p8_screen_t p8_screen_browse;
 
 #endif

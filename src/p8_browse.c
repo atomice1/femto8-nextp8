@@ -25,6 +25,7 @@
 #include "p8_cache.h"
 #endif
 #include "p8_dialog.h"
+#include "p8_main.h"
 #ifdef NEXTP8
 #include "wifi/p8_wifi.h"
 #include "wifi/p8_wifi_config.h"
@@ -72,15 +73,16 @@ struct dir_entry {
     bool is_dir;
 };
 
-static char pwd[PATH_MAX];
 static struct dir_entry *dir_contents = NULL;
 static int nitems = 0;
 static int capacity = 0;
-static int current_item = 0;
+static int selected_index = 0;
+static char last_browse_cart_dir[PATH_MAX];
+
 static void clear_dir_contents(void) {
     filename_mem_ptr = filename_mem;
     nitems = 0;
-    current_item = 0;
+    selected_index = 0;
 }
 static void append_dir_entry(const char *file_name, bool is_dir)
 {
@@ -119,6 +121,7 @@ static void append_dir_entry(const char *file_name, bool is_dir)
     dir_entry->is_dir = is_dir;
     nitems++;
 }
+
 static int make_full_path(char *ret, size_t ret_size, const char *dir_path, const char *file_name)
 {
     if (!ret || !dir_path || !file_name) {
@@ -170,10 +173,10 @@ static int compare_dir_entry(const void *p1, const void *p2)
     else
         return strcmp(dir_entry1->file_name, dir_entry2->file_name);
 }
-static void list_dir(const char* path) {
+static void list_dir() {
+    selected_index = 0;
 #ifdef NEXTP8
-    if (path[0] == '\0') {
-        strcpy(pwd, path);
+    if (m_current_cart_dir[0] == '\0') {
         clear_dir_contents();
         // Show drives
         static const char *volume_names[2] = {"0:/", "1:/"};
@@ -182,14 +185,10 @@ static void list_dir(const char* path) {
         return;
     }
 #endif
-    if (strtcpy(pwd, path, sizeof(pwd)) < 0) {
-        fputs("Path too long\n", stderr);
-        return;
-    }
     p8_show_io_icon(true);
-    DIR *dir = opendir(path);
+    DIR *dir = opendir(m_current_cart_dir);
     if (dir == NULL) {
-        fprintf(stderr, "%s: %s\n", path, strerror(errno));
+        fprintf(stderr, "%s: %s\n", m_current_cart_dir, strerror(errno));
     } else {
         clear_dir_contents();
         char full_path[PATH_MAX];
@@ -199,10 +198,12 @@ static void list_dir(const char* path) {
             dirent = readdir(dir);
             if (dirent == NULL) {
                 if (errno != 0)
-                    fprintf(stderr, "%s: %s\n", path, strerror(errno));
+                    fprintf(stderr, "%s: %s\n", m_current_cart_dir, strerror(errno));
                 break;
             }
-            if (make_full_path(full_path, sizeof(full_path), path, dirent->d_name) != 0) {
+            if (strcmp(dirent->d_name, ".") == 0)
+                continue;
+            if (make_full_path(full_path, sizeof(full_path), m_current_cart_dir, dirent->d_name) != 0) {
                 fputs("Path too long\n", stderr);
                 continue;
             }
@@ -225,7 +226,6 @@ static void list_dir(const char* path) {
         closedir(dir);
     }
     qsort(dir_contents, nitems, sizeof(dir_contents[0]), compare_dir_entry);
-    strtcpy(m_current_cart_dir, path, sizeof(m_current_cart_dir));
     p8_show_io_icon(false);
 }
 
@@ -447,218 +447,247 @@ static int show_menu(void)
         return 0;
 }
 
-int browse_for_cart(char *cart_path, size_t cart_path_size)
+// Create dialog with custom listbox renderer
+static p8_dialog_control_t browse_controls[] = {
+    DIALOG_LABEL_INVERTED(NULL),
+    DIALOG_LISTBOX_CUSTOM_FULLSCREEN(NULL, 0, &selected_index, render_file_item, NULL),
+    DIALOG_LABEL_INVERTED("\216:select file \227:bbs download"),
+};
+
+static p8_dialog_t browse_dialog;
+
+static p8_dialog_control_t preview_controls[5] = {
+    DIALOG_CUSTOM_CONTROL(PREVIEW_LABEL_DISPLAY_SIZE, PREVIEW_LABEL_DISPLAY_SIZE, draw_preview_label, NULL),
+    DIALOG_LABEL(""),
+    DIALOG_LABEL(""),
+    DIALOG_LABEL(""),
+    DIALOG_LABEL(""),
+};
+static p8_dialog_t preview_dialog;
+
+static void browse_init(void)
 {
+    assert(dir_contents == NULL);
+    assert(capacity == 0);
+    assert(nitems == 0);
+    assert(browse_controls[0].label == NULL);
+
     filename_mem = (char *)malloc(INITIAL_FILENAME_MEM_SIZE);
     dir_contents = (struct dir_entry *)malloc(sizeof(struct dir_entry) * INITIAL_CAPACITY);
     if (!filename_mem || !dir_contents) {
         free(filename_mem);
         free(dir_contents);
         fputs("Out of memory\n", stderr);
-        return -1;
+        abort();
     }
     capacity = INITIAL_CAPACITY;
     filename_mem_end = filename_mem + INITIAL_FILENAME_MEM_SIZE;
     clear_dir_contents();
 
-    p8_reset();
-    // Remap screen palette to alternate palette so we can display full
-    // 32-colour labels.
-    for (int i = 0; i < 16; i++)
-        color_set(PALTYPE_SCREEN, i, 128 + i);
+    if (!m_current_cart_dir[0]) {
+        if (access(DEFAULT_CARTS_PATH, F_OK) == 0)
+            strcpy(m_current_cart_dir, DEFAULT_CARTS_PATH);
+        else
+            strcpy(m_current_cart_dir, FALLBACK_CARTS_PATH);
+    }
+    browse_controls[0].label = m_current_cart_dir;
+    browse_controls[1].data.listbox.item_count = nitems;
+    
+    p8_dialog_init(&browse_dialog, NULL, browse_controls, sizeof(browse_controls) / sizeof(browse_controls[0]), P8_WIDTH);
+    browse_dialog.draw_border = false;
+    browse_dialog.padding = 0;
+}
 
-    if (access(DEFAULT_CARTS_PATH, F_OK) == 0)
-        list_dir(DEFAULT_CARTS_PATH);
-    else
-        list_dir(FALLBACK_CARTS_PATH);
+static void browse_show(void)
+{
+    /* Relist directory if current_cart_dir changed since last show/hide, or first time */
+    bool changed = strcmp(m_current_cart_dir, last_browse_cart_dir) != 0;
+    if (changed) {
+        list_dir();
+        browse_controls[1].data.listbox.item_count = nitems;
+    }
 
-    int selected_index = 0;
-
-    // Create dialog with custom listbox renderer
-    p8_dialog_control_t controls[] = {
-        DIALOG_LABEL_INVERTED(""),
-        DIALOG_LISTBOX_CUSTOM_FULLSCREEN(NULL, nitems, &selected_index, render_file_item, NULL),
-        DIALOG_LABEL_INVERTED("\216:select file \227:bbs download"),
-    };
-
-    p8_dialog_t dialog;
-    p8_dialog_init(&dialog, NULL, controls, sizeof(controls) / sizeof(controls[0]), P8_WIDTH);
-    dialog.draw_border = false;
-    dialog.padding = 0;
-
-    p8_dialog_control_t preview_controls[5] = {
-        DIALOG_CUSTOM_CONTROL(PREVIEW_LABEL_DISPLAY_SIZE, PREVIEW_LABEL_DISPLAY_SIZE, draw_preview_label, NULL),
-        DIALOG_LABEL(""),
-        DIALOG_LABEL(""),
-        DIALOG_LABEL(""),
-        DIALOG_LABEL(""),
-    };
-    p8_dialog_t preview_dialog;
+    p8_dialog_set_showing(&browse_dialog, true);
 
     preview_item = -1;
     preview_loaded = false;
     preview_showing = false;
     preview_last_button_time = p8_clock();
 
-    char cart_id_buffer[64] = {'\0'};
-    p8_dialog_action_t result = { DIALOG_RESULT_NONE, 0 };
-    p8_dialog_set_showing(&dialog, true);
-    p8_dialog_draw(&dialog);
+    // Remap screen palette to alternate palette so we can display full
+    // 32-colour labels.
+    for (int i = 0; i < 16; i++)
+        color_set(PALTYPE_SCREEN, i, 128 + i);
+}
 
-    while (!p8_is_quit_requested()) {
-        selected_index = 0;
-        controls[0].label = pwd;
-        controls[1].data.listbox.item_count = nitems;
-
-        // Reset preview state when directory changes
-        preview_item = -1;
-        preview_loaded = false;
+static void browse_hide(void)
+{
+    if (preview_showing) {
         preview_showing = false;
-        p8_preview_cache_clear();
+        p8_dialog_set_showing(&preview_dialog, false);
+    }
 
-        // Main dialog loop
-        do {
-            p8_dialog_draw(&dialog);
+    p8_dialog_set_showing(&browse_dialog, false);
 
-            if (preview_showing)
-                p8_dialog_draw(&preview_dialog);
+    /* Record current directory so browse_show can detect external changes (e.g. cd()) */
+    strtcpy(last_browse_cart_dir, m_current_cart_dir, sizeof(last_browse_cart_dir));
 
-            p8_flip();
+    reset_color();
+    memset(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8), 0, MEMORY_SCREEN_SIZE);
+}
 
-            result = p8_dialog_update(&dialog);
+static void browse_update(void)
+{
+    p8_dialog_action_t result = p8_dialog_update(&browse_dialog);
 
-            bool any_button = (m_buttonsp[0] != 0);
-            bool action2_pressed = ((m_buttonsp[0] & BUTTON_MASK_ACTION2) != 0);
-            if (any_button) {
-                if (preview_showing) {
-                    preview_showing = false;
-                    p8_dialog_set_showing(&preview_dialog, false);
-                }
+    bool any_button = (m_buttonsp[0] != 0);
+    bool action2_pressed = ((m_buttonsp[0] & BUTTON_MASK_ACTION2) != 0);
 
-                preview_loaded = false;
-                preview_item = -1;
-            }
-
-            if (selected_index != preview_item) {
-                preview_item = selected_index;
-                preview_loaded = false;
-                preview_highlight_time = p8_clock();
-            }
-
-            // Try to load preview after item has been highlighted long enough
-            if (!preview_loaded &&
-                !any_button && !preview_showing &&
-                selected_index >= 0 && selected_index < nitems &&
-                !dir_contents[selected_index].is_dir) {
-                unsigned highlight_ms = p8_clock_ms(p8_clock_delta(preview_highlight_time, p8_clock()));
-                if (highlight_ms >= PREVIEW_LOAD_DELAY_MS) {
-                    char full_path[PATH_MAX];
-                    if (make_full_path(full_path, sizeof(full_path), pwd, dir_contents[selected_index].file_name) >= 0) {
-                        preview_loaded = p8_preview_load(full_path, &preview_info);
-                        if (preview_loaded && preview_info.title[0] == '\0')
-                            preview_use_filename_as_title(dir_contents[selected_index].file_name);
-                    }
-                }
-            }
-
-            // Show preview popup if loaded and enough time has elapsed
-            if (preview_loaded && !preview_showing && !any_button &&
-                (preview_info.has_label || preview_info.title[0] != '\0')) {
-                unsigned elapsed_ms = p8_clock_ms(p8_clock_delta(preview_last_button_time, p8_clock()));
-                if (elapsed_ms >= PREVIEW_SHOW_DELAY_MS) {
-                    int ncontrols = 1;
-                    int n_title = wrap_text(preview_info.title, PREVIEW_CHARS_PER_LINE,
-                                           preview_title_line1, sizeof(preview_title_line1),
-                                           preview_title_line2, sizeof(preview_title_line2));
-                    preview_controls[ncontrols++].label = preview_title_line1;
-                    if (n_title == 2)
-                        preview_controls[ncontrols++].label = preview_title_line2;
-                    if (preview_info.author[0] != '\0') {
-                        int n_author = wrap_text(preview_info.author, PREVIEW_CHARS_PER_LINE,
-                                                preview_author_line1, sizeof(preview_author_line1),
-                                                preview_author_line2, sizeof(preview_author_line2));
-                        preview_controls[ncontrols++].label = preview_author_line1;
-                        if (n_author == 2)
-                            preview_controls[ncontrols++].label = preview_author_line2;
-                    }
-                    p8_dialog_init(&preview_dialog, NULL, preview_controls, ncontrols,
-                                   PREVIEW_DIALOG_CONTENT_WIDTH + PREVIEW_BORDER_SIZE);
-                    preview_dialog.x = P8_WIDTH - preview_dialog.width;
-                    preview_showing = true;
-                    p8_dialog_set_showing(&preview_dialog, true);
-                }
-            }
-
-            if (result.type == DIALOG_RESULT_NONE && action2_pressed) {
-                int action_id = show_menu();
-                switch (action_id) {
-#ifdef ENABLE_BBS_DOWNLOAD
-                    case 1:
-                        if (show_bbs_download_dialog(cart_id_buffer, sizeof(cart_id_buffer)) == DIALOG_RESULT_ACCEPTED) {
-                            const char *cart_id = (cart_id_buffer[0] == '#') ? (cart_id_buffer + 1) : cart_id_buffer;
-                            p8_download_bbs_cart(cart_id, cart_path, cart_path_size);
-                        }
-                        break;
-#endif
-#ifdef NEXTP8
-                    case 2:
-                        wifi_show_config_dialog();
-                        break;
-#endif
-                    case 3:
-                        p8_show_version_dialog();
-                        break;
-                    case 4:
-                        p8_show_controls_dialog();
-                        break;
-                    default:
-                        break;
-                }
-                if (action_id == 1 && cart_path[0])
-                    break;
-            }
-            if (any_button)
-                preview_last_button_time = p8_clock();
-        } while (result.type == DIALOG_RESULT_NONE && !p8_is_quit_requested());
-
+    if (any_button) {
         if (preview_showing) {
             preview_showing = false;
             p8_dialog_set_showing(&preview_dialog, false);
         }
 
-        if (cart_path[0])
-            break;
+        preview_loaded = false;
+        preview_item = -1;
+    }
 
-        if (result.type == DIALOG_RESULT_CANCELLED)
-            break;
+    if (selected_index != preview_item) {
+        preview_item = selected_index;
+        preview_loaded = false;
+        preview_highlight_time = p8_clock();
+    }
 
-        if (result.type == DIALOG_RESULT_ACCEPTED && selected_index >= 0 && selected_index < nitems) {
-            struct dir_entry *dir_entry = &dir_contents[selected_index];
-            char full_path[PATH_MAX] = {'\0'};
-            if (make_full_path(full_path, sizeof(full_path), pwd, dir_entry->file_name) < 0) {
-                fputs("Path too long\n", stderr);
-                continue;
-            }
-            if (dir_entry->is_dir) {
-                list_dir(full_path);
-                selected_index = 0;
-            } else {
-                if (strtcpy(cart_path, full_path, cart_path_size) < 0) {
-                    fputs("Path too long\n", stderr);
-                    continue;
-                }
-                break;
+    // Try to load preview after item has been highlighted long enough
+    if (!preview_loaded &&
+        !any_button && !preview_showing &&
+        selected_index >= 0 && selected_index < nitems &&
+        !dir_contents[selected_index].is_dir) {
+        unsigned highlight_ms = p8_clock_ms(p8_clock_delta(preview_highlight_time, p8_clock()));
+        if (highlight_ms >= PREVIEW_LOAD_DELAY_MS) {
+            char full_path[PATH_MAX];
+            if (make_full_path(full_path, sizeof(full_path), m_current_cart_dir, dir_contents[selected_index].file_name) == 0) {
+                preview_loaded = p8_preview_load(full_path, &preview_info);
+                if (preview_loaded && preview_info.title[0] == '\0')
+                    preview_use_filename_as_title(dir_contents[selected_index].file_name);
             }
         }
     }
 
-    p8_dialog_set_showing(&dialog, false);
-    p8_dialog_cleanup(&dialog);
+    // Show preview popup if loaded and enough time has elapsed
+    if (preview_loaded && !preview_showing && !any_button &&
+        (preview_info.has_label || preview_info.title[0] != '\0')) {
+        unsigned elapsed_ms = p8_clock_ms(p8_clock_delta(preview_last_button_time, p8_clock()));
+        if (elapsed_ms >= PREVIEW_SHOW_DELAY_MS) {
+            int ncontrols = 1;
+            int n_title = wrap_text(preview_info.title, PREVIEW_CHARS_PER_LINE,
+                                   preview_title_line1, sizeof(preview_title_line1),
+                                   preview_title_line2, sizeof(preview_title_line2));
+            preview_controls[ncontrols++].label = preview_title_line1;
+            if (n_title == 2)
+                preview_controls[ncontrols++].label = preview_title_line2;
+            if (preview_info.author[0] != '\0') {
+                int n_author = wrap_text(preview_info.author, PREVIEW_CHARS_PER_LINE,
+                                        preview_author_line1, sizeof(preview_author_line1),
+                                        preview_author_line2, sizeof(preview_author_line2));
+                preview_controls[ncontrols++].label = preview_author_line1;
+                if (n_author == 2)
+                    preview_controls[ncontrols++].label = preview_author_line2;
+            }
+            p8_dialog_init(&preview_dialog, NULL, preview_controls, ncontrols,
+                           PREVIEW_DIALOG_CONTENT_WIDTH + PREVIEW_BORDER_SIZE);
+            preview_dialog.x = P8_WIDTH - preview_dialog.width;
+            preview_showing = true;
+            p8_dialog_set_showing(&preview_dialog, true);
+        }
+    }
 
-    overlay_clear();
-    memset(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8), 0, MEMORY_SCREEN_SIZE);
-    reset_color();
-    p8_flip();
+    if (result.type == DIALOG_RESULT_NONE && action2_pressed) {
+        char cart_id_buffer[64] = {'\0'};
+        int action_id = show_menu();
+        switch (action_id) {
+#ifdef ENABLE_BBS_DOWNLOAD
+            case 1:
+                if (show_bbs_download_dialog(cart_id_buffer, sizeof(cart_id_buffer)) == DIALOG_RESULT_ACCEPTED) {
+                    const char *cart_id = (cart_id_buffer[0] == '#') ? (cart_id_buffer + 1) : cart_id_buffer;
+                    char cart_path[PATH_MAX];
+                    if (p8_download_bbs_cart(cart_id, cart_path, sizeof(cart_path)) == 0) {
+                        /* Hide browse screen before running cart */
+                        browse_hide();
+                        if (p8_load(cart_path, NULL, cart_id, NULL) == 0)
+                            p8_run();
+                        /* Show browse screen again after cart exits */
+                        browse_show();
+                    }
+                }
+                break;
+#endif
+#ifdef NEXTP8
+            case 2:
+                wifi_show_config_dialog();
+                break;
+#endif
+            case 3:
+                p8_show_version_dialog();
+                break;
+            case 4:
+                p8_show_controls_dialog();
+                break;
+            default:
+                break;
+        }
+    }
+
+    if (result.type == DIALOG_RESULT_ACCEPTED && selected_index >= 0 && selected_index < nitems) {
+        struct dir_entry *dir_entry = &dir_contents[selected_index];
+        char full_path[PATH_MAX];
+        if (make_full_path(full_path, sizeof(full_path), m_current_cart_dir, dir_entry->file_name) < 0) {
+            fputs("Path too long\n", stderr);
+            return;
+        }
+        if (dir_entry->is_dir) {
+            if (strtcpy(m_current_cart_dir, full_path, sizeof(m_current_cart_dir)) < 0) {
+                fputs("Path too long\n", stderr);
+                return;
+            }
+            list_dir();
+            browse_controls[1].data.listbox.item_count = nitems;
+            
+            // Reset preview state when directory changes
+            preview_item = -1;
+            preview_loaded = false;
+            preview_showing = false;
+            p8_preview_cache_clear();
+        } else {
+            /* Load and run cart */
+            browse_hide();
+            if (p8_load(full_path, NULL, NULL, NULL) == 0)
+                p8_run();
+            browse_show();
+        }
+    }
+
+    if (any_button)
+        preview_last_button_time = p8_clock();
+}
+
+static void browse_draw(int x, int y, int w, int h)
+{
+    (void)x;
+    (void)y;
+    (void)w;
+    (void)h;
+    
+    p8_dialog_draw(&browse_dialog);
+
+    if (preview_showing)
+        p8_dialog_draw(&preview_dialog);
+}
+
+void browse_shutdown(void)
+{
+    p8_dialog_cleanup(&browse_dialog);
 
     clear_dir_contents();
 
@@ -666,6 +695,17 @@ int browse_for_cart(char *cart_path, size_t cart_path_size)
     free(dir_contents);
     filename_mem = NULL;
     dir_contents = NULL;
-
-    return 0;
+    nitems = 0;
+    capacity = 0;
+    selected_index = 0;
+    last_browse_cart_dir[0] = '\0';
 }
+
+p8_screen_t p8_screen_browse = {
+    .init=browse_init,
+    .shutdown=browse_shutdown,
+    .show=browse_show,
+    .hide=browse_hide,
+    .draw=browse_draw,
+    .update=browse_update
+};

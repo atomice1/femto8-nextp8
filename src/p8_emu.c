@@ -82,6 +82,7 @@ p8_clock_t m_start_time;
 
 static jmp_buf jmpbuf_restart;
 static bool restart;
+bool m_reboot = false;
 static bool cart_running = false;
 static bool quit_requested = false;
 
@@ -311,18 +312,10 @@ int p8_load(const char *file_name, const char *param, const char *bbs_cart_id, c
     strtcpy(m_bbs_cart_id, bbs_cart_id ? bbs_cart_id : "", sizeof(m_bbs_cart_id));
     strtcpy(m_breadcrumb, breadcrumb ? breadcrumb : "", sizeof(m_breadcrumb));
 
-    m_current_cart_dir[0] = '\0';
-    m_current_cart_file_name[0] = '\0';
-    if (!bbs_cart_id)
-        strtcpy(m_current_cart_file_name, file_name, sizeof(m_current_cart_file_name));
-
-    /* For BBS carts, set m_current_cart_dir to DEFAULT_CARTS_PATH */
     if (bbs_cart_id) {
-        if (access(DEFAULT_CARTS_PATH, F_OK) != -1)
-            strtcpy(m_current_cart_dir, DEFAULT_CARTS_PATH, sizeof(m_current_cart_dir));
-        else
-            strtcpy(m_current_cart_dir, ".", sizeof(m_current_cart_dir));
+        m_current_cart_file_name[0] = '\0';
     } else {
+        strtcpy(m_current_cart_file_name, file_name, sizeof(m_current_cart_file_name));
         const char *last_slash = strrchr(file_name, '/');
         if (last_slash) {
             size_t dir_len = last_slash - file_name;
@@ -1007,6 +1000,7 @@ void p8_new_cart(void)
     m_current_cart_file_name[0] = '\0';
     memset(m_cart_memory, 0, CART_MEMORY_SIZE);
     memset(m_memory, 0, CART_MEMORY_SIZE);
+    m_lua_script[0] = '\0';
     p8_common_reset_cart();
 }
 
@@ -1035,6 +1029,29 @@ void p8_quit()
     quit_requested = true;
     if (cart_running)
         p8_abort();
+}
+
+void p8_reboot(void)
+{
+    m_reboot = true;
+    clear_screen(0);
+    p8_flip();
+    p8_quit();
+}
+
+bool p8_is_reboot_requested(void)
+{
+    return m_reboot;
+}
+
+void p8_clear_reboot_requested(void)
+{
+    m_reboot = false;
+}
+
+void p8_clear_quit_requested(void)
+{
+    quit_requested = false;
 }
 
 bool p8_is_cart_running(void)

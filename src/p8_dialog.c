@@ -768,7 +768,6 @@ void p8_dialog_set_showing(p8_dialog_t *dialog, bool showing)
         // Draw the dialogs underneath the closed one to refresh the screen
         p8_dialog_clear(dialog);
         p8_dialog_draw_stack();
-        p8_flip();
     } else if (showing) {
         assert(m_dialog_nest_count < MAX_DIALOG_NESTING);
         m_dialog_stack[m_dialog_nest_count] = dialog;

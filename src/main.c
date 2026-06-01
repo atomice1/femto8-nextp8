@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "p8_browse.h"
+#include "p8_main.h"
 #include "p8_parser.h"
 #include "p8_emu.h"
 #include "strtcpy.h"
@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
 
     setvbuf(stdout, NULL, _IONBF, 0); // Disable buffering for stdout
 
-    char file_name[PATH_MAX] = {0};
+    const char *file_name = NULL;
     const char *param_string = NULL;
     bool skip_main_loop = false;
     int exit_code = EXIT_SUCCESS;
@@ -56,11 +56,8 @@ int main(int argc, char *argv[])
             skip_main_loop = true;
         } else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc) {
             param_string = argv[++i];
-        } else if (file_name[0] == '\0') {
-            if (strtcpy(file_name, argv[i], PATH_MAX) < 0) {
-                fputs("Path too long\n", stderr);
-                return EXIT_FAILURE;
-            }
+        } else if (file_name == NULL) {
+            file_name = argv[i];
         }
     }
 
@@ -127,14 +124,13 @@ int main(int argc, char *argv[])
 #endif
     p8_init();
 
-    if (file_name[0] == '\0') {
-        if (browse_for_cart(file_name, sizeof(file_name)) < 0)
-            return EXIT_FAILURE;
-    }
-
-    if (skip_main_loop)
-        p8_set_skip_main_loop_if_no_callbacks(true);
-    if (file_name[0] != '\0') {
+    if (file_name == NULL) {
+        do {
+            p8_main();
+        } while (p8_is_reboot_requested());
+    } else {
+        if (skip_main_loop)
+            p8_set_skip_main_loop_if_no_callbacks(true);
         if (p8_load(file_name, param_string, NULL, NULL) != 0) {
             exit_code = EXIT_FAILURE;
         } else {
