@@ -536,10 +536,8 @@ int print(lua_State *L)
         int col = lua_gettop(L) == 2 ? lua_tointeger(L, 2) : pencolor_get();
         if (lua_gettop(L) == 2)
             pencolor_set(col);
-        draw_text(str, len, x, y, col, left_margin_get(), (m_memory[MEMORY_MISCFLAGS] & 0x4) == 0, &x, &y, &right);
+        draw_text(str, len, x, y, col, left_margin_get(), false, &x, &y, &right);
         cursor_set(x, y, -1);
-        if ((m_memory[MEMORY_MISCFLAGS] & 0x40) == 0)
-            scroll();
     }
     else if (lua_gettop(L) >= 3)
     {
@@ -548,10 +546,9 @@ int print(lua_State *L)
         int col = lua_gettop(L) >= 4 ? lua_tointeger(L, 4) : pencolor_get();
         if (lua_gettop(L) >= 4)
             pencolor_set(col);
-
         left_margin_set(x);
-
-        draw_text(str, len, x, y, col, x, false, NULL, NULL, &right);
+        draw_text(str, len, x, y, col, x, true, &x, &y, &right);
+        cursor_set(x, y, -1);
     }
 
     lua_pushinteger(L, right);
@@ -1969,22 +1966,22 @@ int _stop(lua_State *L)
     if (nargs >= 1 && !lua_isnil(L, 1)) {
         size_t len;
         const char *str = lua_tolstring(L, 1, &len);
+
         if (str) {
             if (nargs >= 3) {
                 int x = lua_tointeger(L, 2);
                 int y = lua_tointeger(L, 3);
                 int col = nargs >= 4 ? lua_tointeger(L, 4) : pencolor_get();
                 int right;
-                draw_text(str, len, x, y, col, x, false, NULL, NULL, &right);
+                draw_text(str, len, x, y, col, x, true, &x, &y, &right);
+                cursor_set(x, y, -1);
             } else {
                 int x, y;
                 cursor_get(&x, &y);
                 int col = nargs >= 2 ? lua_tointeger(L, 2) : pencolor_get();
                 int right;
-                draw_text(str, len, x, y, col, left_margin_get(), (m_memory[MEMORY_MISCFLAGS] & 0x4) == 0, &x, &y, &right);
+                draw_text(str, len, x, y, col, left_margin_get(), false, &x, &y, &right);
                 cursor_set(x, y, -1);
-                if ((m_memory[MEMORY_MISCFLAGS] & 0x40) == 0)
-                    scroll();
             }
             p8_render();
         }

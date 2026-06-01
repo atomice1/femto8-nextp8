@@ -54,7 +54,8 @@ static inline int map_cell_addr(int celx, int cely);
 static inline void map_set(int celx, int cely, int snum);
 static inline uint8_t map_get(int celx, int cely);
 static inline void reset_color(void);
-static inline void scroll(void);
+static inline int scroll(int y, int line_height);
+static inline int scroll_newline(int y);
 static inline void left_margin_set(int x);
 static inline int left_margin_get(void);
 
@@ -735,17 +736,26 @@ static inline void update_buttons(int index, int button, bool state)
 #endif
 }
 
-static inline void scroll(void)
+static inline int scroll(int y, int line_height)
 {
-    int x, y;
-    cursor_get(&x, &y);
-    int bottom = P8_HEIGHT - (GLYPH_HEIGHT + 2);
+    int bottom = P8_HEIGHT - line_height;
     int scrolly = MAX(y - bottom, 0);
     if (scrolly == 0)
-        return;
-    memmove(m_memory + 0x6000, m_memory + 0x6000 + 64 * scrolly, 0x2000 - 64 * scrolly);
-    memset(m_memory + 0x6000 + 0x2000 - 64 * scrolly, 0, 64 * scrolly);
-    cursor_set(x, bottom, -1);
+        return y;
+    memmove(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8), m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8) + 64 * scrolly, 0x2000 - 64 * scrolly);
+    memset(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8) + 0x2000 - 64 * scrolly, 0, 64 * scrolly);
+    return y - scrolly;
+}
+
+static inline int scroll_newline(int y)
+{
+    int threshold = P8_HEIGHT - GLYPH_HEIGHT;
+    if (y <= threshold)
+        return y;
+    int scrolly = MAX(y - threshold, GLYPH_HEIGHT);
+    memmove(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8), m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8) + 64 * scrolly, 0x2000 - 64 * scrolly);
+    memset(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8) + 0x2000 - 64 * scrolly, 0, 64 * scrolly);
+    return y - scrolly;
 }
 
 static inline int left_margin_get(void)
