@@ -531,11 +531,11 @@ int browse_for_cart(char *cart_path, size_t cart_path_size)
 
             p8_flip();
 
+            result = p8_dialog_update(&dialog);
+
             bool any_button = (m_buttonsp[0] != 0);
-
+            bool action2_pressed = ((m_buttonsp[0] & BUTTON_MASK_ACTION2) != 0);
             if (any_button) {
-                preview_last_button_time = p8_clock();
-
                 if (preview_showing) {
                     preview_showing = false;
                     p8_dialog_set_showing(&preview_dialog, false);
@@ -544,8 +544,6 @@ int browse_for_cart(char *cart_path, size_t cart_path_size)
                 preview_loaded = false;
                 preview_item = -1;
             }
-
-            result = p8_dialog_update(&dialog);
 
             if (selected_index != preview_item) {
                 preview_item = selected_index;
@@ -597,7 +595,7 @@ int browse_for_cart(char *cart_path, size_t cart_path_size)
                 }
             }
 
-            if (result.type == DIALOG_RESULT_NONE && ((m_buttonsp[0] & BUTTON_MASK_ACTION2) != 0)) {
+            if (result.type == DIALOG_RESULT_NONE && action2_pressed) {
                 int action_id = show_menu();
                 switch (action_id) {
 #ifdef ENABLE_BBS_DOWNLOAD
@@ -625,6 +623,8 @@ int browse_for_cart(char *cart_path, size_t cart_path_size)
                 if (action_id == 1 && cart_path[0])
                     break;
             }
+            if (any_button)
+                preview_last_button_time = p8_clock();
         } while (result.type == DIALOG_RESULT_NONE);
 
         if (preview_showing) {
