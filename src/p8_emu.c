@@ -267,6 +267,22 @@ static int p8_init_lcd(void)
     return 0;
 }
 
+static void p8_wait_for_any_key(void)
+{
+    int x, y;
+    cursor_get(&x, &y);
+    y = scroll(y, GLYPH_HEIGHT);
+    draw_simple_text("press any key...", 0, y, 7);
+    p8_flip();
+    while (true) {
+        p8_update_input();
+        unsigned scancode = 0, keymod = 0;
+        uint8_t keypress = 0;
+        if (p8_get_next_keypress(&scancode, &keypress, &keymod))
+            break;
+    }
+}
+
 static int p8_init_common(const char *file_name, const char *lua_script)
 {
     p8_show_io_icon(false);
@@ -301,8 +317,11 @@ static int p8_init_common(const char *file_name, const char *lua_script)
 
     lua_init();
 
-    if (!skip_main_loop_if_no_callbacks || lua_has_main_loop_callbacks())
+    if (lua_has_main_loop_callbacks())
         p8_main_loop();
+    else if (!skip_main_loop_if_no_callbacks)
+        p8_wait_for_any_key();
+
     return 0;
 }
 
