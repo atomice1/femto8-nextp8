@@ -276,7 +276,7 @@ static int p8_init_lcd(void)
     return 0;
 }
 
-static void p8_wait_for_any_key(void)
+void p8_wait_for_any_key(void)
 {
     int x, y;
     cursor_get(&x, &y);
@@ -291,6 +291,7 @@ static void p8_wait_for_any_key(void)
         if (p8_get_next_keypress(&scancode, &keypress, &keymod))
             break;
     }
+    draw_rectfill(0, y, P8_WIDTH, y+GLYPH_HEIGHT, 0, 0);
 }
 
 int p8_load(const char *file_name, const char *param, const char *bbs_cart_id, const char *breadcrumb)
@@ -401,6 +402,40 @@ int p8_run(void)
     p8_reset_cart();
 
     return 0;
+}
+
+int p8_exec(const char *input, const char **err_type, char *err, int err_size)
+{
+    assert(m_initialized);
+    assert(!cart_running);
+
+    /* Handle load() calls */
+    if (setjmp(jmpbuf_load)) {
+        cart_running = false;
+        pending_load.requested = false;
+
+        /* Load the new cart */
+
+        if (p8_load(pending_load.file_name, pending_load.param, pending_load.bbs_cart_id, pending_load.breadcrumb) != 0)
+            return -1;
+
+        return 0;
+    }
+
+    /* Handle run() calls */
+    if (setjmp(jmpbuf_restart)) {
+        cart_running = false;
+        if (!restart)
+            return 0;
+        return p8_run();
+    }
+    restart = false;
+
+    cart_running = true;
+    int ret = lua_exec_repl(input, err_type, err, err_size);
+    cart_running = false;
+
+    return ret;
 }
 
 int p8_shutdown()

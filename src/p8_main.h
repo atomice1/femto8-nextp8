@@ -8,6 +8,7 @@
 typedef enum {
     P8_SCREEN_BROWSE = 0,
     P8_SCREEN_EDIT,
+    P8_SCREEN_REPL,
 } p8_screen_index_t;
 
 extern void p8_main(void);

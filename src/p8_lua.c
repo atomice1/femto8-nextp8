@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <math.h>
 #include <stdbool.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -2713,4 +2714,52 @@ void lua_init()
             m_lua_draw = lua_topointer(L, -1);
         lua_pop(L, 1);
     }
+}
+
+/* =========================================================================
+ * REPL helper — run a single Lua expression/statement and return its
+ * string representation.  On success returns 0 and fills
+ * err[]; on error returns -1 and puts the error message in err[].
+ * ========================================================================= */
+int lua_exec_repl(const char *input, const char **err_type, char *err, int err_size)
+{
+    if (!L) {
+        snprintf(err, err_size, "no lua state");
+        return false;
+    }
+
+    int top_before = lua_gettop(L);
+    bool ok = false;
+    const char *err_msg = NULL;
+
+    int expr_load = luaL_loadstring(L, input);
+    if (expr_load == 0) {
+        int pcall_ret = lua_pcall(L, 0, LUA_MULTRET, 0);
+        if (pcall_ret == 0) {
+            ok = true;
+        } else {
+            err_msg = lua_tostring(L, -1);
+            *err_type = "runtime error";
+        }
+    } else {
+        err_msg = lua_tostring(L, -1);
+        if (strstr(err_msg, "syntax error"))
+            err_msg = NULL;
+        *err_type = "syntax error";
+        ok = false;
+    }
+
+    if (err_msg) {
+        const char *colon = strrchr(err_msg, ':');
+        if (colon)
+            err_msg = colon + 2;
+        const char *near = strstr(err_msg, " near ");
+        if (near)
+            *(char *)near = '\0';
+    }
+    if (err_msg) strncpy(err, err_msg, err_size);
+
+    lua_settop(L, top_before);
+
+    return ok ? 0 : -1;
 }

@@ -20,6 +20,7 @@ void lua_update();
 void lua_draw();
 void lua_init();
 bool lua_has_main_loop_callbacks();
+int lua_exec_repl(const char *input, const char **err_type, char *err, int err_size);
 
 extern char m_str_buffer[256];
 

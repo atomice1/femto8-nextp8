@@ -327,5 +327,6 @@ void p8_show_io_icon(bool show);
 void p8_show_error_dialog(const char **lines, int line_count, p8_error_severity_t severity);
 void p8_show_version_dialog(void);
 int p8_shutdown(void);
+void p8_wait_for_any_key(void);
 
 #endif
