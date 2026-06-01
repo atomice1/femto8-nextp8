@@ -11,6 +11,7 @@
 #include "pico_font.h"
 #include "p8_audio.h"
 #include "p8_emu.h"
+#include "p8_input.h"
 #include "p8_lua.h"
 #if defined(_WIN32)
 #include <windows.h>
@@ -1863,12 +1864,13 @@ case STAT_MEM_USAGE: {
         break;
     }
     case STAT_KEY_PRESSED:
-        lua_pushboolean(L, m_keypress != 0);
+        lua_pushboolean(L, p8_has_pending_keypress());
         break;
     case STAT_KEY_NAME: {
-        char s[2] = {(char)m_keypress, '\0'};
+        uint8_t keypress = 0;
+        p8_get_next_keypress(NULL, &keypress, NULL);
+        char s[2] = {(char)keypress, '\0'};
         lua_pushstring(L, s);
-        m_keypress = 0;
         break;
     }
     case STAT_MOUSE_X:
@@ -2315,6 +2317,7 @@ static void lua_event_pump_hook(lua_State *L, lua_Debug *ar)
     (void)L;
     (void)ar;
     p8_pump_events();
+    p8_check_for_pause();
 }
 
 void lua_load_api()

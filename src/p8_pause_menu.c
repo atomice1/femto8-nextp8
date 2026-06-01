@@ -11,6 +11,7 @@
 #include "p8_pause_menu.h"
 #include "p8_emu.h"
 #include "p8_dialog.h"
+#include "p8_input.h"
 #include "p8_overlay_helper.h"
 #include "p8_options.h"
 #include "p8_audio.h"
@@ -129,7 +130,6 @@ void p8_show_pause_menu(void)
 
     // Run dialog loop, allowing menuitem callbacks to keep the menu open
     p8_dialog_set_showing(&pause_dialog, true);
-    m_keypress = 0;
 
     int action_id = -1;
     for (;;) {

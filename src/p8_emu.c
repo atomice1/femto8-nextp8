@@ -26,6 +26,7 @@
 #include "p8_cache.h"
 #include "p8_dialog.h"
 #include "p8_emu.h"
+#include "p8_input.h"
 #include "p8_lua.h"
 #include "p8_lua_helper.h"
 #include "p8_overlay_helper.h"
@@ -98,7 +99,9 @@ char m_clipboard[1024];
 static bool skip_main_loop_if_no_callbacks = false;
 
 #ifdef SDL
-SDL_Surface *m_screen = NULL;
+SDL_Window *m_window = NULL;
+SDL_Renderer *m_renderer = NULL;
+SDL_Texture *m_texture = NULL;
 SDL_Surface *m_output = NULL;
 SDL_PixelFormat *m_format = NULL;
 #endif
@@ -106,23 +109,6 @@ SDL_PixelFormat *m_format = NULL;
 SemaphoreHandle_t m_drawSemaphore;
 #endif
 
-int16_t m_mouse_x, m_mouse_y;
-int16_t mouse_x4, mouse_y4;
-int16_t m_mouse_xrel, m_mouse_yrel;
-uint8_t m_mouse_buttons;
-int8_t m_mouse_wheel;
-uint8_t m_keypress;
-bool m_scancodes[NUM_SCANCODES];
-
-uint16_t m_buttons[PLAYER_COUNT];
-uint16_t m_buttonsp[PLAYER_COUNT];
-uint16_t m_button_first_repeat[PLAYER_COUNT];
-unsigned m_button_down_time[PLAYER_COUNT][BUTTON_INTERNAL_COUNT];
-#ifdef SDL
-uint16_t m_buttons_latch[PLAYER_COUNT];
-#endif
-
-static bool m_prev_pointer_lock;
 
 static FILE *cartdata = NULL;
 static bool cartdata_needs_flush = false;
@@ -131,9 +117,6 @@ static int m_initialized = 0;
 
 #ifdef NEXTP8
 static int vfrontreq = 0;
-static int16_t mouse_x_accum_prev = 0;
-static int16_t mouse_y_accum_prev = 0;
-static int16_t mouse_z_accum_prev = 0;
 #endif
 
 const uint8_t io_icon[32] = {
@@ -196,16 +179,29 @@ int p8_init()
         return 1;
     }
 
-    SDL_ShowCursor(0);
-    SDL_EnableKeyRepeat(0, 0);
-    SDL_EnableUNICODE(true);
+    SDL_ShowCursor(SDL_DISABLE);
 
-    m_screen = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT, 32, SDL_HWSURFACE);
-    m_format = m_screen->format;
+    /* Create SDL2 window/renderer/texture and an output surface we render into. */
+    m_window = SDL_CreateWindow("femto-8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                               SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+    if (!m_window) {
+        printf("Error creating SDL window.\n");
+        return 1;
+    }
+    m_renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (!m_renderer) {
+        SDL_DestroyWindow(m_window);
+        m_window = NULL;
+        printf("Error creating SDL renderer.\n");
+        return 1;
+    }
 
-    m_output = SDL_CreateRGBSurface(0, P8_WIDTH, P8_HEIGHT, 32, m_format->Rmask, m_format->Gmask, m_format->Bmask, m_format->Amask);
+    /* Texture at native P8 resolution; we'll update it from the output surface. */
+    m_texture = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, P8_WIDTH, P8_HEIGHT);
+    m_output = SDL_CreateRGBSurfaceWithFormat(0, P8_WIDTH, P8_HEIGHT, 32, SDL_PIXELFORMAT_ARGB8888);
+    m_format = m_output->format;
 
-    SDL_WM_SetCaption("femto-8", NULL);
+    SDL_SetWindowTitle(m_window, "femto-8");
 #endif
 #ifdef OS_FREERTOS
     m_drawSemaphore = xSemaphoreCreateBinary();
@@ -245,19 +241,7 @@ int p8_init()
 #endif
 
     p8_init_lcd();
-
-    for (unsigned p=0;p<2;++p) {
-        for (unsigned i=0;i<BUTTON_INTERNAL_COUNT;++i) {
-            m_button_down_time[p][i] = UINT_MAX;
-        }
-    }
-
-#ifdef NEXTP8
-    memset((void *)_KEYBOARD_MATRIX_LATCHED, 0xff, 32);
-    *(volatile uint8_t *)_JOYSTICK0_LATCHED = 0xff;
-    *(volatile uint8_t *)_JOYSTICK1_LATCHED = 0xff;
-    *(volatile uint8_t *)_MOUSE_BUTTONS_LATCHED = 0xff;
-#endif
+    p8_init_input();
 
     m_initialized = 1;
 
@@ -294,10 +278,12 @@ static int p8_init_common(const char *file_name, const char *lua_script)
     }
 
     if (setjmp(jmpbuf_restart)) {
+        printf("restarting cart - restart=%d\n", restart);
         if (!restart)
             return 0;
         lua_shutdown_api();
         lua_load_api();
+        printf("restarted cart\n");
     }
 
     restart = false;
@@ -305,11 +291,7 @@ static int p8_init_common(const char *file_name, const char *lua_script)
     memcpy(m_memory, m_cart_memory, CART_MEMORY_SIZE);
 
     m_frames = 0;
-    for (unsigned p = 0; p < PLAYER_COUNT; ++p) {
-        for (unsigned i = 0; i < BUTTON_INTERNAL_COUNT; ++i)
-            m_button_down_time[p][i] = UINT_MAX;
-        m_button_first_repeat[p] = 0;
-    }
+    p8_init_input();
 
     p8_reset();
     clear_screen(0);
@@ -402,8 +384,10 @@ int p8_shutdown()
     p8_close_cartdata();
 
 #ifdef SDL
-    SDL_FreeSurface(m_output);
-    SDL_FreeSurface(m_screen);
+    if (m_texture) { SDL_DestroyTexture(m_texture); m_texture = NULL; }
+    if (m_renderer) { SDL_DestroyRenderer(m_renderer); m_renderer = NULL; }
+    if (m_window) { SDL_DestroyWindow(m_window); m_window = NULL; }
+    if (m_output) { SDL_FreeSurface(m_output); m_output = NULL; }
     SDL_Quit();
 #endif
 
@@ -561,10 +545,17 @@ void p8_render()
         }
     }
 
-    SDL_Rect rect = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
-    // SDL_BlitSurface(m_output, NULL, m_screen, &rect);
-    SDL_SoftStretch(m_output, NULL, m_screen, &rect);
-    SDL_Flip(m_screen);
+    SDL_Rect rectDest = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
+#ifdef SDL
+    if (m_texture && m_renderer) {
+        SDL_UpdateTexture(m_texture, NULL, m_output->pixels, m_output->pitch);
+        SDL_RenderClear(m_renderer);
+        SDL_RenderCopy(m_renderer, m_texture, NULL, &rectDest);
+        SDL_RenderPresent(m_renderer);
+    }
+#else
+    (void)rectDest;
+#endif
 }
 #elif defined(__DA1470x__)
 
@@ -827,616 +818,11 @@ void p8_render()
 }
 #endif
 
-#if defined(NEXTP8)
-char scancode_to_name[2][256] = {
-    {
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\t', '`', '\0',
-        '\0', '\0', '\0', '\0', '\0', 'q', '1', '\0', '\0', '\0', 'z', 's', 'a', 'w', '2', '\0',
-        '\0', 'c', 'x', 'd', 'e', '4', '3', '\0', '\0', '\0', 'v', 'f', 't', 'r', '5', '\0',
-        '\0', 'n', 'b', 'h', 'g', 'y', '6', '\0', '\0', '\0', 'm', 'j', 'u', '7', '8', '\0',
-        '\0', ',', 'k', 'i', 'o', '0', '9', '\0', '\0', '.', '/', 'l', ';', 'p', '-', '\0',
-        '\0', '\0', '\'', '\0', '[', '=', '\0', '\0', '\0', '\0', '\r', ']', '\0', '\\', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\b', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\x1b', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\x7f', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-    },
-    {
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\t', '~', '\0',
-        '\0', '\0', '\0', '\0', '\0', 'Q', '!', '\0', '\0', '\0', 'Z', 'S', 'A', 'W', '@', '\0',
-        '\0', 'C', 'X', 'D', 'E', '$', '#', '\0', '\0', '\0', 'V', 'F', 'T', 'R', '%', '\0',
-        '\0', 'N', 'B', 'H', 'G', 'Y', '&', '\0', '\0', '\0', 'M', 'J', 'U', '\'', '(', '\0',
-        '\0', '<', 'K', 'I', 'O', '-', ')', '\0', '\0', '>', '?', 'L', ':', 'P', '_', '\0',
-        '\0', '\0', '"', '\0', '{', '+', '\0', '\0', '\0', '\0', '\r', '}', '\0', '|', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\b', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\x1b', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
-        '\0', '\x7f', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'
-    },
-};
-
-unsigned nextp8_scancode_to_sdl_scancode[NUM_SCANCODES] = {
-    // 0x00-0x0F
-    0, 66, 0, 62, 60, 58, 59, 69,     // F9, F5, F3, F1, F2, F12
-    0, 67, 65, 63, 61, 43, 53, 0,     // F10, F8, F6, F4, TAB, `
-    // 0x10-0x1F
-    0, 226, 225, 0, 224, 20, 30, 0,   // L-Alt, L-Shift, L-Ctrl, Q, 1
-    0, 0, 29, 22, 4, 26, 31, 0,       // Z, S, A, W, 2
-    // 0x20-0x2F
-    0, 6, 27, 7, 8, 33, 32, 0,        // C, X, D, E, 4, 3
-    0, 44, 25, 23, 21, 34, 0, 0,      // Space, V, F, T, R, 5
-    // 0x30-0x3F
-    0, 17, 5, 11, 10, 28, 35, 0,      // N, B, H, G, Y, 6
-    0, 0, 16, 13, 24, 36, 37, 0,      // M, J, U, 7, 8
-    // 0x40-0x4F
-    0, 54, 14, 12, 18, 39, 38, 0,     // comma, K, I, O, 0, 9
-    0, 55, 56, 15, 51, 19, 45, 0,     // period, slash, L, semicolon, P, minus
-    // 0x50-0x5F
-    0, 0, 52, 0, 47, 46, 0, 0,        // apostrophe, [, =
-    57, 229, 40, 48, 0, 49, 0, 0,     // CapsLock, R-Shift, Enter, ], \,
-    // 0x60-0x6F
-    0, 0, 0, 0, 0, 0, 42, 0,          // Backspace
-    0, 89, 0, 92, 95, 0, 0, 0,        // KP-1, KP-4, KP-7
-    // 0x70-0x7F
-    98, 99, 90, 93, 94, 96, 41, 83,   // KP-0, KP-., KP-2, KP-5, KP-6, KP-8, Esc, NumLock
-    68, 87, 91, 86, 85, 77, 71, 64,   // F11, KP-+, KP-3, KP--, KP-*, PageUp, ScrollLock, F7
-    // 0x80-0x8F
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    // 0x90-0x9F
-    0, 230, 0, 0, 228, 0, 0, 0,       // 0x91: R-Alt, 0x94: R-Ctrl
-    0, 227, 0, 0, 0, 0, 0, 231,       // 0x9F: L-GUI, 0x9F: R-GUI
-    // 0xA0-0xAF
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 266, 0, 0, 0, 0, 101,       // 0xAB: Calculator, 0xAF: Apps
-    // 0xB0-0xBF
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    // 0xC0-0xCF
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 88, 0, 0, 0, 0, 0,          // 0xCA: KP-Enter
-    // 0xD0-0xDF
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    // 0xE0-0xEF
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 77, 0, 80, 74, 0, 0, 0,        // 0xE9: End, 0xEB: Left, 0xEC: Home
-    // 0xF0-0xFF
-    73, 76, 81, 0, 79, 82, 78, 75,    // 0xF0: Insert, 0xF1: Delete, 0xF2: Down, 0xF4: Right, 0xF5: Up, 0xF6: PageDown, 0xF7: PageUp
-    0, 0, 0, 0, 0, 0, 0, 0
-};
-
-#define KEY_CURSOR_LEFT 235
-#define KEY_CURSOR_DOWN 242
-#define KEY_CURSOR_RIGHT 244
-#define KEY_CURSOR_UP 245
-#define KEY_Z 26
-#define KEY_X 34
-#define KEY_N 49
-#define KEY_M 58
-#define KEY_C 33
-#define KEY_V 42
-#define KEY_S 27
-#define KEY_D 35
-#define KEY_F 43
-#define KEY_E 36
-#define KEY_TAB 13
-#define KEY_Q 21
-#define KEY_LEFT_SHIFT 18
-#define KEY_A 28
-#define KEY_RIGHT_SHIFT 89
-#define KEY_ENTER 0x5a
-#define KEY_BREAK 0x76
-#define KEY_P 0x4d
-#define KEY_PAGE_UP   0xfd
-#define KEY_PAGE_DOWN 0xfa
-
-#define JOY_UP      (1 << 0)
-#define JOY_DOWN    (1 << 1)
-#define JOY_LEFT    (1 << 2)
-#define JOY_RIGHT   (1 << 3)
-#define JOY_BUTTON1 (1 << 4)
-#define JOY_BUTTON2 (1 << 5)
-
-static unsigned is_down(volatile uint8_t *base, unsigned index)
-{
-    return base[index >> 3] & (1 << (index & 0x7));
-}
-
-static uint16_t player0_mask(volatile uint8_t *keyboard_matrix, uint8_t joy0)
-{
-    uint16_t mask = 0;
-    if (is_down(keyboard_matrix, KEY_CURSOR_LEFT) ||
-        (joy0 & JOY_LEFT))
-        mask |= BUTTON_MASK_LEFT;
-    if (is_down(keyboard_matrix, KEY_CURSOR_RIGHT) ||
-        (joy0 & JOY_RIGHT))
-        mask |= BUTTON_MASK_RIGHT;
-    if (is_down(keyboard_matrix, KEY_CURSOR_UP) ||
-        (joy0 & JOY_UP))
-        mask |= BUTTON_MASK_UP;
-    if (is_down(keyboard_matrix, KEY_CURSOR_DOWN) ||
-        (joy0 & JOY_DOWN))
-        mask |= BUTTON_MASK_DOWN;
-    if (is_down(keyboard_matrix, KEY_Z) ||
-        is_down(keyboard_matrix, KEY_N) ||
-        is_down(keyboard_matrix, KEY_C) ||
-        is_down(keyboard_matrix, KEY_ENTER) ||
-        (joy0 & JOY_BUTTON1))
-        mask |= BUTTON_MASK_ACTION1;
-    if (is_down(keyboard_matrix, KEY_X) ||
-        is_down(keyboard_matrix, KEY_M) ||
-        is_down(keyboard_matrix, KEY_V) ||
-        (joy0 & JOY_BUTTON2))
-        mask |= BUTTON_MASK_ACTION2;
-    if (is_down(keyboard_matrix, KEY_ENTER))
-        mask |= BUTTON_MASK_PAUSE | BUTTON_MASK_RETURN;
-    if (is_down(keyboard_matrix, KEY_P))
-        mask |= BUTTON_MASK_PAUSE;
-    if (is_down(keyboard_matrix, KEY_BREAK))
-        mask |= BUTTON_MASK_ESCAPE;
-    if (is_down(keyboard_matrix, KEY_PAGE_UP))
-        mask |= BUTTON_MASK_PAGE_UP;
-    if (is_down(keyboard_matrix, KEY_PAGE_DOWN))
-        mask |= BUTTON_MASK_PAGE_DOWN;
-    return mask;
-}
-
-static uint16_t player1_mask(volatile uint8_t *keyboard_matrix, uint8_t joy1)
-{
-    uint16_t mask = 0;
-    if (is_down(keyboard_matrix, KEY_S) ||
-        (joy1 & JOY_LEFT))
-        mask |= BUTTON_MASK_LEFT;
-    if (is_down(keyboard_matrix, KEY_D) ||
-        (joy1 & JOY_RIGHT))
-        mask |= BUTTON_MASK_RIGHT;
-    if (is_down(keyboard_matrix, KEY_F) ||
-        (joy1 & JOY_UP))
-        mask |= BUTTON_MASK_UP;
-    if (is_down(keyboard_matrix, KEY_E) ||
-        (joy1 & JOY_DOWN))
-        mask |= BUTTON_MASK_DOWN;
-    if (is_down(keyboard_matrix, KEY_TAB) ||
-        is_down(keyboard_matrix, KEY_LEFT_SHIFT) ||
-        (joy1 & JOY_BUTTON1))
-        mask |= BUTTON_MASK_ACTION1;
-    if (is_down(keyboard_matrix, KEY_Q) ||
-        is_down(keyboard_matrix, KEY_A) ||
-        (joy1 & JOY_BUTTON2))
-        mask |= BUTTON_MASK_ACTION2;
-    return mask;
-}
-
-static uint32_t keyboard_matrix_prev[8];
-#endif
-
-#ifdef SDL
-/* Translate SDL 1.2 platform-specific scancode to SDL2 (USB HID) scancode.
- * SDL 1.2 scancode is platform-dependent:
- *   Linux  : X11 keycode = evdev + 8  (range 8-255)
- *   Windows: PS/2 Set 1 OEM code, (unsigned char) cast  (range 0-127)
- *   macOS  : Mac virtual keycode  (range 0-127)
- * m_scancodes[] and PICO-8 stat(28,k) use SDL2 scancodes. */
-#if defined(__linux__)
-static const unsigned s_sdl1_to_sdl2[256] = {
-    /* 0x00 */   0,   0,   0,   0,   0,   0,   0,   0,   0,  41,  30,  31,  32,  33,  34,  35,
-    /* 0x10 */  36,  37,  38,  39,  45,  46,  42,  43,  20,  26,   8,  21,  23,  28,  24,  12,
-    /* 0x20 */  18,  19,  47,  48,  40, 224,   4,  22,   7,   9,  10,  11,  13,  14,  15,  51,
-    /* 0x30 */  52,  53, 225,  49,  29,  27,   6,  25,   5,  17,  16,  54,  55,  56, 229,  85,
-    /* 0x40 */ 226,  44,  57,  58,  59,  60,  61,  62,  63,  64,  65,  66,  67,  83,  71,  95,
-    /* 0x50 */  96,  97,  86,  92,  93,  94,  87,  89,  90,  91,  98,  99,   0,   0, 100,  68,
-    /* 0x60 */  69,   0,   0,   0,   0,   0,   0,   0,  88, 228,  84,  70, 230,   0,  74,  82,
-    /* 0x70 */  75,  80,  79,  77,  81,  78,  73,  76,   0,   0,   0,   0,   0, 103,   0,  72,
-    /* 0x80 */   0,   0,   0,   0,   0, 227, 231, 101,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0x90 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0xa0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0xb0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0xc0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0xd0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0xe0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0xf0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-};
-#elif defined(_WIN32)
-/* PS/2 Set 1 OEM scan codes (8-bit, extended-key bit stripped by SDL 1.2). */
-static const unsigned s_sdl1_to_sdl2[128] = {
-    /* 0x00 */   0,  41,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  45,  46,  42,  43,
-    /* 0x10 */  20,  26,   8,  21,  23,  28,  24,  12,  18,  19,  47,  48,  40, 224,   4,  22,
-    /* 0x20 */   7,   9,  10,  11,  13,  14,  15,  51,  52,  53, 225,  49,  29,  27,   6,  25,
-    /* 0x30 */   5,  17,  16,  54,  55,  56, 229,  85, 226,  44,  57,  58,  59,  60,  61,  62,
-    /* 0x40 */  63,  64,  65,  66,  67,  83,  71,  95,  96,  97,  86,  92,  93,  94,  87,  89,
-    /* 0x50 */  90,  91,  98,  99,  70,   0, 100,  68,  69,   0,   0,   0,   0,   0,   0,   0,
-    /* 0x60 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0x70 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-};
-#elif defined(__APPLE__)
-/* Mac virtual keycodes (Carbon HIToolbox kVK_* constants). */
-static const unsigned s_sdl1_to_sdl2[128] = {
-    /* 0x00 */   4,  22,   7,   9,  11,  10,  29,  27,   6,  25,   0,   5,  20,  26,   8,  21,
-    /* 0x10 */  28,  23,  30,  31,  32,  33,  35,  34,  46,  38,  36,  45,  37,  39,  48,  18,
-    /* 0x20 */  24,  47,  12,  19,  40,  15,  13,  52,  14,  51,  49,  54,  56,  17,  16,  55,
-    /* 0x30 */  43,  44,  53,  42,   0,  41, 231, 227, 225,  57, 226, 224, 229, 230, 228,   0,
-    /* 0x40 */   0,  99,   0,  85,   0,  87,   0,  83,   0,   0,   0,  84,  88,   0,  86,   0,
-    /* 0x50 */   0,   0,  98,  89,  90,  91,  92,  93,  94,  95,   0,  96,  97,   0,   0,   0,
-    /* 0x60 */  62,  63,  64,  60,  65,  66,   0,  68,   0,   0,   0,   0,   0,  67,   0,  69,
-    /* 0x70 */   0,   0,  73,  74,  75,  76,  61,  77,  59,  78,  58,  80,  79,  81,  82,   0,
-};
-#else
-static const unsigned s_sdl1_to_sdl2[1] = {0};
-#endif
-static unsigned translate_scancode(unsigned raw) {
-    return (raw < sizeof(s_sdl1_to_sdl2)/sizeof(s_sdl1_to_sdl2[0]))
-        ? s_sdl1_to_sdl2[raw] : 0;
-}
-#endif /* SDL */
-
-void p8_update_input()
-{
-    bool pointer_lock = (m_memory[MEMORY_DEVKIT_MODE] & 0x4) != 0;
-    if (pointer_lock != m_prev_pointer_lock) {
-        m_prev_pointer_lock  = pointer_lock;
-#ifdef SDL
-        SDL_WM_GrabInput(pointer_lock ? SDL_GRAB_ON : SDL_GRAB_OFF);
-#endif
-    }
-
-#ifdef SDL
-    m_mouse_xrel = 0;
-    m_mouse_yrel = 0;
-    m_mouse_wheel = 0;
-
-    SDL_Event event;
-    while (SDL_PollEvent(&event))
-    {
-        switch (event.type)
-        {
-        case SDL_MOUSEMOTION:
-            m_mouse_x = event.motion.x * P8_WIDTH / SCREEN_WIDTH;
-            m_mouse_y = event.motion.y * P8_HEIGHT / SCREEN_HEIGHT;
-            m_mouse_xrel += event.motion.xrel * P8_WIDTH / SCREEN_WIDTH;
-            m_mouse_yrel += event.motion.yrel * P8_HEIGHT / SCREEN_HEIGHT;
-            break;
-        case SDL_MOUSEBUTTONDOWN:
-            if (event.button.button == 1) {
-                m_mouse_buttons |= 0x1;
-                if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
-                    update_buttons(0, BUTTON_ACTION1, true);
-            } else if (event.button.button == 3) {
-                m_mouse_buttons |= 0x2;
-                if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
-                    update_buttons(0, BUTTON_ACTION2, true);
-            } else if (event.button.button == 2) {
-                m_mouse_buttons |= 0x4;
-                if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
-                    update_buttons(0, BUTTON_PAUSE, true);
-            } else if (event.button.button == 4) {
-                m_mouse_wheel += 1;
-            } else if (event.button.button == 5) {
-                m_mouse_wheel -= 1;
-            }
-            break;
-        case SDL_MOUSEBUTTONUP:
-            if (event.button.button == 1) {
-                m_mouse_buttons &= ~0x1;
-                if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
-                    update_buttons(0, BUTTON_ACTION1, false);
-            } else if (event.button.button == 3) {
-                m_mouse_buttons &= ~0x2;
-                if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
-                    update_buttons(0, BUTTON_ACTION2, false);
-            } else if (event.button.button == 2) {
-                m_mouse_buttons &= ~0x4;
-                if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
-                    update_buttons(0, BUTTON_PAUSE, false);
-            }
-            break;
-        case SDL_KEYDOWN:
-            switch (event.key.keysym.sym)
-            {
-            case INPUT_LEFT:
-                update_buttons(0, BUTTON_LEFT, true);
-                break;
-            case INPUT_RIGHT:
-                update_buttons(0, BUTTON_RIGHT, true);
-                break;
-            case INPUT_UP:
-                update_buttons(0, BUTTON_UP, true);
-                break;
-            case INPUT_DOWN:
-                update_buttons(0, BUTTON_DOWN, true);
-                break;
-            case INPUT_ACTION1:
-                update_buttons(0, BUTTON_ACTION1, true);
-                break;
-            case INPUT_ACTION2:
-                update_buttons(0, BUTTON_ACTION2, true);
-                break;
-            case INPUT_ESCAPE:
-                update_buttons(0, BUTTON_ESCAPE, true);
-                break;
-            case SDLK_RETURN:
-                update_buttons(0, BUTTON_PAUSE, true);
-                update_buttons(0, BUTTON_RETURN, true);
-                break;
-            case SDLK_p:
-                update_buttons(0, BUTTON_PAUSE, true);
-                break;
-            case SDLK_SPACE:
-                update_buttons(0, BUTTON_SPACE, true);
-                break;
-            case SDLK_PAGEUP:
-                update_buttons(0, BUTTON_PAGE_UP, true);
-                break;
-            case SDLK_PAGEDOWN:
-                update_buttons(0, BUTTON_PAGE_DOWN, true);
-                break;
-            default:
-                break;
-            }
-            {
-                unsigned sdl2_sc = translate_scancode(event.key.keysym.scancode);
-                if (sdl2_sc > 0 && sdl2_sc < NUM_SCANCODES)
-                    m_scancodes[sdl2_sc] = true;
-            }
-            m_keypress = (event.key.keysym.unicode < 256) ? event.key.keysym.unicode : 0;
-            break;
-        case SDL_KEYUP:
-            switch (event.key.keysym.sym)
-            {
-            case INPUT_LEFT:
-                update_buttons(0, BUTTON_LEFT, false);
-                break;
-            case INPUT_RIGHT:
-                update_buttons(0, BUTTON_RIGHT, false);
-                break;
-            case INPUT_UP:
-                update_buttons(0, BUTTON_UP, false);
-                break;
-            case INPUT_DOWN:
-                update_buttons(0, BUTTON_DOWN, false);
-                break;
-            case INPUT_ACTION1:
-                update_buttons(0, BUTTON_ACTION1, false);
-                break;
-            case INPUT_ACTION2:
-                update_buttons(0, BUTTON_ACTION2, false);
-                break;
-            case SDLK_RETURN:
-                update_buttons(0, BUTTON_PAUSE, false);
-                update_buttons(0, BUTTON_RETURN, false);
-                break;
-            case SDLK_p:
-                update_buttons(0, BUTTON_PAUSE, false);
-                break;
-            case SDLK_SPACE:
-                update_buttons(0, BUTTON_SPACE, false);
-                break;
-            case SDLK_PAGEUP:
-                update_buttons(0, BUTTON_PAGE_UP, false);
-                break;
-            case SDLK_PAGEDOWN:
-                update_buttons(0, BUTTON_PAGE_DOWN, false);
-                break;
-            case INPUT_ESCAPE:
-                update_buttons(0, BUTTON_ESCAPE, false);
-                break;
-            default:
-                break;
-            }
-            {
-                unsigned sdl2_sc = translate_scancode(event.key.keysym.scancode);
-                if (sdl2_sc > 0 && sdl2_sc < NUM_SCANCODES)
-                    m_scancodes[sdl2_sc] = false;
-            }
-            break;
-        case SDL_QUIT:
-            p8_abort();
-            break;
-        default:
-            break;
-        }
-    }
-#elif defined(OS_FREERTOS)
-    uint16_t mask = 0;
-
-    if (gamepad & AXIS_L_LEFT)
-        mask |= BUTTON_MASK_LEFT;
-    if (gamepad & AXIS_L_RIGHT)
-        mask |= BUTTON_MASK_RIGHT;
-    if (gamepad & AXIS_L_UP)
-        mask |= BUTTON_MASK_UP;
-    if (gamepad & AXIS_L_DOWN)
-        mask |= BUTTON_MASK_DOWN;
-    if (gamepad & AXIS_L_TRIGGER)
-        mask |= BUTTON_MASK_ACTION1;
-    if (gamepad & AXIS_R_LEFT)
-        mask |= BUTTON_MASK_LEFT;
-    if (gamepad & AXIS_R_RIGHT)
-        mask |= BUTTON_MASK_RIGHT;
-    if (gamepad & AXIS_R_UP)
-        mask |= BUTTON_MASK_UP;
-    if (gamepad & AXIS_R_DOWN)
-        mask |= BUTTON_MASK_DOWN;
-    if (gamepad & AXIS_R_TRIGGER)
-        mask |= BUTTON_MASK_ACTION2;
-    if (gamepad & DPAD_UP)
-        mask |= BUTTON_MASK_UP;
-    if (gamepad & DPAD_RIGHT)
-        mask |= BUTTON_MASK_RIGHT;
-    if (gamepad & DPAD_DOWN)
-        mask |= BUTTON_MASK_DOWN;
-    if (gamepad & DPAD_LEFT)
-        mask |= BUTTON_MASK_LEFT;
-    if (gamepad & BUTTON_1)
-        mask |= BUTTON_MASK_ACTION1;
-    if (gamepad & BUTTON_2)
-        mask |= BUTTON_MASK_ACTION2;
-
-    m_buttons[0] = mask;
-
-#elif defined(NEXTP8)
-    volatile uint8_t *keyboard_matrix = (volatile uint8_t *) _KEYBOARD_MATRIX;
-    volatile uint8_t *keyboard_matrix_latched = (volatile uint8_t *) _KEYBOARD_MATRIX_LATCHED;
-    volatile uint8_t *joy0_latched_ptr = (volatile uint8_t *) _JOYSTICK0_LATCHED;
-    volatile uint8_t *joy1_latched_ptr = (volatile uint8_t *) _JOYSTICK1_LATCHED;
-
-    uint8_t joy0 = *(volatile uint8_t *) _JOYSTICK0;
-    uint8_t joy1 = *(volatile uint8_t *) _JOYSTICK1;
-    uint8_t joy0_latched = *joy0_latched_ptr;
-    uint8_t joy1_latched = *joy1_latched_ptr;
-
-    // Set current button state from unlatched inputs
-    m_buttons[0] = player0_mask(keyboard_matrix, joy0);
-    m_memory[MEMORY_BUTTON_STATE] = m_buttons[0] & 0xff;
-
-    // Set button press state from latched inputs
-    m_buttonsp[0] = player0_mask(keyboard_matrix_latched, joy0_latched);
-
-    // Clear joystick latched bits for player 0
-    *joy0_latched_ptr = 255;
-
-    // Set current button state from unlatched inputs
-    m_buttons[1] = player1_mask(keyboard_matrix, joy1);
-    m_memory[MEMORY_BUTTON_STATE + 1] = m_buttons[1] & 0xff;
-
-    // Set button press state from latched inputs
-    m_buttonsp[1] = player1_mask(keyboard_matrix_latched, joy1_latched);
-
-    // Clear joystick latched bits for player 1
-    *joy1_latched_ptr = 255;
-
-    // Clear all keyboard latched bits
-    memset((void *)keyboard_matrix_latched, 0xff, 32);
-
-    bool need_update = false;
-    volatile uint32_t *keyboard_matrix32 = (volatile  uint32_t *) keyboard_matrix;
-    for (unsigned i = 0; i < 8; ++i) {
-        if (keyboard_matrix32[i] != keyboard_matrix_prev[i])
-            need_update = true;
-    }
-    if (need_update) {
-        bool shifted = is_down(keyboard_matrix, KEY_LEFT_SHIFT) ||
-                       is_down(keyboard_matrix, KEY_RIGHT_SHIFT);
-        for (unsigned i=0;i<256;++i) {
-            bool down = is_down(keyboard_matrix, i);
-            bool prev_down = is_down((uint8_t *)keyboard_matrix_prev, i);
-            if (down && !prev_down) {
-                // Key press event
-                char ch = scancode_to_name[shifted?1:0][i];
-                if (ch != '\0')
-                    m_keypress = ch;
-            }
-            m_scancodes[nextp8_scancode_to_sdl_scancode[i]] = down;
-        }
-        for (unsigned i = 0; i < 8; ++i)
-            keyboard_matrix_prev[i] = keyboard_matrix32[i];
-    }
-
-    int16_t mouse_x_accum = *(volatile int16_t *) _MOUSE_X;
-    int16_t mouse_y_accum = *(volatile int16_t *) _MOUSE_Y;
-    int16_t mouse_z_accum = *(volatile int16_t *) _MOUSE_Z;
-    m_mouse_buttons = *(volatile uint8_t *) _MOUSE_BUTTONS;
-
-    // Handle wrap-around of signed 16-bit accumulators
-    m_mouse_xrel = (int16_t)(mouse_x_accum - mouse_x_accum_prev);
-    m_mouse_yrel = (int16_t)(mouse_y_accum - mouse_y_accum_prev);
-    m_mouse_wheel = (int16_t)(mouse_z_accum - mouse_z_accum_prev);
-
-    mouse_x4 += m_mouse_xrel;
-    mouse_y4 += m_mouse_yrel;
-    if (mouse_x4 < 0) mouse_x4 = 0;
-    if (mouse_x4 >= P8_WIDTH * 4) mouse_x4 = P8_WIDTH * 4 - 1;
-    if (mouse_y4 < 0) mouse_y4 = 0;
-    if (mouse_y4 >= P8_HEIGHT * 4) mouse_y4 = P8_HEIGHT * 4 - 1;
-    m_mouse_x = mouse_x4 / 4;
-    m_mouse_y = mouse_y4 / 4;
-
-    mouse_x_accum_prev = mouse_x_accum;
-    mouse_y_accum_prev = mouse_y_accum;
-    mouse_z_accum_prev = mouse_z_accum;
-
-    if (m_memory[MEMORY_DEVKIT_MODE] & 0x2) {
-        m_buttons[0] |= (m_mouse_buttons & 0x7) << 4;
-
-        volatile uint8_t mouse_buttons_latched = *(volatile uint8_t *) _MOUSE_BUTTONS_LATCHED;
-        m_buttonsp[0] |= (mouse_buttons_latched & 0x7) << 4;
-        *(volatile uint8_t *) _MOUSE_BUTTONS_LATCHED = 0xff;
-    }
-#endif
-
-    uint8_t delay = m_memory[MEMORY_AUTO_REPEAT_DELAY];
-    if (delay == 0)
-        delay = DEFAULT_AUTO_REPEAT_DELAY;
-    uint8_t interval = m_memory[MEMORY_AUTO_REPEAT_INTERVAL];
-    if (interval == 0)
-        interval = DEFAULT_AUTO_REPEAT_INTERVAL;
-    for (unsigned p=0;p<PLAYER_COUNT;++p) {
-#ifndef NEXTP8
-        m_buttonsp[p] = 0;
-#endif
-        for (unsigned i=0;i<BUTTON_INTERNAL_COUNT;++i) {
-            if (m_buttons[p] & (1 << i)) {
-                if (m_button_down_time[p][i] == UINT_MAX) {
-                    // ignore buttons pressed at startup
-                } else if (!m_button_down_time[p][i]) {
-                    m_button_down_time[p][i] = m_frames;
-#ifndef NEXTP8
-                    m_buttonsp[p] |= 1 << i;
-#endif
-                } else if (i < BUTTON_REPEAT_COUNT) {
-                    if (delay != 255 && !(m_button_first_repeat[p] & (1 << i)) && m_frames - m_button_down_time[p][i] >= delay) {
-                        m_button_down_time[p][i] = m_frames;
-                        m_button_first_repeat[p] |= 1 << i;
-                        m_buttonsp[p] |= 1 << i;
-                    } else if ((m_button_first_repeat[p] & (1 << i)) && m_frames - m_button_down_time[p][i] >= interval) {
-                        m_button_down_time[p][i] = m_frames;
-                        m_buttonsp[p] |= 1 << i;
-                    }
-                }
-            } else  {
-#ifdef SDL
-                // Catch a press-and-release within one frame via latch
-                if ((m_buttons_latch[p] & (1 << i)) && !m_button_down_time[p][i]) {
-                    m_buttonsp[p] |= 1 << i;
-                }
-#endif
-                if (m_button_down_time[p][i]) {
-                    m_button_down_time[p][i] = 0;
-                    m_button_first_repeat[p] &= ~(1 << i);
-                }
-            }
-        }
-#ifdef SDL
-        m_buttons_latch[p] = 0;
-#endif
-    }
-
-    if (!m_dialog_showing) {
-        if ((m_buttons[0] & BUTTON_MASK_ESCAPE) != 0)
-            p8_abort();
-
-        if ((m_buttonsp[0] & BUTTON_MASK_PAUSE) != 0) {
-            p8_show_pause_menu();
-        }
-    }
-}
-
 static void p8_post_flip(void)
 {
     p8_flush_cartdata();
     p8_update_input();
+    p8_check_for_pause();
     m_frames++;
 }
 
@@ -1508,57 +894,17 @@ unsigned p8_elapsed_time(void)
     return elapsed_time;
 }
 
-void p8_pump_events(void)
+void p8_check_for_pause(void)
 {
-#if defined(SDL)
-    SDL_PumpEvents();
+    if (!m_dialog_showing) {
+        if ((m_buttonsp[0] & BUTTON_MASK_ESCAPE) != 0)
+            p8_abort();
 
-    // SDL_QUIT must be consumed and acted on immediately.
-    SDL_Event event;
-    while (SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_QUITMASK) > 0)
-        p8_abort();
-
-    // Consume all pending keydown events.  Handle pause/escape immediately,
-    // and re-queue everything else so p8_update_input processes it normally.
-    SDL_Event keyevents[64];
-    int n = SDL_PeepEvents(keyevents, 64, SDL_GETEVENT, SDL_KEYDOWNMASK);
-    for (int i = 0; i < n; i++) {
-        SDLKey sym = keyevents[i].key.keysym.sym;
-        bool is_pause = (sym == SDLK_RETURN || sym == SDLK_p);
-        bool is_escape = (sym == INPUT_ESCAPE);
-        if (is_pause || is_escape) {
-            if (sym == SDLK_RETURN) {
-                m_buttons[0] |= BUTTON_MASK_PAUSE | BUTTON_MASK_RETURN;
-                m_button_down_time[0][BUTTON_PAUSE] = UINT_MAX;
-                m_button_down_time[0][BUTTON_RETURN] = UINT_MAX;
-            } else if (sym == SDLK_p) {
-                m_buttons[0] |= BUTTON_MASK_PAUSE;
-                m_button_down_time[0][BUTTON_PAUSE] = UINT_MAX;
-            } else if (sym == INPUT_ESCAPE) {
-                m_buttons[0] |= BUTTON_MASK_ESCAPE;
-                m_button_down_time[0][BUTTON_ESCAPE] = UINT_MAX;
-            }
-            if (!m_dialog_showing) {
-                if (is_pause)
-                    p8_show_pause_menu();
-                else if (is_escape)
-                    p8_abort();
-            }
-        } else {
-            SDL_PushEvent(&keyevents[i]);
+        if ((m_buttonsp[0] & BUTTON_MASK_PAUSE) != 0) {
+            printf("show pause menu\n");
+            p8_show_pause_menu();
         }
     }
-#elif defined(NEXTP8)
-    volatile uint8_t *keyboard_matrix = (volatile uint8_t *) _KEYBOARD_MATRIX;
-    bool escape_down = is_down(keyboard_matrix, KEY_BREAK);
-    if (escape_down && (m_buttons[0] & BUTTON_MASK_ESCAPE) == 0)
-        p8_abort();
-
-    bool enter_down = is_down(keyboard_matrix, KEY_ENTER);
-    bool p_down = is_down(keyboard_matrix, KEY_P);
-    if ((enter_down || p_down) && (m_buttons[0] & BUTTON_MASK_PAUSE) == 0)
-        p8_show_pause_menu();
-#endif
 }
 
 void p8_seed_rng_state(uint32_t seed)
