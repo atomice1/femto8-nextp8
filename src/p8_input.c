@@ -387,7 +387,7 @@ void p8_update_input()
             }
             break;
         case SDL_QUIT:
-            p8_abort();
+            p8_quit();
             break;
         default:
             break;

@@ -76,8 +76,10 @@ unsigned m_frames = 0;
 
 p8_clock_t m_start_time;
 
-jmp_buf jmpbuf_restart;
+static jmp_buf jmpbuf_restart;
 static bool restart;
+static bool cart_running = false;
+static bool quit_requested = false;
 
 static jmp_buf jmpbuf_load;
 bool m_load_available = false;
@@ -261,7 +263,7 @@ static void p8_wait_for_any_key(void)
     y = scroll(y, GLYPH_HEIGHT);
     draw_simple_text("press any key...", 0, y, 7);
     p8_flip();
-    while (true) {
+    while (!p8_is_quit_requested()) {
         p8_update_input();
         unsigned scancode = 0, keymod = 0;
         uint8_t keypress = 0;
@@ -280,9 +282,12 @@ static int p8_init_common(const char *file_name, const char *lua_script)
         return -1;
     }
 
+    cart_running = true;
     if (setjmp(jmpbuf_restart)) {
-        if (!restart)
+        if (!restart) {
+            cart_running = false;
             return 0;
+        }
         lua_shutdown_api();
         lua_load_api();
     }
@@ -306,6 +311,8 @@ static int p8_init_common(const char *file_name, const char *lua_script)
         p8_main_loop();
     else if (!skip_main_loop_if_no_callbacks)
         p8_wait_for_any_key();
+
+    cart_running = false;
 
     return 0;
 }
@@ -915,13 +922,32 @@ void p8_reset(void)
 
 void __attribute__ ((noreturn)) p8_abort()
 {
+    assert(cart_running);
     longjmp(jmpbuf_restart, 1);
 }
 
 void __attribute__ ((noreturn)) p8_restart()
 {
+    assert(cart_running);
     restart = true;
     p8_abort();
+}
+
+void p8_quit()
+{
+    quit_requested = true;
+    if (cart_running)
+        p8_abort();
+}
+
+bool p8_is_cart_running(void)
+{
+    return cart_running;
+}
+
+bool p8_is_quit_requested(void)
+{
+    return quit_requested;
 }
 
 int p8_resolve_relative_path(char *dest_filename, const char *src_filename, size_t dest_size, bool for_cstore)
