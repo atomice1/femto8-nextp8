@@ -125,6 +125,7 @@ int main(int argc, char *argv[])
     }
 #endif
 #endif
+    p8_init();
 
     if (file_name[0] == '\0') {
         if (browse_for_cart(file_name, sizeof(file_name)) < 0)
@@ -134,8 +135,12 @@ int main(int argc, char *argv[])
     if (skip_main_loop)
         p8_set_skip_main_loop_if_no_callbacks(true);
     if (file_name[0] != '\0') {
-        if (p8_init_file_with_param(file_name, param_string) != 0)
+        if (p8_load(file_name, param_string, NULL, NULL) != 0) {
             exit_code = EXIT_FAILURE;
+        } else {
+            if (p8_run() != 0)
+                exit_code = EXIT_FAILURE;
+        }
     }
     p8_shutdown();
 

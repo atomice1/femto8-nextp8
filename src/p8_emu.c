@@ -86,10 +86,13 @@ static bool cart_running = false;
 static bool quit_requested = false;
 
 static jmp_buf jmpbuf_load;
-bool m_load_available = false;
-static bool load_requested = false;
-static char load_filename[PATH_MAX];
-static char load_param[256];
+static struct {
+    bool requested;
+    const char *file_name;
+    const char *param;
+    const char *bbs_cart_id;
+    const char *breadcrumb;
+} pending_load;
 
 char m_current_cart_dir[PATH_MAX];
 char m_current_cart_file_name[PATH_MAX];
@@ -245,6 +248,8 @@ int p8_init()
     p8_init_lcd();
     p8_init_input();
 
+    lua_load_api();
+
     m_initialized = 1;
 
     return 0;
@@ -275,6 +280,7 @@ static void p8_wait_for_any_key(void)
     cursor_get(&x, &y);
     y = scroll(y, GLYPH_HEIGHT);
     draw_simple_text("press any key...", 0, y, 7);
+    cursor_set(0, y + GLYPH_HEIGHT, -1);
     p8_flip();
     while (!p8_is_quit_requested()) {
         p8_update_input();
@@ -285,75 +291,33 @@ static void p8_wait_for_any_key(void)
     }
 }
 
-static int p8_init_common(const char *file_name, const char *lua_script)
+int p8_load(const char *file_name, const char *param, const char *bbs_cart_id, const char *breadcrumb)
 {
-    p8_show_io_icon(false);
+    assert(m_initialized);
 
-    if (lua_script == NULL) {
-        if (file_name) fprintf(stderr, "%s: ", file_name);
-        fprintf(stderr, "invalid cart\n");
-        return -1;
+    if (cart_running) {
+        assert(!pending_load.requested);
+
+        pending_load.requested = true;
+        pending_load.file_name = file_name;
+        pending_load.param = param;
+        pending_load.bbs_cart_id = bbs_cart_id;
+        pending_load.breadcrumb = breadcrumb;
+
+        longjmp(jmpbuf_load, 1);
     }
-
-    cart_running = true;
-    if (setjmp(jmpbuf_restart)) {
-        if (!restart) {
-            cart_running = false;
-            return 0;
-        }
-        lua_shutdown_api();
-        lua_load_api();
-        printf("restarted cart\n");
-    }
-
-    restart = false;
-
-    memcpy(m_memory, m_cart_memory, CART_MEMORY_SIZE);
-
-    m_frames = 0;
-    p8_init_input();
-
-    p8_reset();
-    clear_screen(0);
-    p8_update_input();
-
-    lua_init_script(file_name, lua_script);
-
-    lua_init();
-
-    if (lua_has_main_loop_callbacks())
-        p8_main_loop();
-    else if (!skip_main_loop_if_no_callbacks)
-        p8_wait_for_any_key();
-
-    cart_running = false;
-
-    return 0;
-}
-
-int p8_init_file_with_param(const char *file_name, const char *param)
-{
-    if (!m_initialized)
-        p8_init();
 
     strtcpy(m_param_string, param ? param : "", sizeof(m_param_string));
-    m_load_available = true;
-
-    if (setjmp(jmpbuf_load)) {
-        load_requested = false;
-
-        lua_shutdown_api();
-
-        file_name = load_filename;
-    }
+    strtcpy(m_bbs_cart_id, bbs_cart_id ? bbs_cart_id : "", sizeof(m_bbs_cart_id));
+    strtcpy(m_breadcrumb, breadcrumb ? breadcrumb : "", sizeof(m_breadcrumb));
 
     m_current_cart_dir[0] = '\0';
     m_current_cart_file_name[0] = '\0';
-    if (!m_bbs_cart_id[0])
+    if (!bbs_cart_id)
         strtcpy(m_current_cart_file_name, file_name, sizeof(m_current_cart_file_name));
 
     /* For BBS carts, set m_current_cart_dir to DEFAULT_CARTS_PATH */
-    if (m_bbs_cart_id[0]) {
+    if (bbs_cart_id) {
         if (access(DEFAULT_CARTS_PATH, F_OK) != -1)
             strtcpy(m_current_cart_dir, DEFAULT_CARTS_PATH, sizeof(m_current_cart_dir));
         else
@@ -372,30 +336,75 @@ int p8_init_file_with_param(const char *file_name, const char *param)
     }
 
     p8_show_io_icon(true);
-    lua_load_api();
 
     printf("Loading %s\n", file_name);
-    if (parse_cart_file(file_name, m_cart_memory, m_file_buffer, m_decompression_buffer, m_lua_script, NULL) != 0)
+    if (parse_cart_file(file_name, m_cart_memory, m_file_buffer, m_decompression_buffer, m_lua_script, NULL) != 0) {
+        p8_show_io_icon(false);
         return -1;
+    }
 
-    int ret = p8_init_common(file_name, m_lua_script);
+    p8_reset_cart();
 
+    p8_show_io_icon(false);
+    return 0;
+}
+
+int p8_load_ram(uint8_t *buffer, int size)
+{
+    assert(m_initialized);
+
+    p8_show_io_icon(true);
+
+    int ret = parse_cart_ram(buffer, size, m_cart_memory, m_decompression_buffer, m_lua_script, NULL);
+
+    p8_show_io_icon(false);
     return ret;
 }
 
-int p8_init_ram(uint8_t *buffer, int size)
+int p8_run(void)
 {
-    if (!m_initialized)
-        p8_init();
+    assert(m_initialized);
+    assert(m_lua_script);
 
-    p8_show_io_icon(true);
-    lua_load_api();
+    if (cart_running)
+        p8_restart();
+    assert(!cart_running);
 
-    parse_cart_ram(buffer, size, m_cart_memory, m_decompression_buffer, m_lua_script, NULL);
+    /* Handle load() calls from within the cart */
+    if (setjmp(jmpbuf_load)) {
+        pending_load.requested = false;
 
-    int init_ret = p8_init_common(NULL, m_lua_script);
+        /* Load the new cart */
 
-    return init_ret;
+        if (p8_load(pending_load.file_name, pending_load.param, pending_load.bbs_cart_id, pending_load.breadcrumb) != 0)
+            return -1;
+    }
+
+    if (setjmp(jmpbuf_restart)) {
+        cart_running = false;
+        if (!restart)
+            return 0;
+    }
+    restart = false;
+
+    p8_reset_cart();
+
+    cart_running = true;
+
+    lua_init_script(m_current_cart_file_name, m_lua_script);
+
+    lua_init();
+
+    if (lua_has_main_loop_callbacks())
+        p8_main_loop();
+    else if (!skip_main_loop_if_no_callbacks)
+        p8_wait_for_any_key();
+
+    cart_running = false;
+
+    p8_reset_cart();
+
+    return 0;
 }
 
 int p8_shutdown()
@@ -921,7 +930,7 @@ unsigned p8_elapsed_time(void)
 
 void p8_check_for_pause(void)
 {
-    if (!m_dialog_showing) {
+    if (cart_running && !m_dialog_showing) {
         if ((m_buttonsp[0] & BUTTON_MASK_ESCAPE) != 0)
             p8_abort();
 
@@ -963,6 +972,8 @@ void p8_seed_rng_state(uint32_t seed)
 
 void p8_reset(void)
 {
+    uint8_t cursor_x = m_memory[MEMORY_CURSOR];
+    uint8_t cursor_y = m_memory[MEMORY_CURSOR + 1];
     memset(m_memory + MEMORY_DRAWSTATE, 0, MEMORY_DRAWSTATE_SIZE);
     memset(m_memory + MEMORY_HARDWARESTATE, 0, MEMORY_HARDWARESTATE_SIZE);
     m_memory[MEMORY_SCREEN_PHYS] = 0x60;
@@ -974,6 +985,36 @@ void p8_reset(void)
     clip_set(0, 0, P8_WIDTH, P8_HEIGHT);
     // time(NULL) is a plain integer; shift left 16 to make it a fix32 integer.
     p8_seed_rng_state((uint32_t)time(NULL) << 16);
+    m_memory[MEMORY_CURSOR] = cursor_x;
+    m_memory[MEMORY_CURSOR + 1] = cursor_y;
+}
+
+static void p8_common_reset_cart()
+{
+    assert(!cart_running);
+    p8_close_cartdata();
+    lua_shutdown_api();
+    lua_load_api();
+    p8_reset();
+    m_frames = 0;
+    p8_reset_input();
+    p8_update_input();
+}
+
+void p8_new_cart(void)
+{
+    assert(!cart_running);
+    m_current_cart_file_name[0] = '\0';
+    memset(m_cart_memory, 0, CART_MEMORY_SIZE);
+    memset(m_memory, 0, CART_MEMORY_SIZE);
+    p8_common_reset_cart();
+}
+
+void p8_reset_cart(void)
+{
+    assert(!cart_running);
+    memcpy(m_memory, m_cart_memory, CART_MEMORY_SIZE);
+    p8_common_reset_cart();
 }
 
 void __attribute__ ((noreturn)) p8_abort()
@@ -1024,23 +1065,14 @@ int p8_resolve_relative_path(char *dest_filename, const char *src_filename, size
     return -1;
 }
 
-void __attribute__ ((noreturn)) p8_load_new(const char *filename, const char *param)
-{
-    assert(m_load_available);
-
-    strtcpy(load_filename, filename, sizeof(load_filename));
-    if (param)
-        strtcpy(load_param, param, sizeof(load_param));
-    else
-        load_param[0] = '\0';
-    load_requested = true;
-
-    longjmp(jmpbuf_load, 1);
-}
-
 void p8_set_skip_main_loop_if_no_callbacks(bool skip)
 {
     skip_main_loop_if_no_callbacks = skip;
+}
+
+bool p8_get_skip_main_loop_if_no_callbacks(void)
+{
+    return skip_main_loop_if_no_callbacks;
 }
 
 bool p8_open_cartdata(const char *id)

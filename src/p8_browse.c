@@ -225,6 +225,7 @@ static void list_dir(const char* path) {
         closedir(dir);
     }
     qsort(dir_contents, nitems, sizeof(dir_contents[0]), compare_dir_entry);
+    strtcpy(m_current_cart_dir, path, sizeof(m_current_cart_dir));
     p8_show_io_icon(false);
 }
 
@@ -460,7 +461,6 @@ int browse_for_cart(char *cart_path, size_t cart_path_size)
     filename_mem_end = filename_mem + INITIAL_FILENAME_MEM_SIZE;
     clear_dir_contents();
 
-    p8_init();
     p8_reset();
     // Remap screen palette to alternate palette so we can display full
     // 32-colour labels.

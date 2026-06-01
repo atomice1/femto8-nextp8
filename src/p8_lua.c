@@ -1664,18 +1664,18 @@ int reset(lua_State *L)
     return 0;
 }
 
-int __attribute__ ((noreturn)) run(lua_State *L)
+int run(lua_State *L)
 {
     const char *param = (lua_gettop(L) >= 1) ? lua_tostring(L, 1) : "";
     strtcpy(m_param_string, param, sizeof(m_param_string));
 
-    p8_restart();
+    return p8_run();
 }
 
 // load(filename [,breadcrumb] [,param])
 int _load(lua_State *L)
 {
-    if (!m_load_available)
+    if (access(".", F_OK) == -1 && errno != EACCES)
         luaL_error(L, "load() requires a filesystem");
 
     int nargs = lua_gettop(L);
@@ -1687,24 +1687,15 @@ int _load(lua_State *L)
     if (!filename)
         luaL_error(L, "load() filename must be a string");
 
-    const char *breadcrumb = NULL;
-    if (nargs >= 2)
-        breadcrumb = lua_tostring(L, 2);
-
-    /* Set breadcrumb */
-    if (breadcrumb)
-        strtcpy(m_breadcrumb, breadcrumb, sizeof(m_breadcrumb));
-    else
-        m_breadcrumb[0] = '\0';
-
     char full_filename[PATH_MAX];
     char resolved_path[PATH_MAX];
+    const char *bbs_cart_id = NULL;
 
     /* Check if filename starts with '#' for BBS download */
     if (filename[0] == '#') {
 #ifdef ENABLE_BBS_DOWNLOAD
-        const char *cart_id = filename + 1;  /* Skip the '#' */
-        if (p8_download_bbs_cart(cart_id, resolved_path, sizeof(resolved_path)) < 0) {
+        bbs_cart_id = filename + 1;  /* Skip the '#' */
+        if (p8_download_bbs_cart(bbs_cart_id, resolved_path, sizeof(resolved_path)) < 0) {
             m_load_result = -2;
             fprintf(stderr, "load: could not fetch cart\n");
             lua_pushboolean(L, 0);
@@ -1719,9 +1710,6 @@ int _load(lua_State *L)
         return 2;
 #endif
     } else {
-        /* Clear BBS cart ID for non-BBS loads */
-        m_bbs_cart_id[0] = '\0';
-
         if (strstr(filename, ".p8") == NULL && strstr(filename, ".P8") == NULL) {
             snprintf(full_filename, sizeof(full_filename), "%s.p8", filename);
             filename = full_filename;
@@ -1742,12 +1730,16 @@ int _load(lua_State *L)
         return 2;
     }
 
+    const char *breadcrumb = NULL;
+    if (nargs >= 2)
+        breadcrumb = lua_tostring(L, 2);
+
     const char *param = NULL;
     if (nargs >= 3)
         param = lua_tostring(L, 3);
 
     m_load_result = 1;
-    p8_load_new(resolved_path, param);
+    p8_load(resolved_path, param, bbs_cart_id, breadcrumb);
 
     lua_pushboolean(L, 1);
     return 1;
@@ -2508,7 +2500,7 @@ void lua_draw()
 
 bool lua_has_main_loop_callbacks()
 {
-    return (m_lua_update != NULL || m_lua_update60 != NULL) && (m_lua_draw != NULL);
+    return (m_lua_update != NULL || m_lua_update60 != NULL || m_lua_draw != NULL);
 }
 
 void lua_init()
