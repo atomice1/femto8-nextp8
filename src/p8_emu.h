@@ -309,7 +309,7 @@ bool p8_is_quit_requested(void);
 bool p8_is_reboot_requested(void);
 int p8_load(const char *file_name, const char *param, const char *bbs_cart_id, const char *breadcrumb);
 int p8_load_ram(uint8_t *buffer, int size);
-void p8_set_skip_main_loop_if_no_callbacks(bool skip);
+int p8_make_full_path(char *ret, int ret_size, const char *dir_path, const char *file_name);
 void p8_new_cart(void);
 bool p8_open_cartdata(const char *id);
 void p8_pump_events(void);
@@ -322,6 +322,7 @@ int p8_resolve_relative_path(char *dest_filename, const char *src_filename, size
 void __attribute__ ((noreturn)) p8_restart();
 int p8_run(void);
 void p8_seed_rng_state(uint32_t seed);
+void p8_set_skip_main_loop_if_no_callbacks(bool skip);
 void p8_show_io_icon(bool show);
 void p8_show_error_dialog(const char **lines, int line_count, p8_error_severity_t severity);
 void p8_show_version_dialog(void);

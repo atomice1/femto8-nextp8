@@ -10,6 +10,7 @@
 #include "p8_symbols.h"
 #include "pico_font.h"
 #include "p8_audio.h"
+#include "p8_browse.h"
 #include "p8_emu.h"
 #include "p8_input.h"
 #include "p8_lua.h"
@@ -29,12 +30,15 @@
 #include <unistd.h>   // sysconf
 #include <stdio.h>    // fopen/fscanf
 #endif
+#include <dirent.h>
 #include <errno.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <time.h>
 #include <string.h>
 #include <unistd.h>
@@ -2123,6 +2127,176 @@ int serial(lua_State *L)
     return 0;
 }
 
+// ****************************************************************
+// *** Filesystem ***
+// ****************************************************************
+
+// save([filename])
+// Save the current cartridge to disk.
+int save(lua_State *L)
+{
+    const char *filename = lua_gettop(L) >= 1 ? lua_tostring(L, 1) : NULL;
+
+    char resolved[PATH_MAX];
+    if (filename) {
+        if (p8_resolve_relative_path(resolved, filename, sizeof(resolved), true) < 0) {
+            luaL_error(L, "out of memory");
+            return 0;
+        }
+    } else {
+        if (!m_current_cart_file_name[0]) {
+            lua_pushboolean(L, 0);
+            return 1;
+        }
+        strtcpy(resolved, m_current_cart_file_name, sizeof(resolved));
+    }
+
+    p8_show_io_icon(true);
+    int ret = write_cart_p8(resolved, m_lua_script, m_cart_memory);
+    p8_show_io_icon(false);
+
+    if (ret != 0) {
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
+// ls([directory])
+// List .p8 and .p8.png files in the given directory (relative to current_cart_dir).
+// Directories are returned with a trailing '/'.
+// Returns nil when called from a BBS cart.
+int ls(lua_State *L)
+{
+    if (m_bbs_cart_id[0])
+        return 0; /* nil */
+
+    const char *path = NULL;
+    char resolved[PATH_MAX];
+
+    if (lua_gettop(L) >= 1 && !lua_isnil(L, 1)) {
+        const char *arg = lua_tostring(L, 1);
+        if (arg) {
+            if (p8_resolve_relative_path(resolved, arg, sizeof(resolved), false) < 0) {
+                luaL_error(L, "Path too long");
+                return 0;
+            }
+            path = resolved;
+        }
+    }
+
+    if (!path)
+        path = m_current_cart_dir[0] ? m_current_cart_dir : ".";
+
+    DIR *dir = opendir(path);
+    if (!dir)
+        return 0; /* nil */
+
+    lua_newtable(L);
+    int idx = 1;
+
+    struct dirent *de;
+    char full_path[PATH_MAX];
+    while ((de = readdir(dir)) != NULL) {
+        char *name = de->d_name;
+        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0)
+            continue;
+
+        /* Build full path for stat */
+        if (p8_make_full_path(full_path, sizeof(full_path), path, name) < 0)
+            continue;
+
+        struct stat st;
+        bool is_dir = false;
+        if (stat(full_path, &st) == 0)
+            is_dir = S_ISDIR(st.st_mode);
+
+        size_t name_len = strlen(name);
+        if (is_dir) {
+            /* Append trailing '/' */
+            if (name_len < sizeof(de->d_name) - 2) {
+                name[name_len] = '/';
+                name[name_len + 1] = '\0';
+                lua_pushstring(L, name);
+                lua_rawseti(L, -2, idx++);
+            }
+        } else {
+            /* Only include .p8 and .p8.png files */
+            bool is_p8 = (name_len > 3 && strcmp(name + name_len - 3, ".p8") == 0) ||
+                         (name_len > 7 && strcmp(name + name_len - 7, ".p8.png") == 0);
+            if (is_p8) {
+                lua_pushstring(L, name);
+                lua_rawseti(L, -2, idx++);
+            }
+        }
+    }
+    closedir(dir);
+    return 1;
+}
+
+// reboot()
+// Reboot the machine / start a new project.
+int reboot(lua_State *L)
+{
+    (void)L;
+    p8_reboot();
+    return 0;
+}
+
+// cd([directory])
+// Change the current cartridge directory.
+int cd(lua_State *L)
+{
+    if (lua_gettop(L) < 1 || lua_isnil(L, 1))
+        return 0;
+
+    const char *dir = lua_tostring(L, 1);
+    if (!dir)
+        return 0;
+
+    char new_dir[PATH_MAX];
+    if (p8_resolve_relative_path(new_dir, dir, sizeof(new_dir), false) < 0) {
+        luaL_error(L, "Path too long");
+        return 0;
+    }
+
+    struct stat st;
+    if (stat(new_dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        luaL_error(L, "%s: not a directory", dir);
+        return 0;
+    }
+
+    strtcpy(m_current_cart_dir, new_dir, sizeof(m_current_cart_dir));
+    return 0;
+}
+
+// mkdir(directory)
+// Create a directory.
+int lua_mkdir(lua_State *L)
+{
+    const char *dir = lua_gettop(L) >= 1 ? lua_tostring(L, 1) : NULL;
+    if (!dir) {
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+
+    char resolved[PATH_MAX];
+    if (p8_resolve_relative_path(resolved, dir, sizeof(resolved), true) < 0) {
+        luaL_error(L, "Path too long");
+        return 0;
+    }
+
+    int ret = MKDIR(resolved);
+
+    if (ret != 0 && errno != EEXIST) {
+        lua_pushboolean(L, 0);
+        return 1;
+    }
+    lua_pushboolean(L, 1);
+    return 1;
+}
+
 void lua_register_functions(lua_State *L)
 {
     // ****************************************************************
@@ -2260,6 +2434,11 @@ void lua_register_functions(lua_State *L)
     lua_register(L, "run", run);
     lua_register(L, "serial", serial);
     lua_register(L, "_set_fps", set_fps);
+    lua_register(L, "save", save);
+    lua_register(L, "ls", ls);
+    lua_register(L, "reboot", reboot);
+    lua_register(L, "cd", cd);
+    lua_register(L, "mkdir", lua_mkdir);
     // ****************************************************************
     // *** Debugging ***
     // ****************************************************************

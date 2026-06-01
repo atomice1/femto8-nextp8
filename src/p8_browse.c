@@ -122,48 +122,6 @@ static void append_dir_entry(const char *file_name, bool is_dir)
     nitems++;
 }
 
-static int make_full_path(char *ret, size_t ret_size, const char *dir_path, const char *file_name)
-{
-    if (!ret || !dir_path || !file_name) {
-        errno = EINVAL;
-        return -1;
-    }
-
-    size_t dir_len = strlen(dir_path);
-    size_t file_len = strlen(file_name);
-    if (dir_len > PATH_MAX || file_len > PATH_MAX || dir_len + 1 + file_len > PATH_MAX)
-        return -1;
-
-    if (strcmp(file_name, "..") == 0) {
-        strcpy(ret, dir_path);
-        char *slash = strrchr(ret, '/');
-        if (!slash)
-            slash = strrchr(ret, '\\');
-        if (slash) {
-            if (slash[1] == '\0' && ret[1] == ':' && slash==ret+2) {
-                // If going up a directory from the root of a drive,
-                // go up to the list of drives rather than the current
-                // directory of the drive.
-                // i.e. "C:\" -> "" rather than "C:\" -> "C:"
-                ret[0] = '\0';
-            } else if (ret[1] == ':' && slash==ret+2) {
-                // If going up to the root of the drive don't erase
-                // the trailing slash.
-                slash[1] = '\0';
-            } else {
-                slash[0] = '\0';
-            }
-        }
-    } else {
-        strcpy(ret, dir_path);
-        if (dir_len > 0 &&
-            ret[dir_len - 1] != '/' &&
-            ret[dir_len - 1] != '\\')
-            strcat(ret, "/");
-        strcat(ret, file_name);
-    }
-    return 0;
-}
 static int compare_dir_entry(const void *p1, const void *p2)
 {
     struct dir_entry *dir_entry1 = (struct dir_entry *)p1;
@@ -203,7 +161,7 @@ static void list_dir() {
             }
             if (strcmp(dirent->d_name, ".") == 0)
                 continue;
-            if (make_full_path(full_path, sizeof(full_path), m_current_cart_dir, dirent->d_name) != 0) {
+            if (p8_make_full_path(full_path, sizeof(full_path), m_current_cart_dir, dirent->d_name) != 0) {
                 fputs("Path too long\n", stderr);
                 continue;
             }
@@ -567,7 +525,7 @@ static void browse_update(void)
         unsigned highlight_ms = p8_clock_ms(p8_clock_delta(preview_highlight_time, p8_clock()));
         if (highlight_ms >= PREVIEW_LOAD_DELAY_MS) {
             char full_path[PATH_MAX];
-            if (make_full_path(full_path, sizeof(full_path), m_current_cart_dir, dir_contents[selected_index].file_name) == 0) {
+            if (p8_make_full_path(full_path, sizeof(full_path), m_current_cart_dir, dir_contents[selected_index].file_name) == 0) {
                 preview_loaded = p8_preview_load(full_path, &preview_info);
                 if (preview_loaded && preview_info.title[0] == '\0')
                     preview_use_filename_as_title(dir_contents[selected_index].file_name);
@@ -642,7 +600,7 @@ static void browse_update(void)
     if (result.type == DIALOG_RESULT_ACCEPTED && selected_index >= 0 && selected_index < nitems) {
         struct dir_entry *dir_entry = &dir_contents[selected_index];
         char full_path[PATH_MAX];
-        if (make_full_path(full_path, sizeof(full_path), m_current_cart_dir, dir_entry->file_name) < 0) {
+        if (p8_make_full_path(full_path, sizeof(full_path), m_current_cart_dir, dir_entry->file_name) < 0) {
             fputs("Path too long\n", stderr);
             return;
         }
