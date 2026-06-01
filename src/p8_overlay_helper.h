@@ -176,6 +176,18 @@ static inline int overlay_get_text_width(const char *text)
     return w;
 }
 
+static inline int overlay_get_text_width_len(const char *text, size_t len)
+{
+    int w = 0;
+    for (size_t i = 0; i < len && text[i] != '\0'; i++) {
+        if ((uint8_t)text[i] >= 0x80)
+            w += GLYPH_WIDTH * 2;
+        else
+            w += GLYPH_WIDTH;
+    }
+    return w;
+}
+
 static inline void overlay_pixel(int x, int y, int col)
 {
     if (x < overlay_clip_x0 || y < overlay_clip_y0 || x >= overlay_clip_x1 || y >= overlay_clip_y1)
