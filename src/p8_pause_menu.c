@@ -99,8 +99,6 @@ void p8_show_pause_menu(void)
         return;
     }
 
-    m_dialog_showing = true;
-
     /* Pause audio during pause menu unless 0x5f2f == 2 */
     bool should_pause_audio = m_memory[MEMORY_AUDIO_PAUSE] != 2;
     if (should_pause_audio)
@@ -176,8 +174,7 @@ void p8_show_pause_menu(void)
 
     p8_dialog_set_showing(&pause_dialog, false);
     p8_dialog_cleanup(&pause_dialog);
-
-    m_dialog_showing = false;
+    p8_flip(); // Ensure dialog hides immediately even if next flip is some time away
 
     if (should_pause_audio)
         audio_resume();
