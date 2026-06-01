@@ -183,7 +183,7 @@ static inline void draw_char_styled(int n, int left, int top, int fg, int bg, pr
     }
 }
 
-static inline void draw_text(const char *str, unsigned str_len, int x, int y, int col, int left_margin, bool add_newline, int *out_left, int *out_top, int *out_right)
+static inline void draw_text(const char *str, unsigned str_len, int x, int y, int col, int left_margin, bool no_scroll, int *out_left, int *out_top, int *out_right)
 {
     int right = x;
     int repeat = 1;
@@ -191,7 +191,6 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
     int fg = col;
     int tab_width = 16;
     int wrap_boundary = 128;
-    bool wrap_enabled = m_memory[MEMORY_MISCFLAGS] & 0x80;
     int last_advance = GLYPH_WIDTH;
     int home_x = x;
     int home_y = y;
@@ -236,6 +235,11 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
         state.char_h = ch;
     if (tw > 0)
         tab_width = tw;
+
+    bool add_newline = (m_memory[MEMORY_MISCFLAGS] & 0x4) == 0;
+    bool wrap_enabled = (m_memory[MEMORY_MISCFLAGS] & 0x80) != 0;
+    bool memory_no_scroll = (m_memory[MEMORY_MISCFLAGS] & 0x40) != 0;
+    bool do_scroll = !memory_no_scroll && !no_scroll;
 
     for (unsigned i = 0; i < str_len; i++)
     {
@@ -444,6 +448,11 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
                                     if ((unsigned)(addr + k) < MEMORY_SIZE)
                                         m_memory[addr + k] = byte;
                                 }
+
+                                add_newline = (m_memory[MEMORY_MISCFLAGS] & 0x4) == 0;
+                                wrap_enabled = (m_memory[MEMORY_MISCFLAGS] & 0x80) != 0;
+                                memory_no_scroll = (m_memory[MEMORY_MISCFLAGS] & 0x40) != 0;
+                                do_scroll = !memory_no_scroll && !no_scroll;
                             }
                             break;
                         case '!':
@@ -510,7 +519,9 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
                     break;
                 case 0xa: // "\n"
                     x = left_margin;
-                    y += state.char_h;
+                    y += state.char_h * (state.tall ? 2 : 1);
+                    if (do_scroll)
+                        y = scroll_newline(y);
                     break;
                 case 0xb: // "\v"
                     if (i + 2 < str_len) {
@@ -586,6 +597,13 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
 
                     bool use_styled = state.wide || state.tall || state.invert || !state.border || state.outline_enabled || state.use_custom_font || (state.char_w != GLYPH_WIDTH) || (state.char_w2 != GLYPH_WIDTH) || (state.char_h != GLYPH_HEIGHT);
 
+                    if (wrap_enabled && x + char_width > wrap_boundary) {
+                        x = left_margin;
+                        y += state.char_h * (state.tall ? 2 : 1);
+                    }
+                    if (do_scroll)
+                        y = scroll(y, state.char_h * (state.tall ? 2 : 1));
+
                     int draw_bg = state.solid_bg ? bg : -1;
                     if (use_styled) {
                         draw_char_styled(index, x, y, fg, draw_bg, &state);
@@ -604,11 +622,6 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
                         p8_flip();
                     }
 
-                    if (wrap_enabled && x >= wrap_boundary) {
-                        x = left_margin;
-                        y += state.char_h;
-                    }
-
                     if (x > right) right = x;
                 }
             }
@@ -618,6 +631,8 @@ static inline void draw_text(const char *str, unsigned str_len, int x, int y, in
     if (add_newline) {
         x = left_margin;
         y += state.char_h * (state.tall ? 2 : 1);
+        if (do_scroll)
+            y = scroll_newline(y);
     }
 
     if (out_left)

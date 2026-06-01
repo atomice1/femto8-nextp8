@@ -583,7 +583,7 @@ void p8_render()
 #endif
 
     sprintf(m_str_buffer, "%d", (int)m_actual_fps);
-    draw_text(m_str_buffer, 0, 0, 1);
+    draw_text(m_str_buffer, strlen(m_str_buffer), 0, 0, 1, 0, false, NULL, NULL, NULL);
 
     uint16_t *output = gdi_get_frame_buffer_addr(HW_LCDC_LAYER_0);
     uint8_t *screen_mem = &m_memory[(m_memory[MEMORY_SCREEN_PHYS] << 8)];
