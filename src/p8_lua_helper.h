@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <math.h>
 #include "p8_emu.h"
+#include "p8_input.h"
 #include "p8_symbols.h"
 #include "pico_font.h"
 
@@ -49,7 +50,6 @@ static inline void cursor_set(int x, int y, int col);
 static inline void pixel_set(int x, int y, int c, int fillp, int draw_type);
 static inline void draw_simple_text(const char *str, int x, int y, int col);
 static inline bool is_button_set(int index, int button, bool prev_buttons);
-static inline void update_buttons(int index, int button, bool state);
 static inline int map_cell_addr(int celx, int cely);
 static inline void map_set(int celx, int cely, int snum);
 static inline uint8_t map_get(int celx, int cely);
@@ -722,18 +722,6 @@ static inline bool is_button_set(int index, int button, bool btnp)
 {
     uint16_t mask = (btnp?m_buttonsp:m_buttons)[index];
     return mask & (1 << button);
-}
-
-static inline void update_buttons(int index, int button, bool state)
-{
-    uint16_t mask = m_buttons[index];
-    mask = state ? mask | (1 << button) : mask & ~(1 << button);
-    m_buttons[index] = mask;
-    m_memory[MEMORY_BUTTON_STATE + index] = mask & 0xff;
-#ifdef SDL
-    if (state)
-        m_buttons_latch[index] |= (1 << button);
-#endif
 }
 
 static inline int scroll(int y, int line_height)

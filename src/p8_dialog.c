@@ -6,6 +6,7 @@
 
 #include "p8_dialog.h"
 #include "p8_emu.h"
+#include "p8_input.h"
 #include "p8_overlay_helper.h"
 #include <string.h>
 #include <ctype.h>
@@ -524,32 +525,34 @@ p8_dialog_action_t p8_dialog_update(p8_dialog_t *dialog)
         if (dialog->controls[dialog->focused_control].type == DIALOG_INPUTBOX) {
             p8_dialog_control_t *control = &dialog->controls[dialog->focused_control];
 
-            // Handle Return
-            if (buttons & BUTTON_MASK_RETURN) {
-                if (!move_to_next_control(dialog, quick_mode)) {
-                    // No more controls, accept the dialog
-                    result.type = DIALOG_RESULT_ACCEPTED;
+            uint8_t keypress;
+            while (p8_get_next_keypress(NULL, &keypress, NULL)) {
+                // Handle Return
+                if (keypress == 13) {
+                    if (!move_to_next_control(dialog, quick_mode)) {
+                        // No more controls, accept the dialog
+                        result.type = DIALOG_RESULT_ACCEPTED;
+                    }
+
+                    return result;
                 }
-                return result;
-            }
-            // Handle printable characters
-            else if (m_keypress >= 32 && m_keypress <= 126) {
-                int len = strlen(control->data.inputbox.buffer);
-                if (len < control->data.inputbox.buffer_size - 1) {
-                    control->data.inputbox.buffer[len] = m_keypress;
-                    control->data.inputbox.buffer[len + 1] = '\0';
+                // Handle printable characters
+                else if (keypress >= 32 && keypress <= 126) {
+                    int len = strlen(control->data.inputbox.buffer);
+                    if (len < control->data.inputbox.buffer_size - 1) {
+                        control->data.inputbox.buffer[len] = keypress;
+                        control->data.inputbox.buffer[len + 1] = '\0';
+                    }
+                    return result;
                 }
-                m_keypress = 0;
-                return result;
-            }
-            // Handle backspace
-            else if (m_keypress == 8) {
-                int len = strlen(control->data.inputbox.buffer);
-                if (len > 0) {
-                    control->data.inputbox.buffer[len - 1] = '\0';
+                // Handle backspace
+                else if (keypress == 8) {
+                    int len = strlen(control->data.inputbox.buffer);
+                    if (len > 0) {
+                        control->data.inputbox.buffer[len - 1] = '\0';
+                    }
+                    return result;
                 }
-                m_keypress = 0;
-                return result;
             }
         } else {
             // Action buttons
@@ -723,9 +726,6 @@ p8_dialog_action_t p8_dialog_run(p8_dialog_t *dialog)
 
     p8_dialog_set_showing(dialog, true);
 
-    // Clear any previous keypress
-    m_keypress = 0;
-
     // Main dialog loop
     while (result.type == DIALOG_RESULT_NONE) {
         result = p8_dialog_update(dialog);
@@ -733,12 +733,6 @@ p8_dialog_action_t p8_dialog_run(p8_dialog_t *dialog)
         p8_dialog_draw(dialog);
         p8_flip();  // p8_flip calls p8_update_input internally
     }
-
-    // Clear overlay before returning
-    overlay_draw_rectfill(dialog->x, dialog->y,
-                          dialog->x + dialog->width - 1,
-                          dialog->y + dialog->height - 1, 0);
-    p8_flip();
 
     p8_dialog_set_showing(dialog, false);
 
@@ -765,6 +759,7 @@ void p8_dialog_set_showing(p8_dialog_t *dialog, bool showing)
         // Draw the dialogs underneath the closed one to refresh the screen
         p8_dialog_clear(dialog);
         p8_dialog_draw_stack();
+        p8_flip();
     } else if (showing) {
         assert(m_dialog_nest_count < MAX_DIALOG_NESTING);
         m_dialog_stack[m_dialog_nest_count] = dialog;

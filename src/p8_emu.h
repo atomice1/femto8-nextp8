@@ -197,15 +197,6 @@
 #define STAT_PCM_APP_BUFFER 109
 #define STAT_CURRENT_PATH 124
 
-#define INPUT_LEFT SDLK_LEFT
-#define INPUT_RIGHT SDLK_RIGHT
-#define INPUT_UP SDLK_UP
-#define INPUT_DOWN SDLK_DOWN
-#define INPUT_ACTION1 SDLK_z
-#define INPUT_ACTION2 SDLK_x
-#define INPUT_ESCAPE SDLK_ESCAPE
-#define NUM_SCANCODES 512
-
 #define DEFAULT_AUTO_REPEAT_DELAY 15
 #define DEFAULT_AUTO_REPEAT_INTERVAL 4
 
@@ -227,38 +218,6 @@ enum
     DRAWTYPE_DEFAULT,
     DRAWTYPE_GRAPHIC,
     DRAWTYPE_SPRITE
-};
-
-enum
-{
-    BUTTON_LEFT = 0,
-    BUTTON_RIGHT = 1,
-    BUTTON_UP = 2,
-    BUTTON_DOWN = 3,
-    BUTTON_ACTION1 = 4,
-    BUTTON_ACTION2 = 5,
-    BUTTON_PAUSE = 6,
-    BUTTON_ESCAPE = 8,
-    BUTTON_RETURN = 9,
-    BUTTON_SPACE = 10,
-    BUTTON_PAGE_UP = 11,
-    BUTTON_PAGE_DOWN = 12,
-};
-
-enum
-{
-    BUTTON_MASK_LEFT      = (1 << BUTTON_LEFT),
-    BUTTON_MASK_RIGHT     = (1 << BUTTON_RIGHT),
-    BUTTON_MASK_UP        = (1 << BUTTON_UP),
-    BUTTON_MASK_DOWN      = (1 << BUTTON_DOWN),
-    BUTTON_MASK_ACTION1   = (1 << BUTTON_ACTION1),
-    BUTTON_MASK_ACTION2   = (1 << BUTTON_ACTION2),
-    BUTTON_MASK_PAUSE     = (1 << BUTTON_PAUSE),
-    BUTTON_MASK_ESCAPE    = (1 << BUTTON_ESCAPE),
-    BUTTON_MASK_RETURN    = (1 << BUTTON_RETURN),
-    BUTTON_MASK_SPACE     = (1 << BUTTON_SPACE),
-    BUTTON_MASK_PAGE_UP   = (1 << BUTTON_PAGE_UP),
-    BUTTON_MASK_PAGE_DOWN = (1 << BUTTON_PAGE_DOWN),
 };
 
 enum {
@@ -302,26 +261,15 @@ extern char m_breadcrumb[256];
 extern char m_clipboard[1024];
 extern char m_param_string[256];
 
-extern int16_t m_mouse_x, m_mouse_y;
-extern int16_t m_mouse_xrel, m_mouse_yrel;
-extern uint8_t m_mouse_buttons;
-extern int8_t m_mouse_wheel;
-extern uint8_t m_keypress;
-extern bool m_scancodes[NUM_SCANCODES];
-
-extern uint16_t m_buttons[PLAYER_COUNT];
-extern uint16_t m_buttonsp[PLAYER_COUNT];
-extern uint16_t m_button_first_repeat[PLAYER_COUNT];
-extern unsigned m_button_down_time[PLAYER_COUNT][BUTTON_INTERNAL_COUNT];
-#ifdef SDL
-extern uint16_t m_buttons_latch[PLAYER_COUNT];
-#endif
-
 extern jmp_buf jmpbuf_restart;
 
 extern bool m_load_available;
 
 void __attribute__ ((noreturn)) p8_abort();
+void p8_check_for_pause(void);
+p8_clock_t p8_clock(void);
+unsigned p8_clock_ms(p8_clock_t clocks);
+p8_clock_t p8_clock_delta(p8_clock_t start, p8_clock_t end);
 void p8_close_cartdata(void);
 void p8_delayed_flush_cartdata(void);
 unsigned p8_elapsed_time(void);
@@ -345,9 +293,5 @@ void p8_show_io_icon(bool show);
 void p8_show_error_dialog(const char **lines, int line_count, p8_error_severity_t severity);
 void p8_show_version_dialog(void);
 int p8_shutdown(void);
-void p8_update_input(void);
-#ifdef NEXTP8
-void p8_update_keyboard_input(void);
-#endif
 
 #endif
