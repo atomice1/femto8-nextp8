@@ -210,6 +210,34 @@ static inline void overlay_draw_char(int n, int left, int top, int col)
     }
 }
 
+static inline void overlay_scroll_one_line()
+{
+    memmove(m_overlay_memory, m_overlay_memory + 64 * GLYPH_HEIGHT, 0x2000 - 64 * GLYPH_HEIGHT);
+    memset(m_overlay_memory + 0x2000 - 64 * GLYPH_HEIGHT, 0, 64 * GLYPH_HEIGHT);
+}
+
+static inline int overlay_draw_text(const char *str, int x, int y, int col)
+{
+    int cursor_x = x;
+    int cursor_y = y;
+    for (const char *c = str; *c != '\0'; c++) {
+        overlay_draw_char((uint8_t)*c, cursor_x, cursor_y, col);
+        if ((uint8_t)*c >= 0x80)
+            cursor_x += GLYPH_WIDTH * 2;
+        else
+            cursor_x += GLYPH_WIDTH;
+        if (cursor_x >= P8_WIDTH) {
+            cursor_x = 0;
+            cursor_y += GLYPH_HEIGHT;
+        }
+        if (cursor_y > P8_HEIGHT - GLYPH_HEIGHT) {
+            overlay_scroll_one_line();
+            cursor_y -= GLYPH_HEIGHT;
+        }
+    }
+    return cursor_x;
+}
+
 static inline void overlay_draw_simple_text(const char *str, int x, int y, int col)
 {
     int cursor_x = x;
