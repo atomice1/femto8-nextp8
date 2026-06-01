@@ -43,7 +43,6 @@ struct dir_entry {
     bool is_dir;
 };
 
-static char pwd[PATH_MAX];
 static struct dir_entry *dir_contents = NULL;
 static int nitems = 0;
 static int capacity = 0;
@@ -90,48 +89,7 @@ static void append_dir_entry(const char *file_name, bool is_dir)
     dir_entry->is_dir = is_dir;
     nitems++;
 }
-static int make_full_path(char *ret, size_t ret_size, const char *dir_path, const char *file_name)
-{
-    if (!ret || !dir_path || !file_name) {
-        errno = EINVAL;
-        return -1;
-    }
 
-    size_t dir_len = strlen(dir_path);
-    size_t file_len = strlen(file_name);
-    if (dir_len > PATH_MAX || file_len > PATH_MAX || dir_len + 1 + file_len > PATH_MAX)
-        return -1;
-
-    if (strcmp(file_name, "..") == 0) {
-        strcpy(ret, dir_path);
-        char *slash = strrchr(ret, '/');
-        if (!slash)
-            slash = strrchr(ret, '\\');
-        if (slash) {
-            if (slash[1] == '\0' && ret[1] == ':' && slash==ret+2) {
-                // If going up a directory from the root of a drive,
-                // go up to the list of drives rather than the current
-                // directory of the drive.
-                // i.e. "C:\" -> "" rather than "C:\" -> "C:"
-                ret[0] = '\0';
-            } else if (ret[1] == ':' && slash==ret+2) {
-                // If going up to the root of the drive don't erase
-                // the trailing slash.
-                slash[1] = '\0';
-            } else {
-                slash[0] = '\0';
-            }
-        }
-    } else {
-        strcpy(ret, dir_path);
-        if (dir_len > 0 &&
-            ret[dir_len - 1] != '/' &&
-            ret[dir_len - 1] != '\\')
-            strcat(ret, "/");
-        strcat(ret, file_name);
-    }
-    return 0;
-}
 static int compare_dir_entry(const void *p1, const void *p2)
 {
     struct dir_entry *dir_entry1 = (struct dir_entry *)p1;
@@ -142,18 +100,7 @@ static int compare_dir_entry(const void *p1, const void *p2)
         return strcmp(dir_entry1->file_name, dir_entry2->file_name);
 }
 static void list_dir(const char* path) {
-#ifdef NEXTP8
-    if (path[0] == '\0') {
-        strcpy(pwd, path);
-        clear_dir_contents();
-        // Show drives
-        static const char *volume_names[2] = {"0:/", "1:/"};
-        for (int i=0;i<2;++i)
-            append_dir_entry(volume_names[i], true);
-        return;
-    }
-#endif
-    if (strtcpy(pwd, path, sizeof(pwd)) < 0) {
+    if (strtcpy(m_current_cart_dir, path, sizeof(m_current_cart_dir)) < 0) {
         fputs("Path too long\n", stderr);
         return;
     }
@@ -173,7 +120,9 @@ static void list_dir(const char* path) {
                     fprintf(stderr, "%s: %s\n", path, strerror(errno));
                 break;
             }
-            if (make_full_path(full_path, sizeof(full_path), path, dirent->d_name) != 0) {
+            if (strcmp(dirent->d_name, ".") == 0)
+                continue;
+            if (p8_make_full_path(full_path, sizeof(full_path), m_current_cart_dir, dirent->d_name) != 0) {
                 fputs("Path too long\n", stderr);
                 continue;
             }
@@ -305,7 +254,7 @@ int browse_for_cart(char *cart_path, size_t cart_path_size)
 
     while (!p8_is_quit_requested()) {
         selected_index = 0;
-        controls[0].label = pwd;
+        controls[0].label = m_current_cart_dir;
         controls[1].data.listbox.item_count = nitems;
 
         // Main dialog loop
@@ -339,7 +288,7 @@ int browse_for_cart(char *cart_path, size_t cart_path_size)
         if (result.type == DIALOG_RESULT_ACCEPTED && selected_index >= 0 && selected_index < nitems) {
             struct dir_entry *dir_entry = &dir_contents[selected_index];
             char full_path[PATH_MAX] = {'\0'};
-            if (make_full_path(full_path, sizeof(full_path), pwd, dir_entry->file_name) < 0) {
+            if (p8_make_full_path(full_path, sizeof(full_path), m_current_cart_dir, dir_entry->file_name) < 0) {
                 fputs("Path too long\n", stderr);
                 continue;
             }

@@ -981,6 +981,49 @@ bool p8_is_quit_requested(void)
     return quit_requested;
 }
 
+int p8_make_full_path(char *ret, int ret_size, const char *dir_path, const char *file_name)
+{
+    if (!ret || !dir_path || !file_name) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    size_t dir_len = strlen(dir_path);
+    size_t file_len = strlen(file_name);
+    if (dir_len > PATH_MAX || file_len > PATH_MAX || dir_len + 1 + file_len > PATH_MAX)
+        return -1;
+
+    if (strcmp(file_name, "..") == 0) {
+        strcpy(ret, dir_path);
+        char *slash = strrchr(ret, '/');
+        if (!slash)
+            slash = strrchr(ret, '\\');
+        if (slash) {
+            if (slash[1] == '\0' && ret[1] == ':' && slash==ret+2) {
+                // If going up a directory from the root of a drive,
+                // go up to the list of drives rather than the current
+                // directory of the drive.
+                // i.e. "C:\" -> "" rather than "C:\" -> "C:"
+                ret[0] = '\0';
+            } else if (ret[1] == ':' && slash==ret+2) {
+                // If going up to the root of the drive don't erase
+                // the trailing slash.
+                slash[1] = '\0';
+            } else {
+                slash[0] = '\0';
+            }
+        }
+    } else {
+        strcpy(ret, dir_path);
+        if (dir_len > 0 &&
+            ret[dir_len - 1] != '/' &&
+            ret[dir_len - 1] != '\\')
+            strcat(ret, "/");
+        strcat(ret, file_name);
+    }
+    return 0;
+}
+
 int p8_resolve_relative_path(char *dest_filename, const char *src_filename, size_t dest_size, bool for_cstore)
 {
     if (src_filename[0] == '/' || src_filename[1] == ':')
