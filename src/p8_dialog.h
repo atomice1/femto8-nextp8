@@ -10,6 +10,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/* Forward declaration for dialog type used in callbacks */
+typedef struct p8_dialog p8_dialog_t;
+
 /* Dialog Control Types */
 typedef enum {
     DIALOG_LABEL,      // Read-only text label
@@ -59,7 +62,8 @@ typedef struct {
         struct {
             int width;    // Minimum content width required (0 = no constraint)
             int height;   // Control height in pixels
-            void (*draw_fn)(int x, int y, int width, int height); // Draw function
+            void (*draw_fn)(const p8_dialog_t *dialog, void *user_data, int x, int y, int width, int height); // Draw function
+            void *user_data; // User data pointer passed to draw function
         } custom;
 
         struct {
@@ -72,7 +76,7 @@ typedef struct {
             int visible_lines;   // Number of visible lines (0 = auto)
             int scroll_offset;   // Current scroll position (internal)
             bool draw_border;    // Whether to draw border around listbox
-            void (*render_callback)(void *user_data, int index, bool selected, int x, int y, int width, int height, int fg_color, int bg_color);
+            void (*render_callback)(const p8_dialog_t *dialog, void *user_data, int index, bool selected, int x, int y, int width, int height, int fg_color, int bg_color);
         } listbox;
     } data;
 
@@ -299,10 +303,11 @@ extern bool m_dialog_showing;
  * @param w    Minimum content width needed (0 = no constraint; use for auto-sizing).
  * @param h    Control height in pixels.
  * @param fn   Draw callback: void fn(int x, int y, int width, int height)
+ * @param user_data  User data pointer passed to draw function (can be NULL)
  */
-#define DIALOG_CUSTOM_CONTROL(w, h, fn) \
+#define DIALOG_CUSTOM_CONTROL(w, h, fn, usr_data) \
     { .type = DIALOG_CUSTOM, .label = NULL, \
-      .data.custom = { .width = (w), .height = (h), .draw_fn = (fn) }, \
+      .data.custom = { .width = (w), .height = (h), .draw_fn = (fn), .user_data = (usr_data) }, \
       .selectable = false, .enabled = true, \
       .inverted = false }
 
@@ -311,7 +316,7 @@ extern bool m_dialog_showing;
  * Use this when you need complete control over item rendering (e.g., file browsers with metadata).
  * The callback receives: user_data, index, x, y, width, height, fg_color, bg_color
  */
-#define DIALOG_LISTBOX_CUSTOM_FULLSCREEN(title, usr_data, count, sel_idx_ptr, callback) \
+#define DIALOG_LISTBOX_CUSTOM_FULLSCREEN(title, count, sel_idx_ptr, callback, usr_data) \
     { .type = DIALOG_LISTBOX, .label = (title), \
       .data.listbox = { .user_data = (usr_data), \
                         .item_count = (count), \

@@ -32,9 +32,10 @@ typedef struct {
 static wifi_config_state_t wifi_state;
 
 /* Custom render callback for AP list items */
-static void render_ap_item(void *user_data, int index, bool selected, int x, int y, int width, int height, int fg_color, int bg_color)
+static void render_ap_item(const p8_dialog_t *dialog, void *user_data, int index, bool selected, int x, int y, int width, int height, int fg_color, int bg_color)
 {
     (void)user_data;
+    (void)dialog;
     (void)width;
     (void)height;
 
