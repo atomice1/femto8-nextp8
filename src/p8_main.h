@@ -6,7 +6,8 @@
 #define P8_MAIN_H
 
 typedef enum {
-    P8_SCREEN_BROWSE,
+    P8_SCREEN_BROWSE = 0,
+    P8_SCREEN_EDIT,
 } p8_screen_index_t;
 
 extern void p8_main(void);

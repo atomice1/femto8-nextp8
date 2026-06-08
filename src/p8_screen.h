@@ -39,6 +39,7 @@ typedef struct {
 
     /**
      * Handle pressed buttons.
+     * Return true if the input was handled and should not be processed further, or false to allow default processing.
      */
     bool (*handle_buttons)(int button_mask, int buttonp_mask);
 

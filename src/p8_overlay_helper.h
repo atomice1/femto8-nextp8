@@ -266,6 +266,28 @@ static inline void overlay_clear(void)
     memset(m_overlay_memory, OVERLAY_TRANSPARENT_COLOR, MEMORY_SCREEN_SIZE);
 }
 
+/* Draw a simple arrow-shaped mouse cursor.  Hot-spot is at (mx, my).
+ * Color 7 (white) for the arrow body, color 1 (dark blue) for shadow.
+ * Color 0 is transparent in the overlay so 1 is used for the darkest
+ * visible shade. */
+static inline void overlay_draw_mouse_cursor(int mx, int my)
+{
+    /* 7-row, 5-col arrow pointing upper-left. -1 = transparent (skip). */
+    static const int8_t cur[7][5] = {
+        { 7,-1,-1,-1,-1 },
+        { 7, 7,-1,-1,-1 },
+        { 7, 1, 7,-1,-1 },
+        { 7, 1, 1, 7,-1 },
+        { 7, 7, 7, 7,-1 },
+        {-1, 1, 7, 7,-1 },
+        {-1,-1, 1, 1,-1 },
+    };
+    for (int r = 0; r < 7; r++)
+        for (int c = 0; c < 5; c++)
+            if (cur[r][c] >= 0)
+                overlay_pixel(mx + c, my + r, (int)cur[r][c]);
+}
+
 static inline void overlay_draw_icon(const uint8_t *icon, int x, int y)
 {
     assert((x & 1) == 0);

@@ -573,23 +573,38 @@ static void browse_update(void)
                     if (p8_download_bbs_cart(cart_id, cart_path, sizeof(cart_path)) == 0) {
                         /* Hide browse screen before running cart */
                         browse_hide();
-                        if (p8_load(cart_path, NULL, cart_id, NULL) == 0)
+                        if (p8_load(cart_path, NULL, cart_id, NULL) == 0) {
                             p8_run();
+                            p8_reset();
+                        }
                         /* Show browse screen again after cart exits */
                         browse_show();
                     }
                 }
                 break;
 #endif
+            case 2: {
+                /* "Edit file": switch to editor with selected file */
+                struct dir_entry *dir_entry = &dir_contents[selected_index];
+                char full_path[PATH_MAX];
+                if (p8_make_full_path(full_path, sizeof(full_path), m_current_cart_dir, dir_entry->file_name) < 0) {
+                    fputs("Path too long\n", stderr);
+                    break;
+                }
+                /* Load cart for editing, then switch to editor */
+                p8_load(full_path, NULL, NULL, NULL);
+                p8_set_active_screen(P8_SCREEN_EDIT);
+                break;
+            }
 #ifdef NEXTP8
-            case 2:
+            case 3:
                 wifi_show_config_dialog();
                 break;
 #endif
-            case 3:
+            case 4:
                 p8_show_version_dialog();
                 break;
-            case 4:
+            case 5:
                 p8_show_controls_dialog();
                 break;
             default:

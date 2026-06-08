@@ -3,6 +3,7 @@
  */
 
 #include "p8_browse.h"
+#include "p8_editor.h"
 #include "p8_emu.h"
 #include "p8_input.h"
 #include "p8_main.h"
@@ -13,6 +14,7 @@
 
 static p8_screen_t *screens[] = {
     &p8_screen_browse,  /* P8_SCREEN_BROWSE */
+    &p8_screen_edit,    /* P8_SCREEN_EDIT */
 };
 #define NUM_SCREENS (sizeof(screens) / sizeof(screens[0]))
 
@@ -93,6 +95,9 @@ void p8_main(void)
             p8_screen_index_t next_screen;
             switch (current_screen) {
                 case P8_SCREEN_BROWSE:
+                    next_screen = P8_SCREEN_EDIT;
+                    break;
+                case P8_SCREEN_EDIT:
                     next_screen = P8_SCREEN_BROWSE;
                     break;
                 default:
