@@ -27,28 +27,35 @@
 #include "p8_options.h"
 #include "p8_overlay_helper.h"
 #include "p8_pause_menu.h"
+#include "strtcpy.h"
 
 #define FALLBACK_CARTS_PATH "."
 
+#define INITIAL_FILENAME_MEM_SIZE 8192
+#define INITIAL_CAPACITY 100
+
+static char *filename_mem = NULL;
+static char *filename_mem_ptr = NULL;
+static char *filename_mem_end = NULL;
+
 struct dir_entry {
-    const char *file_name;
+    char *file_name;
     bool is_dir;
 };
 
-static const char *pwd = NULL;
+static char pwd[PATH_MAX];
 static struct dir_entry *dir_contents = NULL;
 static int nitems = 0;
 static int capacity = 0;
 static int current_item = 0;
 static void clear_dir_contents(void) {
-    for (int i=0;i<nitems;++i)
-        free((char *)dir_contents[i].file_name);
+    filename_mem_ptr = filename_mem;
     nitems = 0;
     current_item = 0;
 }
 static void append_dir_entry(const char *file_name, bool is_dir)
 {
-    if (nitems == capacity) {
+   if (nitems >= capacity) {
         int new_capacity;
         if (capacity == 0)
             new_capacity = 10;
@@ -63,27 +70,37 @@ static void append_dir_entry(const char *file_name, bool is_dir)
         capacity = new_capacity;
     }
     struct dir_entry *dir_entry = &dir_contents[nitems];
-    dir_entry->file_name = strdup(file_name);
-    if (!dir_entry->file_name) {
-        fputs("Out of memory\n", stderr);
-        return;
+    size_t name_len = strlen(file_name);
+    if (filename_mem_ptr + name_len + 1 > filename_mem_end) {
+        size_t old_size = filename_mem_end - filename_mem;
+        size_t new_size = old_size * 2;
+        size_t offset = filename_mem_ptr - filename_mem;
+        char *new_filename_mem = realloc(filename_mem, new_size);
+        if (!new_filename_mem) {
+            fputs("Out of memory\n", stderr);
+            return;
+        }
+        filename_mem_ptr = new_filename_mem + offset;
+        filename_mem_end = new_filename_mem + new_size;
+        filename_mem = new_filename_mem;
     }
+    dir_entry->file_name = filename_mem_ptr;
+    memcpy(dir_entry->file_name, file_name, name_len + 1);
+    filename_mem_ptr += name_len + 1;
     dir_entry->is_dir = is_dir;
     nitems++;
 }
-static const char *make_full_path(const char *dir_path, const char *file_name)
+static int make_full_path(char *ret, size_t ret_size, const char *dir_path, const char *file_name)
 {
-    if (!dir_path || !file_name)
-        return NULL;
+    if (!ret || !dir_path || !file_name) {
+        errno = EINVAL;
+        return -1;
+    }
 
     size_t dir_len = strlen(dir_path);
     size_t file_len = strlen(file_name);
-    if (dir_len > 256 || file_len > 256)
-        return NULL;
-
-    char *ret = malloc(dir_len + 1 + file_len + 1);
-    if (!ret)
-        return NULL;
+    if (dir_len > PATH_MAX || file_len > PATH_MAX || dir_len + 1 + file_len > PATH_MAX)
+        return -1;
 
     if (strcmp(file_name, "..") == 0) {
         strcpy(ret, dir_path);
@@ -113,7 +130,7 @@ static const char *make_full_path(const char *dir_path, const char *file_name)
             strcat(ret, "/");
         strcat(ret, file_name);
     }
-    return ret;
+    return 0;
 }
 static int compare_dir_entry(const void *p1, const void *p2)
 {
@@ -127,8 +144,7 @@ static int compare_dir_entry(const void *p1, const void *p2)
 static void list_dir(const char* path) {
 #ifdef NEXTP8
     if (path[0] == '\0') {
-        free((char *)pwd);
-        pwd = strdup(path);
+        strcpy(pwd, path);
         clear_dir_contents();
         // Show drives
         static const char *volume_names[2] = {"0:/", "1:/"};
@@ -137,14 +153,17 @@ static void list_dir(const char* path) {
         return;
     }
 #endif
+    if (strtcpy(pwd, path, sizeof(pwd)) < 0) {
+        fputs("Path too long\n", stderr);
+        return;
+    }
     p8_show_io_icon(true);
     DIR *dir = opendir(path);
     if (dir == NULL) {
         fprintf(stderr, "%s: %s\n", path, strerror(errno));
     } else {
-        free((char *)pwd);
-        pwd = strdup(path);
         clear_dir_contents();
+        char full_path[PATH_MAX];
         for (;;) {
             struct dirent *dirent;
             errno = 0;
@@ -154,9 +173,8 @@ static void list_dir(const char* path) {
                     fprintf(stderr, "%s: %s\n", path, strerror(errno));
                 break;
             }
-            const char *full_path = make_full_path(path, dirent->d_name);
-            if (!full_path) {
-                fputs("Out of memory\n", stderr);
+            if (make_full_path(full_path, sizeof(full_path), path, dirent->d_name) != 0) {
+                fputs("Path too long\n", stderr);
                 continue;
             }
             bool is_dir = false;
@@ -173,7 +191,6 @@ static void list_dir(const char* path) {
                 else
                     fprintf(stderr, "%s: %s\n", full_path, strerror(errno));
             }
-            free((char *)full_path);
             append_dir_entry(dirent->d_name, is_dir);
         }
         closedir(dir);
@@ -245,12 +262,26 @@ static int show_menu(void)
         return 0;
 }
 
-const char *browse_for_cart(void)
+int browse_for_cart(char *cart_path, size_t cart_path_size)
 {
+    filename_mem = (char *)malloc(INITIAL_FILENAME_MEM_SIZE);
+    dir_contents = (struct dir_entry *)malloc(sizeof(struct dir_entry) * INITIAL_CAPACITY);
+    if (!filename_mem || !dir_contents) {
+        free(filename_mem);
+        free(dir_contents);
+        fputs("Out of memory\n", stderr);
+        return -1;
+    }
+    capacity = INITIAL_CAPACITY;
+    filename_mem_end = filename_mem + INITIAL_FILENAME_MEM_SIZE;
+    clear_dir_contents();
+
     p8_init();
     p8_reset();
     if (setjmp(jmpbuf_restart)) {
-        return NULL;
+        free(filename_mem);
+        free(dir_contents);
+        return 0;
     }
 
     if (access(DEFAULT_CARTS_PATH, F_OK) == 0)
@@ -258,7 +289,6 @@ const char *browse_for_cart(void)
     else
         list_dir(FALLBACK_CARTS_PATH);
 
-    const char *cart_path = NULL;
     int selected_index = 0;
 
     // Create dialog with custom listbox renderer
@@ -300,12 +330,10 @@ const char *browse_for_cart(void)
                     default:
                         break;
                 }
-                if (action_id == 2 && cart_path)
-                    break;
             }
         } while (result.type == DIALOG_RESULT_NONE);
 
-        if (cart_path)
+        if (cart_path[0])
             break;
 
         if (result.type == DIALOG_RESULT_CANCELLED)
@@ -313,17 +341,19 @@ const char *browse_for_cart(void)
 
         if (result.type == DIALOG_RESULT_ACCEPTED && selected_index >= 0 && selected_index < nitems) {
             struct dir_entry *dir_entry = &dir_contents[selected_index];
-            const char *full_path = make_full_path(pwd, dir_entry->file_name);
-            if (!full_path) {
-                fputs("Out of memory\n", stderr);
+            char full_path[PATH_MAX] = {'\0'};
+            if (make_full_path(full_path, sizeof(full_path), pwd, dir_entry->file_name) < 0) {
+                fputs("Path too long\n", stderr);
                 continue;
             }
             if (dir_entry->is_dir) {
                 list_dir(full_path);
-                free((char *)full_path);
                 selected_index = 0;
             } else {
-                cart_path = full_path;
+                if (strtcpy(cart_path, full_path, cart_path_size) < 0) {
+                    fputs("Path too long\n", stderr);
+                    continue;
+                }
                 break;
             }
         }
@@ -336,8 +366,11 @@ const char *browse_for_cart(void)
     p8_flip();
 
     clear_dir_contents();
-    free(dir_contents);
-    free((char *)pwd);
 
-    return cart_path;
+    free(filename_mem);
+    free(dir_contents);
+    filename_mem = NULL;
+    dir_contents = NULL;
+
+    return 0;
 }

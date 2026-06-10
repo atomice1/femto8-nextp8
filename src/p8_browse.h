@@ -5,6 +5,6 @@
 #ifndef P8_BROWSE_H
 #define P8_BROWSE_H
 
-const char *browse_for_cart(void);
+int browse_for_cart(char *cart_path, size_t cart_path_size);
 
 #endif

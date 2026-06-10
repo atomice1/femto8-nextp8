@@ -45,6 +45,7 @@
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
+#include "strtcpy.h"
 
 lua_State *L = NULL;
 
@@ -53,7 +54,7 @@ const void *m_lua_update = NULL;
 const void *m_lua_update60 = NULL;
 const void *m_lua_draw = NULL;
 
-static char *m_clipboard = NULL;
+/* m_clipboard is a fixed-size buffer defined in p8_emu.c */
 
 char m_str_buffer[256] = {0};
 
@@ -1157,48 +1158,30 @@ int cstore(lua_State *L)
         return 1;
     }
 
-    char *resolved_path = NULL;
+    char resolved_path[PATH_MAX];
     if (file_name != NULL) {
         // Append .p8 if no extension given
-        char *full_filename = NULL;
+        char full_filename[PATH_MAX];
         if (strstr(file_name, ".p8") == NULL && strstr(file_name, ".P8") == NULL) {
-            size_t flen = strlen(file_name) + 4;
-            full_filename = (char *)malloc(flen);
-            if (full_filename)
-                snprintf(full_filename, flen, "%s.p8", file_name);
+            snprintf(full_filename, sizeof(full_filename), "%s.p8", file_name);
             file_name = full_filename;
         }
-        resolved_path = p8_resolve_relative_path(file_name, true);
-        free(full_filename);
-    } else {
-        if (!current_cart_path) {
+        if (p8_resolve_relative_path(resolved_path, file_name, sizeof(resolved_path), true) < 0) {
             lua_pushinteger(L, 0);
             return 1;
         }
-        resolved_path = strdup(current_cart_path);
-    }
-
-    if (!resolved_path) {
-        lua_pushinteger(L, 0);
-        return 1;
+    } else {
+        if (!m_current_cart_file_name[0]) {
+            lua_pushinteger(L, 0);
+            return 1;
+        }
+        strtcpy(resolved_path, m_current_cart_file_name, sizeof(resolved_path));
     }
 
     // Refuse to write .p8.png (not supported)
     size_t rlen = strlen(resolved_path);
     if (rlen >= 7 && strcmp(resolved_path + rlen - 7, ".p8.png") == 0) {
         fprintf(stderr, "cstore: .p8.png output is not supported\n");
-        free(resolved_path);
-        lua_pushinteger(L, 0);
-        return 1;
-    }
-
-    // Load existing cart data (preserves sections not being patched, including Lua)
-    uint8_t *work_mem = (uint8_t *)malloc(CART_MEMORY_SIZE);
-    const char *existing_lua = NULL;
-    uint8_t *file_buffer = NULL;
-    if (!work_mem) {
-        luaL_error(L, "out of memory");
-        free(resolved_path);
         lua_pushinteger(L, 0);
         return 1;
     }
@@ -1208,42 +1191,35 @@ int cstore(lua_State *L)
     int ret = MKDIR(DEFAULT_CARTS_PATH);
     if (ret == -1 && errno != EEXIST) {
         fprintf(stderr, "cstore: failed to create carts directory: %s\n", strerror(errno));
-        free(resolved_path);
         p8_show_io_icon(false);
         lua_pushinteger(L, 0);
         return 1;
     }
 
+    memset(m_temp_cart_memory, 0, CART_MEMORY_SIZE);
+    m_temp_lua_script[0] = '\0';
     if (access(resolved_path, F_OK) == -1) {
         if (errno != ENOENT) {
             fprintf(stderr, "cstore: failed to access existing cart: %s\n", strerror(errno));
-            free(resolved_path);
             p8_show_io_icon(false);
             lua_pushinteger(L, 0);
             return 1;
         }
-        memset(work_mem, 0, CART_MEMORY_SIZE);
-        existing_lua = "";
-    } else if (parse_cart_file(resolved_path, work_mem, &existing_lua, &file_buffer, NULL) != 0) {
+    } else if (parse_cart_file(resolved_path, m_temp_cart_memory, m_file_buffer, m_decompression_buffer, m_temp_lua_script, NULL) != 0) {
         fprintf(stderr, "cstore: failed to read existing cart\n");
-        free(resolved_path);
         p8_show_io_icon(false);
         lua_pushinteger(L, 0);
         return 1;
     }
 
     // Patch the requested region from runtime memory
-    memcpy(work_mem + destaddr, m_memory + srcaddr, len);
+    memcpy(m_temp_cart_memory + destaddr, m_memory + srcaddr, len);
 
     // Also update m_cart_memory when writing to the current cart
     if (nargs < 4 || lua_isnil(L, 4))
         memcpy(m_cart_memory + destaddr, m_memory + srcaddr, len);
 
-    write_cart_p8(resolved_path, existing_lua ? existing_lua : "", work_mem);
-
-    free(work_mem);
-    free(file_buffer);
-    free(resolved_path);
+    write_cart_p8(resolved_path, m_temp_lua_script, m_temp_cart_memory);
 
     p8_show_io_icon(false);
     lua_pushinteger(L, len);
@@ -1425,47 +1401,36 @@ int reload(lua_State *L)
 {
     int nargs = lua_gettop(L);
     unsigned destaddr = nargs >= 1 ? lua_tounsigned(L, 1) : 0;
-    unsigned orig_destaddr = destaddr;
     unsigned srcaddr  = nargs >= 2 ? lua_tounsigned(L, 2) : 0;
     unsigned len      = nargs >= 3 ? lua_tounsigned(L, 3) : 0x4300;
     destaddr = addr_remap(destaddr);
     const char *file_name = nargs >= 4 ? lua_tostring(L, 4) : NULL;
     uint8_t *src_mem = NULL;
     if (file_name != NULL) {
-        char *full_filename = NULL;
+        char full_filename[PATH_MAX];
         if (strstr(file_name, ".p8") == NULL && strstr(file_name, ".P8") == NULL) {
-            size_t len = strlen(file_name) + 4;
-            full_filename = (char *)malloc(len);
-            if (full_filename)
-                snprintf(full_filename, len, "%s.p8", file_name);
+            snprintf(full_filename, sizeof(full_filename), "%s.p8", file_name);
             file_name = full_filename;
         }
-        char *resolved_path = p8_resolve_relative_path(file_name, false);
-        free(full_filename);
-        if (!resolved_path) {
-            lua_pushinteger(L, orig_destaddr);
-            return 1;
-        }
-        uint8_t *buffer = NULL;
-        src_mem = (uint8_t *)malloc(CART_MEMORY_SIZE);
-        if (parse_cart_file(resolved_path, src_mem, NULL, &buffer, NULL) != 0) {
-            free(src_mem);
-            free(resolved_path);
+        char resolved_path[PATH_MAX];
+        p8_show_io_icon(true);
+        if (p8_resolve_relative_path(resolved_path, file_name, sizeof(resolved_path), false) < 0) {
             p8_show_io_icon(false);
             lua_pushinteger(L, 0);
             return 1;
         }
-        free(buffer);
-        free(resolved_path);
+        int ret = parse_cart_file(resolved_path, m_temp_cart_memory, m_file_buffer, m_decompression_buffer, NULL, NULL);
+        p8_show_io_icon(false);
+        if (ret < 0) {
+            lua_pushinteger(L, 0);
+            return 1;
+        }
+        src_mem = m_temp_cart_memory;
     } else {
         src_mem = m_cart_memory;
     }
     if (destaddr >= 0 && destaddr + len <= 0x10000 && srcaddr >= 0 && srcaddr + len <= CART_MEMORY_SIZE)
         memcpy(m_memory + destaddr, src_mem + srcaddr, len);
-    if (file_name != NULL) {
-        free(src_mem);
-        p8_show_io_icon(false);
-    }
     lua_pushinteger(L, len);
     return 1;
 }
@@ -1703,7 +1668,8 @@ int reset(lua_State *L)
 
 int __attribute__ ((noreturn)) run(lua_State *L)
 {
-    m_param_string = (lua_gettop(L) >= 1) ? lua_tostring(L, 1) : "";
+    const char *param = (lua_gettop(L) >= 1) ? lua_tostring(L, 1) : "";
+    strtcpy(m_param_string, param, sizeof(m_param_string));
 
     p8_restart();
 }
@@ -1728,40 +1694,26 @@ int _load(lua_State *L)
         breadcrumb = lua_tostring(L, 2);
 
     /* Set breadcrumb */
-    if (m_breadcrumb) {
-        free(m_breadcrumb);
-        m_breadcrumb = NULL;
-    }
     if (breadcrumb)
-        m_breadcrumb = strdup(breadcrumb);
+        strtcpy(m_breadcrumb, breadcrumb, sizeof(m_breadcrumb));
+    else
+        m_breadcrumb[0] = '\0';
 
-    char *full_filename = NULL;
-    char *resolved_path = NULL;
+    char full_filename[PATH_MAX];
+    char resolved_path[PATH_MAX];
 
     if (strstr(filename, ".p8") == NULL && strstr(filename, ".P8") == NULL) {
-        size_t len = strlen(filename) + 4;
-        full_filename = (char *)malloc(len);
-        if (!full_filename) {
-            luaL_error(L, "out of memory");
-            return 0;
-        }
-        snprintf(full_filename, len, "%s.p8", filename);
+        snprintf(full_filename, sizeof(full_filename), "%s.p8", filename);
         filename = full_filename;
     }
 
-    resolved_path = p8_resolve_relative_path(filename, false);
-
-    if (full_filename) {
-        free(full_filename);
-    }
-
-    if (!resolved_path) {
+    if (p8_resolve_relative_path(resolved_path, filename, sizeof(resolved_path), false) < 0) {
         luaL_error(L, "out of memory");
     }
 
+
     if (access(resolved_path, F_OK) != 0) {
         fprintf(stderr, "load: could not find cart %s\n", filename);
-        free(resolved_path);
         m_load_result = -1;
         lua_pushboolean(L, -1);
         lua_pushstring(L, "could not find cart");
@@ -1774,7 +1726,6 @@ int _load(lua_State *L)
 
     m_load_result = 1;
     p8_load_new(resolved_path, param);
-    free(resolved_path);
 
     lua_pushboolean(L, 1);
     return 1;
@@ -1802,8 +1753,7 @@ int printh(lua_State *L)
     if (!str) str = "";
 
     if (filename && strcmp(filename, "@clip") == 0) {
-        free(m_clipboard);
-        m_clipboard = strdup(str);
+        strtcpy(m_clipboard, str, sizeof(m_clipboard));
         lua_pushboolean(L, 1);
         return 1;
     }
@@ -1857,10 +1807,7 @@ int _stat(lua_State *L)
         lua_pushinteger(L, 0);
         break;
     case STAT_CLIPBOARD:
-        if (m_clipboard)
-            lua_pushstring(L, m_clipboard);
-        else
-            lua_pushnil(L);
+        lua_pushstring(L, m_clipboard);
         break;
     case STAT_VERSION:
         lua_pushnumber(L, fix32_from_double(0.43));
@@ -1990,10 +1937,7 @@ int _stat(lua_State *L)
         lua_pushinteger(L, audio_pcm_app_buffer());
         break;
     case STAT_BREADCRUMB:
-        if (m_breadcrumb)
-            lua_pushstring(L, m_breadcrumb);
-        else
-            lua_pushstring(L, "");
+        lua_pushstring(L, m_breadcrumb);
         break;
     case STAT_BBS_CART_ID:
         lua_pushstring(L, "");
@@ -2002,10 +1946,7 @@ int _stat(lua_State *L)
         lua_pushinteger(L, m_load_result);
         break;
     case STAT_CURRENT_PATH:
-        if (current_cart_dir)
-            lua_pushstring(L, current_cart_dir);
-        else
-            lua_pushstring(L, ".");
+        lua_pushstring(L, m_current_cart_dir[0] ? m_current_cart_dir : ".");
         break;
     default:
         if (n == 57) {
@@ -2384,15 +2325,13 @@ void lua_shutdown_api()
     }
 }
 
-static char *s_saved_script = NULL;
-
 static void print_script_context(int lineno)
 {
-    if (!s_saved_script || lineno <= 0)
+    if (lineno <= 0)
         return;
     int lo = lineno - 3, hi = lineno + 3;
     if (lo < 1) lo = 1;
-    const char *p = s_saved_script;
+    const char *p = m_lua_script;
     int cur = 1;
     while (*p && cur < lo) {
         if (*p++ == '\n') cur++;
@@ -2436,26 +2375,12 @@ void lua_init_script(const char *file_name, const char *script)
     if (!L)
         L = luaL_newstate();
 
-    char *temp_file_name = malloc(strlen(file_name) + 2);
+    char temp_file_name[PATH_MAX + 1];
     temp_file_name[0] = '@';
-    strcpy(temp_file_name + 1, file_name);
-#if 1
-    // Prepend newlines so Lua's line numbers match the original .p8 file.
-    // The Lua section starts at line 4 (after the 3-line pico-8 header), so
-    // prepend 3 newlines to make line 1 of the script appear as line 4.
-    size_t script_len = strlen(script);
-    char *padded_script = malloc(3 + script_len + 1);
-    padded_script[0] = padded_script[1] = padded_script[2] = '\n';
-    memcpy(padded_script + 3, script, script_len + 1);
-    int ret = luaL_loadbuffer(L, padded_script, 3 + script_len, temp_file_name);
-    free(s_saved_script);
-    s_saved_script = padded_script;
-#else
-    int ret = lua_loadBuffer(L, script, strlen(script), temp_file_name);
-    free(s_saved_script);
-    s_saved_script = script;
-#endif
-    free(temp_file_name);
+    strtcpy(temp_file_name + 1, file_name, PATH_MAX);
+
+    size_t script_len = strnlen(script, LUA_SCRIPT_SIZE);
+    int ret = luaL_loadbuffer(L, script, script_len, temp_file_name);
     if (ret)
     {
         lua_print_error("luaL_loadBuffer");

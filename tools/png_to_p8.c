@@ -17,6 +17,11 @@
 #include "p8_symbols.h"
 #include "lodepng.h"
 
+/* png_to_p8 is a standalone tool that does not link p8_emu.c.
+ * Define the globals that p8_parser.c depends on here. */
+uint8_t *m_file_buffer = NULL;
+char    *m_lua_script  = NULL;
+
 static inline const p8_symbol_t *get_p8_encoding(uint8_t index)
 {
     int p8_symbols_len = sizeof(p8_symbols) / sizeof(p8_symbol_t);
@@ -220,12 +225,22 @@ int main(int argc, char *argv[])
     }
     memset(label_image, 0, 0x4000);
 
-    const char *lua_script = NULL;
-    uint8_t *file_buffer = NULL;
+    uint8_t *file_buffer = (uint8_t *)malloc(FILE_BUFFER_SIZE);
+    uint8_t *decompression_buffer = (uint8_t *)malloc(DECOMPRESSION_BUFFER_SIZE);
+    char *lua_script  = (char *)malloc(LUA_SCRIPT_SIZE);
+    if (!file_buffer || !lua_script || !decompression_buffer) {
+        fprintf(stderr, "Error: Could not allocate parser buffers\n");
+        free(file_buffer);
+        free(lua_script);
+        free(decompression_buffer);
+        return 1;
+    }
+    if (parse_cart_file(input_file, memory, file_buffer, decompression_buffer, lua_script, label_image) != 0) {
+        fprintf(stderr, "Error: Could not extract Lua code from %s\n", input_file);
+        return 1;
+    }
 
-    parse_cart_file(input_file, memory, &lua_script, &file_buffer, label_image);
-
-    if (!lua_script) {
+    if (lua_script[0] == '\0') {
         fprintf(stderr, "Error: Could not extract Lua code from %s\n", input_file);
         return 1;
     }
