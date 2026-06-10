@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "strtcpy.h"
 
 #ifdef ENABLE_BBS_DOWNLOAD
 
@@ -62,8 +63,7 @@ static int parse_url(const char *url, bool *use_ssl, char *host, size_t host_len
         return -1;
     }
 
-    strncpy(host, host_start, host_size);
-    host[host_size] = '\0';
+    strtcpy(host, host_start, host_len);
     p = host_end;
 
     /* Extract port if present */
