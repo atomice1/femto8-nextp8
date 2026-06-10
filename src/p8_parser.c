@@ -175,7 +175,12 @@ static char *process_includes(const char *lua_script, const char *cart_dir)
                         result = new_result;
                     }
 
-                    fread(result + length, 1, inc_size, inc);
+                    if (fread(result + length, 1, inc_size, inc) != inc_size) {
+                        fprintf(stderr, "Error reading include file: %s\n", include_path);
+                        fclose(inc);
+                        free(result);
+                        return NULL;
+                    }
                     convert_utf8_to_p8scii((uint8_t *)(result + length), inc_size);
                     length += strlen(result + length);
                     fclose(inc);
@@ -235,7 +240,16 @@ int parse_cart_file(const char *file_name, uint8_t *memory, const char **lua_scr
     *file_buffer = (uint8_t *)rh_malloc(file_size + 1);
 #endif
 
-    fread(*file_buffer, 1, file_size, file);
+    if (fread(*file_buffer, 1, file_size, file) != file_size) {
+        fprintf(stderr, "Error reading file: %s\n", file_name);
+#ifdef OS_FREERTOS
+        rh_free(*file_buffer);
+#else
+        free(*file_buffer);
+#endif
+        fclose(file);
+        return -1;
+    }
 
     fclose(file);
 
