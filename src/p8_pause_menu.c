@@ -6,6 +6,7 @@
 #include <setjmp.h>
 #include <stdlib.h>
 #include <string.h>
+#include "strtcpy.h"
 
 #include "p8_pause_menu.h"
 #include "p8_emu.h"
@@ -31,8 +32,7 @@ void p8_menuitem_set(int index, const char *label, int lua_callback_ref)
     if (item->lua_callback_ref != LUA_NOREF && L)
         luaL_unref(L, LUA_REGISTRYINDEX, item->lua_callback_ref);
     item->active = true;
-    strncpy(item->label, label ? label : "", sizeof(item->label) - 1);
-    item->label[sizeof(item->label) - 1] = '\0';
+    strtcpy(item->label, label ? label : "", sizeof(item->label));
     item->lua_callback_ref = lua_callback_ref;
 }
 
@@ -42,8 +42,7 @@ void p8_menuitem_set_label(int index, const char *label)
         return;
     p8_custom_menuitem_t *item = &m_custom_menuitems[index - 1];
     item->active = true;
-    strncpy(item->label, label ? label : "", sizeof(item->label) - 1);
-    item->label[sizeof(item->label) - 1] = '\0';
+    strtcpy(item->label, label ? label : "", sizeof(item->label));
 }
 
 void p8_menuitem_clear(int index)
