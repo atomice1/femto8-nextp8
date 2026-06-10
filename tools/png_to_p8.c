@@ -186,9 +186,15 @@ int main(int argc, char *argv[])
     uint8_t *png_file_data = (uint8_t *)malloc(png_file_size);
     if (!png_file_data) {
         fprintf(stderr, "Error: Could not allocate memory for PNG file\n");
+        fclose(png_file);
         return 1;
     }
-    fread(png_file_data, 1, png_file_size, png_file);
+    if (fread(png_file_data, 1, png_file_size, png_file) != png_file_size) {
+        fprintf(stderr, "Error reading PNG file: %s\n", input_file);
+        free(png_file_data);
+        fclose(png_file);
+        return 1;
+    }
     fclose(png_file);
 
     uint8_t *png_pixels = NULL;
