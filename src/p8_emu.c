@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <math.h>
 #include <assert.h>
+#include "strtcpy.h"
 #ifdef OS_FREERTOS
 #include <FreeRTOS.h>
 #include <task.h>
@@ -65,8 +66,12 @@ static void p8_main_loop();
 
 uint8_t *m_memory = NULL;
 uint8_t *m_cart_memory = NULL;
-
+uint8_t *m_temp_cart_memory = NULL;
 uint8_t *m_overlay_memory = NULL;
+uint8_t *m_file_buffer = NULL;
+uint8_t *m_decompression_buffer = NULL;
+char    *m_lua_script  = NULL;
+char    *m_temp_lua_script  = NULL;
 
 unsigned m_fps = 30;
 unsigned m_actual_fps = 0;
@@ -80,17 +85,17 @@ static bool restart;
 static jmp_buf jmpbuf_load;
 bool m_load_available = false;
 static bool load_requested = false;
-static char *load_filename = NULL;
-static char *load_param = NULL;
-char *current_cart_dir = NULL;
-char *current_cart_path = NULL;
+static char load_filename[PATH_MAX];
+static char load_param[256];
 
-char *m_breadcrumb = NULL;
-char *m_bbs_cart_id = NULL;
+char m_current_cart_dir[PATH_MAX];
+char m_current_cart_file_name[PATH_MAX];
+char m_breadcrumb[256];
+char m_bbs_cart_id[256];
+char m_param_string[256];
+char m_clipboard[1024];
 
 static bool skip_main_loop_if_no_callbacks = false;
-
-const char *m_param_string = "";
 
 #ifdef SDL
 SDL_Surface *m_screen = NULL;
@@ -207,19 +212,33 @@ int p8_init()
 
     xSemaphoreGive(m_drawSemaphore);
 #endif
-#ifndef OS_FREERTOS
+
     m_memory = (uint8_t *)malloc(MEMORY_SIZE);
     m_cart_memory = (uint8_t *)malloc(CART_MEMORY_SIZE);
+    m_temp_cart_memory = (uint8_t *)malloc(CART_MEMORY_SIZE);
     m_overlay_memory = (uint8_t *)malloc(MEMORY_SCREEN_SIZE);
-#else
-    m_memory = (uint8_t *)rh_malloc(MEMORY_SIZE);
-    m_cart_memory = (uint8_t *)rh_malloc(CART_MEMORY_SIZE);
-    m_overlay_memory = (uint8_t *)rh_malloc(MEMORY_SCREEN_SIZE);
-#endif
+    m_file_buffer = (uint8_t *)malloc(FILE_BUFFER_SIZE);
+    m_decompression_buffer = (uint8_t *)malloc(DECOMPRESSION_BUFFER_SIZE);
+    m_lua_script  = (char *)malloc(LUA_SCRIPT_SIZE);
+    m_temp_lua_script  = (char *)malloc(LUA_SCRIPT_SIZE);
+
+    if (!m_memory || !m_cart_memory || !m_overlay_memory || !m_file_buffer || !m_decompression_buffer || !m_lua_script || !m_temp_lua_script) {
+        fputs("Out of memory\n", stderr);
+        free(m_memory);
+        free(m_cart_memory);
+        free(m_temp_cart_memory);
+        free(m_overlay_memory);
+        free(m_file_buffer);
+        free(m_decompression_buffer);
+        free(m_lua_script);
+        free(m_temp_lua_script);
+        return 1;
+    }
 
     memset(m_memory, 0, MEMORY_SIZE);
     memset(m_cart_memory, 0, CART_MEMORY_SIZE);
     memset(m_overlay_memory, (OVERLAY_TRANSPARENT_COLOR << 4) | OVERLAY_TRANSPARENT_COLOR, MEMORY_SCREEN_SIZE);
+    m_lua_script[0] = '\0';
 
 #ifdef ENABLE_AUDIO
     audio_init();
@@ -310,61 +329,38 @@ int p8_init_file_with_param(const char *file_name, const char *param)
     if (!m_initialized)
         p8_init();
 
-    m_param_string = param ? param : "";
+    strtcpy(m_param_string, param ? param : "", sizeof(m_param_string));
     m_load_available = true;
-
-    const char *lua_script = NULL;
-    uint8_t *file_buffer = NULL;
 
     if (setjmp(jmpbuf_load)) {
         load_requested = false;
 
-#ifdef OS_FREERTOS
-        rh_free(file_buffer);
-#else
-        free(file_buffer);
-#endif
-
         lua_shutdown_api();
 
-        m_param_string = load_param ? load_param : "";
         file_name = load_filename;
     }
 
-    if (current_cart_dir) {
-#ifdef OS_FREERTOS
-        rh_free(current_cart_dir);
-#else
-        free(current_cart_dir);
-#endif
-    }
+    m_current_cart_dir[0] = '\0';
+    m_current_cart_file_name[0] = '\0';
+    if (!m_bbs_cart_id[0])
+        strtcpy(m_current_cart_file_name, file_name, sizeof(m_current_cart_file_name));
 
-    if (current_cart_path) {
-        free(current_cart_path);
-        current_cart_path = NULL;
-    }
-    if (!m_bbs_cart_id || m_bbs_cart_id[0] == '\0')
-        current_cart_path = strdup(file_name);
-
-    /* For BBS carts, set current_cart_dir to DEFAULT_CARTS_PATH */
-    if (m_bbs_cart_id && m_bbs_cart_id[0] != '\0') {
+    /* For BBS carts, set m_current_cart_dir to DEFAULT_CARTS_PATH */
+    if (m_bbs_cart_id[0]) {
         if (access(DEFAULT_CARTS_PATH, F_OK) != -1)
-            current_cart_dir = strdup(DEFAULT_CARTS_PATH);
+            strtcpy(m_current_cart_dir, DEFAULT_CARTS_PATH, sizeof(m_current_cart_dir));
         else
-            current_cart_dir = strdup(".");
+            strtcpy(m_current_cart_dir, ".", sizeof(m_current_cart_dir));
     } else {
         const char *last_slash = strrchr(file_name, '/');
         if (last_slash) {
             size_t dir_len = last_slash - file_name;
-#ifdef OS_FREERTOS
-            current_cart_dir = rh_malloc(dir_len + 1);
-#else
-            current_cart_dir = malloc(dir_len + 1);
-#endif
-            memcpy(current_cart_dir, file_name, dir_len);
-            current_cart_dir[dir_len] = '\0';
+            if (dir_len >= sizeof(m_current_cart_dir))
+                dir_len = sizeof(m_current_cart_dir) - 1;
+            memcpy(m_current_cart_dir, file_name, dir_len);
+            m_current_cart_dir[dir_len] = '\0';
         } else {
-            current_cart_dir = strdup(".");
+            strtcpy(m_current_cart_dir, ".", sizeof(m_current_cart_dir));
         }
     }
 
@@ -372,16 +368,10 @@ int p8_init_file_with_param(const char *file_name, const char *param)
     lua_load_api();
 
     printf("Loading %s\n", file_name);
-    if (parse_cart_file(file_name, m_cart_memory, &lua_script, &file_buffer, NULL) != 0)
+    if (parse_cart_file(file_name, m_cart_memory, m_file_buffer, m_decompression_buffer, m_lua_script, NULL) != 0)
         return -1;
 
-    int ret = p8_init_common(file_name, lua_script);
-
-#ifdef OS_FREERTOS
-    rh_free(file_buffer);
-#else
-    free(file_buffer);
-#endif
+    int ret = p8_init_common(file_name, m_lua_script);
 
     return ret;
 }
@@ -394,18 +384,9 @@ int p8_init_ram(uint8_t *buffer, int size)
     p8_show_io_icon(true);
     lua_load_api();
 
-    const char *lua_script = NULL;
-    uint8_t *decompression_buffer = NULL;
+    parse_cart_ram(buffer, size, m_cart_memory, m_decompression_buffer, m_lua_script, NULL);
 
-    parse_cart_ram(buffer, size, m_cart_memory, &lua_script, &decompression_buffer, NULL);
-
-    int init_ret = p8_init_common(NULL, lua_script);
-
-#ifdef OS_FREERTOS
-    rh_free(decompression_buffer);
-#else
-    free(decompression_buffer);
-#endif
+    int init_ret = p8_init_common(NULL, m_lua_script);
 
     return init_ret;
 }
@@ -425,15 +406,22 @@ int p8_shutdown()
     SDL_FreeSurface(m_screen);
     SDL_Quit();
 #endif
-#ifdef OS_FREERTOS
-    rh_free(m_cart_memory);
-    rh_free(m_memory);
-    rh_free(m_overlay_memory);
-#else
+
     free(m_cart_memory);
+    free(m_temp_cart_memory);
     free(m_memory);
     free(m_overlay_memory);
-#endif
+    free(m_file_buffer);
+    free(m_decompression_buffer);
+    free(m_lua_script);
+    free(m_temp_lua_script);
+    m_cart_memory = NULL;
+    m_memory = NULL;
+    m_overlay_memory = NULL;
+    m_file_buffer = NULL;
+    m_decompression_buffer = NULL;
+    m_lua_script = NULL;
+    m_temp_lua_script = NULL;
 
     m_initialized = 0;
 
@@ -1630,50 +1618,33 @@ void __attribute__ ((noreturn)) p8_restart()
     p8_abort();
 }
 
-char *p8_resolve_relative_path(const char *filename, bool for_cstore)
+int p8_resolve_relative_path(char *dest_filename, const char *src_filename, size_t dest_size, bool for_cstore)
 {
-    if (filename[0] == '/' || filename[1] == ':')
-        return strdup(filename);
+    if (src_filename[0] == '/' || src_filename[1] == ':')
+        return strtcpy(dest_filename, src_filename, dest_size);
 
-    if (!current_cart_dir)
-        return strdup(filename);
+    if (!m_current_cart_dir[0])
+        return strtcpy(dest_filename, src_filename, dest_size);
 
     for (int pass=1;pass<=(for_cstore?1:2);pass++) {
-        const char *cart_dir = (pass == 1) ? DEFAULT_CARTS_PATH : current_cart_dir;
-        size_t len = strlen(cart_dir) + strlen(filename) + 2;
-        char *resolved_path = malloc(len);
-        if (resolved_path) {
-            snprintf(resolved_path, len, "%s/%s", cart_dir, filename);
-            if (pass == (for_cstore ? 1 : 2) || access(resolved_path, F_OK) == 0)
-                return resolved_path;
-            free(resolved_path);
-        }
+        const char *cart_dir = (pass == 1) ? DEFAULT_CARTS_PATH : m_current_cart_dir;
+        int ret = snprintf(dest_filename, dest_size, "%s/%s", cart_dir, src_filename);
+        if (pass == (for_cstore ? 1 : 2) || access(dest_filename, F_OK) == 0)
+            return (ret > 0 && (size_t)ret < dest_size) ? ret : -1;
     }
 
-    return NULL;
+    return -1;
 }
 
 void __attribute__ ((noreturn)) p8_load_new(const char *filename, const char *param)
 {
     assert(m_load_available);
 
-    if (load_filename) {
-#ifdef OS_FREERTOS
-        rh_free(load_filename);
-#else
-        free(load_filename);
-#endif
-    }
-    if (load_param) {
-#ifdef OS_FREERTOS
-        rh_free(load_param);
-#else
-        free(load_param);
-#endif
-    }
-
-    load_filename = strdup(filename);
-    load_param = param ? strdup(param) : NULL;
+    strtcpy(load_filename, filename, sizeof(load_filename));
+    if (param)
+        strtcpy(load_param, param, sizeof(load_param));
+    else
+        load_param[0] = '\0';
     load_requested = true;
 
     longjmp(jmpbuf_load, 1);
@@ -1769,13 +1740,13 @@ void p8_show_error_dialog(const char **lines, int line_count, p8_error_severity_
 }
 
 #ifdef ENABLE_BBS_DOWNLOAD
-char *p8_download_bbs_cart(const char *cart_id)
+int p8_download_bbs_cart(const char *cart_id, char *cached_filename, size_t cached_filename_size)
 {
     /* Download cart from BBS */
     p8_show_io_icon(true);
     printf("Downloading cart %s from BBS...\n", cart_id);
-    char cached_filename[256] = {'\0'};
-    int ret = cache_download(cart_id, cached_filename, sizeof(cached_filename));
+    cached_filename[0] = '\0';
+    int ret = cache_download(cart_id, cached_filename, cached_filename_size);
     p8_show_io_icon(false);
     if (ret < 0) {
         printf("Failed to download cart %s from BBS, error %d\n", cart_id, errno);
@@ -1785,14 +1756,12 @@ char *p8_download_bbs_cart(const char *cart_id)
             "from bbs."
         };
         p8_show_error_dialog(error_lines, 2, P8_ERROR_ERROR);
-        return NULL;
+        return -1;
     } else {
         /* Successfully downloaded - set BBS cart ID */
-        if (m_bbs_cart_id)
-            free(m_bbs_cart_id);
-        m_bbs_cart_id = strdup(cart_id);
+        strtcpy(m_bbs_cart_id, cart_id, sizeof(m_bbs_cart_id));
         printf("Downloaded cart to %s\n", cached_filename);
-        return strdup(cached_filename);
+        return 0;
     }
 }
 #endif

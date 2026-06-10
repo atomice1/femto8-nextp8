@@ -13,11 +13,12 @@
 #include "p8_preview.h"
 #include "p8_emu.h"
 #include "p8_parser.h"
+#include "strtcpy.h"
 
 #define PREVIEW_CACHE_SIZE 64
 
 typedef struct {
-    char *path;
+    char path[PATH_MAX];
     p8_preview_info_t info;
 } preview_cache_entry_t;
 
@@ -40,24 +41,16 @@ static p8_preview_info_t *cache_insert(const char *path)
         entry = &preview_cache[preview_cache_count++];
     } else {
         // Evict oldest entry
-        free(preview_cache[0].path);
         memmove(&preview_cache[0], &preview_cache[1],
                 (PREVIEW_CACHE_SIZE - 1) * sizeof(preview_cache[0]));
         entry = &preview_cache[PREVIEW_CACHE_SIZE - 1];
     }
-    entry->path = strdup(path);
-    if (!entry->path) {
-        if (preview_cache_count > 0)
-            preview_cache_count--;
-        return NULL;
-    }
+    strtcpy(entry->path, path, sizeof(entry->path));
     return &entry->info;
 }
 
 void p8_preview_cache_clear(void)
 {
-    for (int i = 0; i < preview_cache_count; i++)
-        free(preview_cache[i].path);
     preview_cache_count = 0;
 }
 
@@ -156,25 +149,22 @@ static bool load_p8_text_preview(uint8_t *buffer, long size,
     return true;
 }
 
-static bool load_p8_png_preview(uint8_t *buffer, long size,
+static bool load_p8_png_preview(uint8_t *buffer, int size,
                                 p8_preview_info_t *info)
 {
-    uint8_t *temp_memory = calloc(1, 0x8000);
-    if (!temp_memory)
+    const char *lua_script = NULL;
+
+    if (parse_png_ram(NULL, buffer, (int)size, m_temp_cart_memory, m_decompression_buffer, &lua_script, info->label) != 0)
         return false;
 
-    const char *lua_script = NULL;
-    uint8_t *decompression_buffer = NULL;
-    parse_cart_ram(buffer, (int)size, temp_memory, &lua_script,
-                   &decompression_buffer, info->label);
     info->has_label = true;
 
+    if (!lua_script)
+        return true;
     extract_title_author(lua_script,
                          info->title, sizeof(info->title),
                          info->author, sizeof(info->author));
 
-    free(decompression_buffer);
-    free(temp_memory);
     return true;
 }
 
@@ -208,35 +198,26 @@ bool p8_preview_load(const char *path, p8_preview_info_t *info_out)
         return false;
     }
 
-    uint8_t *buffer = malloc(file_size + 1);
-    if (!buffer) {
-        fclose(f);
-        p8_show_io_icon(false);
-        return false;
-    }
-
     long total_read = 0;
     while (total_read < file_size) {
         long chunk = file_size - total_read;
         if (chunk > 4096)
             chunk = 4096;
 
-        size_t n = fread(buffer + total_read, 1, chunk, f);
+        size_t n = fread(m_file_buffer + total_read, 1, chunk, f);
         if (n == 0)
             break;
         total_read += n;
     }
     fclose(f);
-    buffer[total_read] = '\0';
+    m_file_buffer[total_read] = '\0';
 
     static const uint8_t PNG_SIG[8] = {137, 80, 78, 71, 13, 10, 26, 10};
     bool ok;
-    if (total_read >= 8 && memcmp(buffer, PNG_SIG, 8) == 0)
-        ok = load_p8_png_preview(buffer, total_read, &info);
+    if (total_read >= 8 && memcmp(m_file_buffer, PNG_SIG, 8) == 0)
+        ok = load_p8_png_preview(m_file_buffer, total_read, &info);
     else
-        ok = load_p8_text_preview(buffer, total_read, &info);
-
-    free(buffer);
+        ok = load_p8_text_preview(m_file_buffer, total_read, &info);
 
     if (ok) {
         p8_preview_info_t *entry = cache_insert(path);

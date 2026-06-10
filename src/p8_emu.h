@@ -79,6 +79,15 @@
 #define MKDIR(p) mkdir((p), 0777)
 #endif
 
+#ifdef OS_FREERTOS
+#define malloc(x) rh_malloc(x)
+#define free(x)   rh_free(x)
+#endif
+
+#ifndef PATH_MAX
+#define PATH_MAX 256
+#endif
+
 #ifndef SCREEN_WIDTH
 #define SCREEN_WIDTH 512
 #define SCREEN_HEIGHT 512
@@ -228,6 +237,10 @@
 
 #define OVERLAY_TRANSPARENT_COLOR 0
 
+#define FILE_BUFFER_SIZE          (128 * 1024)
+#define DECOMPRESSION_BUFFER_SIZE (128 * 1024)
+#define LUA_SCRIPT_SIZE           (128 * 1024)
+
 enum
 {
     PALTYPE_DRAW,
@@ -298,16 +311,23 @@ typedef uint_fast64_t p8_clock_t;
 
 extern p8_clock_t m_start_time;
 
-extern unsigned char *m_memory;
-extern unsigned char *m_cart_memory;
+extern uint8_t *m_memory;
+extern uint8_t *m_cart_memory;
+extern uint8_t *m_temp_cart_memory;
+extern uint8_t *m_overlay_memory;
+extern uint8_t *m_file_buffer;
+extern uint8_t *m_decompression_buffer;
+extern char    *m_lua_script;
+extern char    *m_temp_lua_script;
+
 extern char *m_font;
 
-extern uint8_t *m_overlay_memory;
-extern char *current_cart_dir;
-extern char *current_cart_path;
-
-extern char *m_breadcrumb;
-extern char *m_bbs_cart_id;
+extern char m_current_cart_dir[PATH_MAX];
+extern char m_current_cart_file_name[PATH_MAX];
+extern char m_breadcrumb[256];
+extern char m_bbs_cart_id[256];
+extern char m_clipboard[1024];
+extern char m_param_string[256];
 
 extern int16_t m_mouse_x, m_mouse_y;
 extern int16_t m_mouse_xrel, m_mouse_yrel;
@@ -328,8 +348,6 @@ extern jmp_buf jmpbuf_restart;
 
 extern bool m_load_available;
 
-extern const char *m_param_string;
-
 void __attribute__ ((noreturn)) p8_abort();
 p8_clock_t p8_clock(void);
 unsigned p8_clock_ms(p8_clock_t clocks);
@@ -337,7 +355,7 @@ p8_clock_t p8_clock_delta(p8_clock_t start, p8_clock_t end);
 void p8_close_cartdata(void);
 void p8_delayed_flush_cartdata(void);
 #ifdef ENABLE_BBS_DOWNLOAD
-char *p8_download_bbs_cart(const char *cart_id);
+int p8_download_bbs_cart(const char *cart_id, char *cached_filename, size_t cached_filename_size);
 #endif
 unsigned p8_elapsed_time(void);
 void p8_flip(void);
@@ -352,7 +370,7 @@ void p8_pump_events(void);
 int p8_shutdown(void);
 void p8_render();
 void p8_reset(void);
-char *p8_resolve_relative_path(const char *filename, bool for_cstore);
+int p8_resolve_relative_path(char *dest_filename, const char *src_filename, size_t dest_size, bool for_cstore);
 void __attribute__ ((noreturn)) p8_abort();
 void __attribute__ ((noreturn)) p8_restart();
 void p8_seed_rng_state(uint32_t seed);

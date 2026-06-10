@@ -5,6 +5,7 @@ PNG_TO_P8_TARGET := $(BUILD_DIR)/png_to_p8
 
 # png_to_p8 tool objects (parser with decompression support)
 PNG_TO_P8_OBJECTS := $(BUILD_DIR)/p8_parser.o \
+                     $(BUILD_DIR)/strtcpy.o \
                      $(BUILD_DIR)/lexaloffle/p8_compress.o \
                      $(BUILD_DIR)/lexaloffle/pxa_compress_snippets.o \
                      $(BUILD_DIR)/lodepng/lodepng.o \

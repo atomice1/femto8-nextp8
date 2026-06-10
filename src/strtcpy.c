@@ -1,6 +1,7 @@
 /* This code is in the public domain.  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
