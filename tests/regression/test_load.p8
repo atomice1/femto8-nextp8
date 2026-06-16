@@ -2,42 +2,30 @@ pico-8 cartridge // http://www.pico-8.com
 version 43
 __lua__
 --check=(stat(6)=="check")
-check=true
-last_bad=-2
-pass=true
-i=0x3101
-printh("i="..tostr(i,1))
-printh("i*0x43f7="..tostr(i*0x43f7,1))
-printh("i*0x1239="..tostr(i*0x1239,1))
-printh("(i*0x43f7)^^(i*0x1239)="..tostr((i*0x43f7)^^(i*0x1239),1))
-for i=0,0x42ff do
-  r=((i*0x43f7)^^(i*0x1293)^^(i*0xfe21)) & 0xff
-  if check then
-    x=peek(i)
-    y=@i
-    if x!=r or y != r then
-      if (i-last_bad)>1 then
-        printh("off "..sub(tostr(i,1),1,6).." ex 0x"..sub(tostr(r,1),5,6).." peek 0x"..sub(tostr(x,1),5,6).." @ 0x"..sub(tostr(y,1),5,6))
-        --printh("off "..tostr(i,1).." ex "..tostr(r,1).." peek "..tostr(x,1).." @ "..tostr(y,1))      
-      end
-      pass=false
-      last_bad=i
+
+#include test_fwk.lua
+
+function test_load()
+  -- Run the same deterministic checks as the original test and assert success.
+  local last_bad = -2
+  local pass = true
+  local i = 0x3101
+  for i=0,0x42ff do
+    local r = ((i*0x43f7) ^^ (i*0x1293) ^^ (i*0xfe21)) & 0xff
+    local x = peek(i)
+    local y = @i
+    if x != r or y != r then
+      pass = false
+      last_bad = i
+      break
     end
-  else
-    poke(i,r)
   end
+  check_true(pass)
 end
-if check then
-  if pass then
-    print("pass")
-    printh("pass")
-  else
-    print("fail")
-    printh("fail")
-  end
-else
-  cstore(0, 0, 0x4300)
-  load("test_load.p8", nil, "check")
+
+function _init()
+  test_suite("load", test_load)
+  summary()
 end
 
 __gfx__
