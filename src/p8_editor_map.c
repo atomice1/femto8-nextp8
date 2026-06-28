@@ -1,8 +1,7 @@
 /**
  * Copyright (C) 2026 Chris January
  *
- * Map editor — read-only stub that renders the 128×32 tile map using sprites
- * from cart memory. Navigation scrolls a 16×15-tile viewport.
+ * Map editor.
  */
 
 #include <stdbool.h>
@@ -163,6 +162,8 @@ static void map_draw(const p8_dialog_t *dialog, void *user_data,
     int strip_y = y + h - GLYPH_HEIGHT - 16;
     overlay_draw_rectfill(x, strip_y, x + w - 1, strip_y + 15, 1);
     draw_tile_strip(x, strip_y);
+
+    overlay_draw_rectfill(x, y + MAP_VIEW_ROWS * 8, x + w - 1, strip_y - 1, 1);
 
     /* Status bar */
     char buf[40];

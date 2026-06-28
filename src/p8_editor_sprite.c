@@ -1,27 +1,7 @@
 /**
  * Copyright (C) 2026 Chris January
  *
- * Sprite editor — pixel painting, colour selection and sprite flag editing.
- *
- * Sheet mode (default):
- *   Sprite sheet view with 12 visible rows; colour palette (16 swatches) and
- *   sprite flag indicators are shown at the bottom.
- *
- * Pixel edit mode (Enter to enter, ESC to exit):
- *   8x zoomed view of the selected sprite with a moveable pixel cursor.
- *   Right-hand panel shows the colour palette and flag indicators.
- *   Mini sprite navigator strip at the bottom.
- *
- * Controls — sheet mode:
- *   Arrow keys  move sprite cursor          Q/W  prev/next sprite
- *   1/2         cycle selected colour       0-7  toggle sprite flag
- *   Enter       enter pixel edit mode
- *
- * Controls — pixel edit mode:
- *   Arrow keys  move pixel cursor           Space/Enter  paint pixel
- *   Backspace   clear pixel (colour 0)      1/2  cycle colour
- *   0-7         toggle sprite flag          Q/W  prev/next sprite
- *   ESC         back to sheet mode
+ * Sprite editor.
  */
 
 #include <stdbool.h>
@@ -536,7 +516,7 @@ static void draw_sheet_mode(int x, int y, int w, int h)
     /* Status bar */
     overlay_draw_rectfill(x, y + h - GLYPH_HEIGHT, x + w - 1, y + h - 1, 1);
     char buf[32];
-    snprintf(buf, sizeof(buf), "spr:%03d  1/2:col  enter:edit", sel_sprite);
+    snprintf(buf, sizeof(buf), "spr:%03d enter:edit", sel_sprite);
     overlay_draw_simple_text(buf, x + 1, y + h - GLYPH_HEIGHT, 6);
 
     /* Scroll position indicator at top-right of sheet area */

@@ -32,7 +32,7 @@ static void editor_screen_hide();
 #define SCANCODE_F5       62
 #define SCANCODE_F6       63
 #define SCANCODE_F7       64
-/* Letter scancodes for stub ctrl-key handling */
+/* Letter scancodes for ctrl-key handling */
 #define SCANCODE_A         4
 #define SCANCODE_R        21
 #define SCANCODE_S        22

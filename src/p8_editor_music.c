@@ -1,3 +1,9 @@
+/**
+ * Copyright (C) 2026 Chris January
+ *
+ * Music editor.
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>

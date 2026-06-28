@@ -2,15 +2,6 @@
  * Copyright (C) 2026 Chris January
  *
  * SFX editor.
- *
- *   List view:   64 SFX slots, each showing speed and a dot-preview.
- *   Detail view: three modes cycled by TAB:
- *     0 – pitch bars  (one column per note, height = pitch)
- *     1 – tracker     (one row per note: pitch name, waveform, vol, effect)
- *     2 – scale       (visual piano key toggle + scale presets)
- *   PCM/"wav" editor: mode 3 or shown whenever the SFX is marked as a waveform
- *   instrument (SFX 0..7, instrument bit). When wav is selected, the PCM editor
- *   is shown regardless of the tab-cycled mode and TAB becomes a no-op.
  */
 
 #include <stdbool.h>

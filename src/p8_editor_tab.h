@@ -15,7 +15,7 @@
 /* ── Action codes produced by handle_keypress ─────────────────────────────── */
 
 #define EDITOR_ACTION_NONE         0
-#define EDITOR_ACTION_QUIT         1   /* Escape – leave editor (hub → browser) */
+#define EDITOR_ACTION_QUIT         1   /* Switch screens */
 #define EDITOR_ACTION_SAVE         2
 #define EDITOR_ACTION_SAVE_AS      3
 #define EDITOR_ACTION_RUN          4

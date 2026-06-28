@@ -1,3 +1,9 @@
+/**
+ * Copyright (C) 2026 Chris January
+ *
+ * Code editor.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
