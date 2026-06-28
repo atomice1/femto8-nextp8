@@ -59,7 +59,7 @@ static inline int color_index(uint8_t c)
 }
 
 static int p8_init_lcd(void);
-static void p8_main_loop();
+static int p8_main_loop();
 
 uint8_t *m_memory = NULL;
 uint8_t *m_cart_memory = NULL;
@@ -79,16 +79,8 @@ p8_clock_t m_start_time;
 static jmp_buf jmpbuf_restart;
 static bool restart;
 static bool cart_running = false;
+static bool lua_running = false;
 static bool quit_requested = false;
-
-static jmp_buf jmpbuf_load;
-static struct {
-    bool requested;
-    const char *file_name;
-    const char *param;
-    const char *bbs_cart_id;
-    const char *breadcrumb;
-} pending_load;
 
 char m_current_cart_dir[PATH_MAX];
 char m_current_cart_file_name[PATH_MAX];
@@ -239,7 +231,9 @@ int p8_init()
     p8_init_lcd();
     p8_init_input();
 
-    lua_load_api();
+    int ret = lua_load_api();
+    if (ret != 0)
+        return ret;
 
     m_initialized = 1;
 
@@ -282,24 +276,6 @@ int p8_load(const char *file_name, const char *param, const char *bbs_cart_id, c
 {
     assert(m_initialized);
 
-    if (cart_running) {
-        assert(!pending_load.requested);
-
-        pending_load.requested = true;
-        pending_load.file_name = file_name;
-        pending_load.param = param;
-        pending_load.bbs_cart_id = bbs_cart_id;
-        pending_load.breadcrumb = breadcrumb;
-
-        longjmp(jmpbuf_load, 1);
-    }
-
-    strtcpy(m_param_string, param ? param : "", sizeof(m_param_string));
-    strtcpy(m_breadcrumb, breadcrumb ? breadcrumb : "", sizeof(m_breadcrumb));
-
-    strtcpy(m_current_cart_file_name, file_name, sizeof(m_current_cart_file_name));
-    strtcpy(m_current_cart_dir, ".", sizeof(m_current_cart_dir));
-
     p8_show_io_icon(true);
 
     printf("Loading %s\n", file_name);
@@ -308,7 +284,14 @@ int p8_load(const char *file_name, const char *param, const char *bbs_cart_id, c
         return -1;
     }
 
-    p8_reset_cart();
+    strtcpy(m_param_string, param ? param : "", sizeof(m_param_string));
+    strtcpy(m_breadcrumb, breadcrumb ? breadcrumb : "", sizeof(m_breadcrumb));
+
+    strtcpy(m_current_cart_file_name, file_name, sizeof(m_current_cart_file_name));
+    strtcpy(m_current_cart_dir, ".", sizeof(m_current_cart_dir));
+
+    if (cart_running)
+        p8_reset_cart();
 
     p8_show_io_icon(false);
     return 0;
@@ -331,19 +314,15 @@ int p8_run(void)
     assert(m_initialized);
     assert(m_lua_script);
 
-    if (cart_running)
+    if (lua_running) {
+        restart = true;
+        longjmp(jmpbuf_restart, 1);
+    } else if (cart_running) {
         p8_restart();
-    assert(!cart_running);
-
-    /* Handle load() calls from within the cart */
-    if (setjmp(jmpbuf_load)) {
-        pending_load.requested = false;
-
-        /* Load the new cart */
-
-        if (p8_load(pending_load.file_name, pending_load.param, pending_load.bbs_cart_id, pending_load.breadcrumb) != 0)
-            return -1;
+        // should not be reachable
+        abort();
     }
+    assert(!cart_running);
 
     if (setjmp(jmpbuf_restart)) {
         cart_running = false;
@@ -356,14 +335,27 @@ int p8_run(void)
 
     cart_running = true;
 
-    lua_init_script(m_current_cart_file_name, m_lua_script);
+    int ret = lua_init_script(m_current_cart_file_name, m_lua_script);
+    if (ret != 0) {
+        cart_running = false;
+        return ret;
+    }
 
-    lua_init();
+    ret = lua_init();
+    if (ret != 0) {
+        cart_running = false;
+        return ret;
+    }
 
-    if (lua_has_main_loop_callbacks())
-        p8_main_loop();
-    else if (!skip_main_loop_if_no_callbacks)
+    if (lua_has_main_loop_callbacks()) {
+        ret = p8_main_loop();
+        if (ret != 0) {
+            cart_running = false;
+            return ret;
+        }
+    } else if (!skip_main_loop_if_no_callbacks) {
         p8_wait_for_any_key();
+    }
 
     cart_running = false;
 
@@ -813,7 +805,7 @@ void p8_flip()
     p8_post_flip();
 }
 
-static void p8_main_loop()
+static int p8_main_loop()
 {
     int time_debt = 0;
     unsigned updates_since_last_flip = 0;
@@ -822,7 +814,9 @@ static void p8_main_loop()
     {
         const int target_frame_time = 1000 / m_fps;
 
-        lua_update();
+        int ret = lua_update();
+        if (ret != 0)
+            return ret;
         updates_since_last_flip++;
 
         unsigned elapsed = p8_elapsed_time();
@@ -830,7 +824,9 @@ static void p8_main_loop()
         time_debt += elapsed;
 
         if (time_debt < target_frame_time || updates_since_last_flip >= m_fps) {
-            lua_draw();
+            ret = lua_draw();
+            if (ret != 0)
+                return ret;
             time_debt += p8_elapsed_time() - elapsed;
 
             p8_flip();
@@ -864,12 +860,15 @@ unsigned p8_elapsed_time(void)
 
 void p8_check_for_pause(void)
 {
-    if (cart_running && !m_dialog_showing) {
-        if ((m_buttonsp[0] & BUTTON_MASK_ESCAPE) != 0)
-            p8_abort();
-
-        if ((m_buttonsp[0] & BUTTON_MASK_PAUSE) != 0)
-            p8_show_pause_menu();
+    if (!m_dialog_showing) {
+        if (cart_running || lua_running) {
+            if ((m_buttonsp[0] & BUTTON_MASK_ESCAPE) != 0)
+                p8_abort();
+        }
+        if (cart_running) {
+            if ((m_buttonsp[0] & BUTTON_MASK_PAUSE) != 0)
+                p8_show_pause_menu();
+        }
     }
 }
 
@@ -967,7 +966,7 @@ void __attribute__ ((noreturn)) p8_restart()
 void p8_quit()
 {
     quit_requested = true;
-    if (cart_running)
+    if (cart_running || lua_running)
         p8_abort();
 }
 
@@ -1154,3 +1153,16 @@ void p8_show_version_dialog(void)
     p8_dialog_cleanup(&dialog);
 }
 
+void p8_show_lua_error_dialog(void)
+{
+    const char *err_type;
+    char err_msg[256];
+    err_msg[0] = '\0';
+    lua_get_error(&err_type, err_msg, sizeof(err_msg), NULL, NULL);
+
+    const char *lines[] = {
+        err_type ? err_type : "",
+        err_msg
+    };
+    p8_show_error_dialog(lines, 2, P8_ERROR_ERROR);
+}

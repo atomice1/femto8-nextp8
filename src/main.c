@@ -11,6 +11,7 @@
 #include "p8_browse.h"
 #include "p8_parser.h"
 #include "p8_emu.h"
+#include "p8_lua.h"
 #include "strtcpy.h"
 
 #define VERSION "1.0.00"
@@ -55,8 +56,10 @@ int main(int argc, char *argv[])
         if (p8_load(file_name, param_string, NULL, NULL) != 0) {
             exit_code = EXIT_FAILURE;
         } else {
-            if (p8_run() != 0)
+            if (p8_run() != 0) {
+                lua_print_error();
                 exit_code = EXIT_FAILURE;
+            }
         }
     }
     p8_shutdown();

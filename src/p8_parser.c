@@ -30,7 +30,9 @@
 
 enum P8Type
 {
-    P8TYPE_HEADER,
+    P8TYPE_START = 0,
+    P8TYPE_IDENT,
+    P8TYPE_VERSION,
     P8TYPE_LUA,
     P8TYPE_GFX_4BIT,
     P8TYPE_GFX_8BIT,
@@ -44,6 +46,8 @@ enum P8Type
 
 static const char *m_p8_name[] = {
     NULL,
+    "pico-8 cartridge",
+    "version",
     "__lua__",
     "__gfx__",
     "__gfx8__",
@@ -55,6 +59,8 @@ static const char *m_p8_name[] = {
 };
 
 static int m_p8_mem_offset[] = {
+    0,
+    0,
     0,
     0,
     MEMORY_SPRITES,
@@ -442,12 +448,13 @@ static int parse_p8_ram(const char *file_name, uint8_t *buffer, int size, uint8_
     char *line;
     char *rest = (char *)buffer;
     int lua_start = 0, lua_end = 0;
-    int p8_type = P8TYPE_HEADER;
+    int p8_type = P8TYPE_START;
     int file_offset = 0;
     int read_offset = 0;
     int write_offset = 0;
     int read_length = 0;
     int write_length = 0;
+    bool seen_ident = false;
 
     if (lua_script)
         *lua_script = NULL;
@@ -465,7 +472,7 @@ static int parse_p8_ram(const char *file_name, uint8_t *buffer, int size, uint8_
 
         file_offset += line_length;
 
-        for (int i = P8TYPE_LUA; i < P8TYPE_COUNT; i++)
+        for (int i = P8TYPE_IDENT; i < P8TYPE_COUNT; i++)
         {
             if (strncmp(line, m_p8_name[i], strlen(m_p8_name[i])) == 0)
             {
@@ -484,13 +491,15 @@ static int parse_p8_ram(const char *file_name, uint8_t *buffer, int size, uint8_
                 lua_start = file_offset;
                 lua_end = file_offset;
             }
+            else if (p8_type == P8TYPE_IDENT)
+            {
+                seen_ident = true;
+            }
             continue;
         }
 
         switch (p8_type)
         {
-        case P8TYPE_HEADER:
-            break;
         case P8TYPE_LUA:
         {
             lua_end += line_length;
@@ -553,6 +562,11 @@ static int parse_p8_ram(const char *file_name, uint8_t *buffer, int size, uint8_
         }
     }
 
+    if (!seen_ident) {
+        fprintf(stderr, "Error: %s: missing pico-8 cartridge header\n", file_name ? file_name : "<buffer>");
+        return 1;
+    }
+
     for (int i = MEMORY_SPRITES; i < MEMORY_SPRITES + MEMORY_SPRITES_SIZE; i++)
         memory[i] = NIBBLE_SWAP(memory[i]);
 
@@ -563,7 +577,7 @@ static int parse_p8_ram(const char *file_name, uint8_t *buffer, int size, uint8_
 
     convert_utf8_to_p8scii(&buffer[lua_start], lua_end - lua_start);
 
-    if (lua_script)
+    if (lua_script && lua_start)
         *lua_script = (const char *) &buffer[lua_start];
 
     return 0;

@@ -53,6 +53,7 @@
 #include "strtcpy.h"
 
 lua_State *L = NULL;
+static int m_status = 0;
 
 const void *m_lua_init = NULL;
 const void *m_lua_update = NULL;
@@ -67,14 +68,14 @@ static int m_tline_precision = 13;
 
 static int m_load_result = 0;  /* stat(107): 1=success, -1=not found, -2=fetch failed, -3=no bbs */
 
-void lua_load_api();
-void lua_shutdown_api();
-void lua_print_error(const char *where);
-void lua_init_script(const char *file_name, const char *script);
-void lua_call_function(const char *name, int ret);
-void lua_update();
-void lua_draw();
-void lua_init();
+int lua_load_api();
+int lua_shutdown_api();
+void lua_print_error();
+int lua_init_script(const char *file_name, const char *script);
+int lua_call_function(const char *name, int ret);
+int lua_update();
+int lua_draw();
+int lua_init();
 
 void lua_register_functions(lua_State *L);
 
@@ -1704,12 +1705,20 @@ int _load(lua_State *L)
         luaL_error(L, "out of memory");
     }
 
+    if (p8_resolve_relative_path(resolved_path, filename, sizeof(resolved_path), false) < 0) {
+        luaL_error(L, "out of memory");
+    }
+
     if (access(resolved_path, F_OK) != 0) {
         fprintf(stderr, "load: could not find cart %s\n", filename);
         m_load_result = -1;
-        lua_pushboolean(L, -1);
-        lua_pushstring(L, "could not find cart");
-        return 2;
+        if (p8_is_cart_running()) {
+            lua_pushboolean(L, 0);
+            lua_pushstring(L, "could not find cart");
+            return 2;
+        } else {
+            return luaL_error(L, "could not find cart");
+        }
     }
 
     const char *breadcrumb = NULL;
@@ -1720,11 +1729,26 @@ int _load(lua_State *L)
     if (nargs >= 3)
         param = lua_tostring(L, 3);
 
-    m_load_result = 1;
-    p8_load(resolved_path, param, bbs_cart_id, breadcrumb);
+    int ret = p8_load(resolved_path, param, bbs_cart_id, breadcrumb);
+    if (ret != 0) {
+        m_load_result = -1;
+        if (p8_is_cart_running()) {
+            lua_pushboolean(L, 0);
+            lua_pushstring(L, "could not load cart");
+            return 2;
+        } else {
+            return luaL_error(L, "could not load cart");
+        }
+    }
 
-    lua_pushboolean(L, 1);
-    return 1;
+    m_load_result = 1;
+
+    if (p8_is_cart_running()) {
+        return p8_run();
+    } else {
+        lua_pushboolean(L, 1);
+        return 1;
+    }
 }
 
 // ****************************************************************
@@ -2466,7 +2490,7 @@ static void lua_event_pump_hook(lua_State *L, lua_Debug *ar)
     p8_check_for_pause();
 }
 
-void lua_load_api()
+int lua_load_api()
 {
     if (!L)
     {
@@ -2477,26 +2501,30 @@ void lua_load_api()
 
     lua_register_functions(L);
 
-    if (luaL_dostring(L, lua_api_string))
-        lua_print_error("Error loading extended PICO-8 Api");
-
+    int ret = luaL_dostring(L, lua_api_string);
+    if (ret != 0)
+        return ret;
     lua_setpico8memory(L, m_memory);
 
     // Set debug hook to pump events every ~3000 instructions
     lua_sethook(L, lua_event_pump_hook, LUA_MASKCOUNT, 3000);
+
+    return 0;
 }
 
-void lua_shutdown_api()
+int lua_shutdown_api()
 {
     if (L) {
         p8_menuitem_reset_all();
         lua_close(L);
         L = NULL;
     }
+    return 0;
 }
 
-static void print_script_context(int lineno)
+static void print_script_context(const char *filename, int lineno)
 {
+    (void) filename;
     if (lineno <= 0)
         return;
     int lo = lineno - 3, hi = lineno + 3;
@@ -2518,29 +2546,30 @@ static void print_script_context(int lineno)
     }
 }
 
-void lua_print_error(const char *where)
+void lua_print_error()
 {
-    printf("Error on %s\r\n", where);
-
-    if (lua_isstring(L, -1))
-    {
-        const char *message = lua_tostring(L, -1);
-        printf("%s\r\n", message);
-        // Extract line number from error string like "...:1292:"
-        const char *colon = message;
-        int lineno = 0;
-        while (*colon) {
-            if (*colon != ']' && *(colon+1) == ':') {
-                lineno = atoi(colon + 2);
-                if (lineno > 0) break;
-            }
-            colon++;
-        }
-        print_script_context(lineno);
+    const char *err_type = NULL;
+    char err_msg[96] = {0};
+    const char *filename = NULL;
+    int lineno = -1;
+    lua_get_error(&err_type, err_msg, sizeof(err_msg), &filename, &lineno);
+    if (err_type) {
+        if (lineno > 0)
+            fprintf(stderr, "%s line %d\n", err_type, lineno);
+        else
+            fprintf(stderr, "%s\n", err_type);
+    } else if (lineno > 0) {
+        fprintf(stderr, "line %d\n", lineno);
     }
+    if (err_msg[0])
+        fprintf(stderr, "%s\n", err_msg);
+    if (!err_type && !err_msg[0])
+        fprintf(stderr, "unknown error\n");
+    if (lineno != -1)
+        print_script_context(filename, lineno);
 }
 
-void lua_init_script(const char *file_name, const char *script)
+int lua_init_script(const char *file_name, const char *script)
 {
     if (!L)
         L = luaL_newstate();
@@ -2552,19 +2581,18 @@ void lua_init_script(const char *file_name, const char *script)
     else
         temp_file_name[1] = '\0';
 
+    lua_settop(L, 0);
+
     size_t script_len = strnlen(script, LUA_SCRIPT_SIZE);
-    int ret = luaL_loadbuffer(L, script, script_len, temp_file_name);
+    m_status = luaL_loadbuffer(L, script, script_len, temp_file_name);
 
-    if (ret)
-    {
-        lua_print_error("luaL_loadBuffer");
-        return;
-    }
+    if (m_status)
+        return m_status;
 
-    int error = lua_pcall(L, 0, 0, 0);
+    m_status = lua_pcall(L, 0, 0, 0);
 
-    if (error)
-        lua_print_error("lua_pcall on init");
+    if (m_status)
+        return m_status;
 
     lua_getglobal(L, "_update");
 
@@ -2599,18 +2627,19 @@ void lua_init_script(const char *file_name, const char *script)
         m_lua_init = lua_topointer(L, -1);
         lua_pop(L, 1);
     }
+
+    return 0;
 }
 
-void lua_call_function(const char *name, int ret)
+int lua_call_function(const char *name, int ret)
 {
+    lua_settop(L, 0);
     lua_getglobal(L, name);
-    int error = lua_pcall(L, 0, ret, 0);
-
-    if (error)
-        lua_print_error(name);
+    m_status = lua_pcall(L, 0, ret, 0);
+    return m_status;
 }
 
-void lua_update()
+int lua_update()
 {
     if (!m_lua_update && !m_lua_update60)
     {
@@ -2631,13 +2660,17 @@ void lua_update()
         lua_pop(L, 1);
     }
 
+    lua_settop(L, 0);
+    m_status = 0;
+
     if (m_lua_update60)
-        lua_call_function("_update60", 0);
+        return lua_call_function("_update60", 0);
     else if (m_lua_update)
-        lua_call_function("_update", 0);
+        return lua_call_function("_update", 0);
+    return 0;
 }
 
-void lua_draw()
+int lua_draw()
 {
     if (!m_lua_draw)
     {
@@ -2647,8 +2680,12 @@ void lua_draw()
         lua_pop(L, 1);
     }
 
+    lua_settop(L, 0);
+    m_status = 0;
+
     if (m_lua_draw)
-        lua_call_function("_draw", 0);
+        return lua_call_function("_draw", 0);
+    return 0;
 }
 
 bool lua_has_main_loop_callbacks()
@@ -2656,35 +2693,67 @@ bool lua_has_main_loop_callbacks()
     return (m_lua_update != NULL || m_lua_update60 != NULL || m_lua_draw != NULL);
 }
 
-void lua_init()
+int lua_init()
 {
+    m_status = 0;
     if (m_lua_init)
-        lua_call_function("_init", 0);
+        return lua_call_function("_init", 0);
+    return 0;
+}
 
-    if (!m_lua_update && !m_lua_update60)
-    {
-        lua_getglobal(L, "_update");
-        if (lua_isfunction(L, -1))
-        {
-            m_lua_update = lua_topointer(L, -1);
-            m_fps = 30;
-        }
-        lua_pop(L, 1);
-
-        lua_getglobal(L, "_update60");
-        if (lua_isfunction(L, -1))
-        {
-            m_lua_update60 = lua_topointer(L, -1);
-            m_fps = 60;
-        }
-        lua_pop(L, 1);
+void lua_get_error(const char **err_type, char *err, int err_size, const char **filename, int *lineno)
+{
+    if (!L) {
+        strtcpy(err, "no lua state", err_size);
+        return;
     }
 
-    if (!m_lua_draw)
-    {
-        lua_getglobal(L, "_draw");
-        if (lua_isfunction(L, -1))
-            m_lua_draw = lua_topointer(L, -1);
-        lua_pop(L, 1);
+    switch (m_status ){
+    case LUA_ERRSYNTAX:
+        *err_type = "syntax error";
+        break;
+    case LUA_ERRMEM:
+        *err_type = "out of memory";
+        break;
+    case LUA_ERRRUN:
+        *err_type = "runtime error";
+        break;
+    case LUA_ERRERR:
+        *err_type = "error in error handler";
+        break;
+    default:
+        *err_type = "unknown error";
+        break;
+    }
+    if (lua_gettop(L) > 0 && lua_isstring(L, -1)) {
+        const char *err_msg = lua_tostring(L, -1);
+        if (err_msg) {
+            const char *colon = strrchr(err_msg, ':');
+            if (colon)
+                err_msg = colon + 2;
+            const char *near = strstr(err_msg, " near ");
+            if (near)
+                *(char *)near = '\0';
+            if (strstr(err_msg, "syntax error") == NULL)
+                strtcpy(err, err_msg, err_size);
+        }
+
+        if (lineno) {
+            const char *message = lua_tostring(L, -1);
+            // Extract line number from error string like "...:1292:"
+            const char *colon = message;
+            *lineno = 0;
+            if (*colon == ':') {
+                *lineno = atoi(colon + 1);
+            } else {
+                while (*colon) {
+                    if (*colon != ']' && *(colon+1) == ':') {
+                        *lineno = atoi(colon + 2);
+                        if (*lineno > 0) break;
+                    }
+                    colon++;
+                }
+            }
+        }
     }
 }
