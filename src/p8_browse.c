@@ -574,8 +574,15 @@ static void browse_update(void)
                         /* Hide browse screen before running cart */
                         browse_hide();
                         if (p8_load(cart_path, NULL, cart_id, NULL) == 0) {
-                            p8_run();
+                            if (p8_run() != 0)
+                                p8_show_lua_error_dialog();
                             p8_reset();
+                        } else {
+                            const char *error_lines[] = {
+                                "failed to load",
+                                "downloaded cart"
+                            };
+                            p8_show_error_dialog(error_lines, 2, P8_ERROR_ERROR);
                         }
                         /* Show browse screen again after cart exits */
                         browse_show();
@@ -635,8 +642,15 @@ static void browse_update(void)
         } else {
             /* Load and run cart */
             browse_hide();
-            if (p8_load(full_path, NULL, NULL, NULL) == 0)
-                p8_run();
+            if (p8_load(full_path, NULL, NULL, NULL) == 0) {
+                if (p8_run() != 0)
+                    p8_show_lua_error_dialog();
+            } else {
+                const char *error_lines[] = {
+                    "failed to load cart"
+                };
+                p8_show_error_dialog(error_lines, 1, P8_ERROR_ERROR);
+            }
             browse_show();
         }
     }

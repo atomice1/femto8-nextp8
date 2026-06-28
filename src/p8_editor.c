@@ -147,7 +147,8 @@ static void handle_action(p8_dialog_t *dialog, int action)
         }
         case EDITOR_ACTION_RUN: {
             editor_screen_hide();
-            p8_run();
+            if (p8_run() != 0)
+                p8_show_lua_error_dialog();
             editor_screen_show();
             break;
         }

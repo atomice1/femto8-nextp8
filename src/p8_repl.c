@@ -5,6 +5,7 @@
 #include <stdarg.h>
 
 #include "p8_dialog.h"
+#include "p8_editor_code.h"
 #include "p8_emu.h"
 #include "p8_input.h"
 #include "p8_lua.h"
@@ -75,7 +76,7 @@ static void repl_print(const char *line, int colour, bool add_newline)
     int x, y, right;
     cursor_get(&x, &y);
     uint8_t old_flags = m_memory[MEMORY_MISCFLAGS];
-    m_memory[MEMORY_MISCFLAGS] = 0x80;
+    m_memory[MEMORY_MISCFLAGS] = 0x80 | (add_newline ? 0 : 0x4);
     draw_text(line, strlen(line), x, y, colour, 0, false, &x, &y, &right);
     m_memory[MEMORY_MISCFLAGS] = old_flags;
     cursor_set(x, y, -1);
@@ -350,13 +351,25 @@ static void repl_execute(void)
     /* Run: only show errors, swallow success results */
     char err_msg[REPL_LINE_MAX];
     const char *err_type = NULL;
+    const char *filename = NULL;
+    int lineno = 0;
     err_msg[0] = '\0';
-    int ret= p8_exec(repl_input, &err_type, err_msg, sizeof(err_msg));
+    int ret = p8_exec(repl_input, &err_type, err_msg, sizeof(err_msg), &filename, &lineno);
     if (ret != 0) {
-        if (err_type)
-            repl_print(err_type, COLOUR_ERROR_TYPE, true);
+        if (err_type) {
+            if (lineno > 0) {
+                repl_print(err_type, COLOUR_ERROR_TYPE, false);
+                char buf[32];
+                snprintf(buf, sizeof(buf), " line %d", lineno);
+                repl_print(buf, COLOUR_ERROR_TYPE, true);
+            } else {
+                repl_print(err_type, COLOUR_ERROR_TYPE, true);
+            }
+        }
         if (err_msg[0])
             repl_print(err_msg, COLOUR_ERROR_MSG, true);
+        if (lineno > 0)
+            p8_editor_code_set_line(lineno);
     }
 
     /* Clear input */

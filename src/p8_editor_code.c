@@ -1010,6 +1010,14 @@ void p8_editor_code_invalidate(void)
     free_lines();
 }
 
+void p8_editor_code_set_line(int line)
+{
+    if (line < 1) line = 1;
+    if (line > line_count) line = line_count;
+    cursor_line = line - 1;
+    cursor_col = 0;
+}
+
 void p8_editor_code_sync(void)
 {
     if (code_modified) {

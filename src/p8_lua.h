@@ -11,16 +11,17 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-void lua_load_api();
-void lua_shutdown_api();
-void lua_print_error(const char *where);
-void lua_init_script(const char *file_name, const char *script);
-void lua_call_function(const char *name, int ret);
-void lua_update();
-void lua_draw();
-void lua_init();
+int lua_load_api();
+int lua_shutdown_api();
+void lua_print_error();
+int lua_init_script(const char *file_name, const char *script);
+int lua_call_function(const char *name, int ret);
+int lua_update();
+int lua_draw();
+int lua_init();
 bool lua_has_main_loop_callbacks();
-int lua_exec_repl(const char *input, const char **err_type, char *err, int err_size);
+int lua_exec_repl(const char *input);
+void lua_get_error(const char **err_type, char *err, int err_size, const char **filename, int *lineno);
 
 extern char m_str_buffer[256];
 
