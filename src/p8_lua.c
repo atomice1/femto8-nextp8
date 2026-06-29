@@ -1704,9 +1704,13 @@ int _load(lua_State *L)
         if (p8_download_bbs_cart(bbs_cart_id, resolved_path, sizeof(resolved_path)) < 0) {
             m_load_result = -2;
             fprintf(stderr, "load: could not fetch cart\n");
-            lua_pushboolean(L, 0);
-            lua_pushstring(L, "could not fetch cart");
-            return 2;
+            if (p8_is_cart_running()) {
+                lua_pushboolean(L, 0);
+                lua_pushstring(L, "could not fetch cart");
+                return 2;
+            } else {
+                return luaL_error(L, "could not fetch cart");
+            }
         }
 #else
         m_load_result = -3;
@@ -1731,9 +1735,13 @@ int _load(lua_State *L)
     if (filename[0] != '#' && access(resolved_path, F_OK) != 0) {
         fprintf(stderr, "load: could not find cart %s\n", filename);
         m_load_result = -1;
-        lua_pushboolean(L, 0);
-        lua_pushstring(L, "could not find cart");
-        return 2;
+        if (p8_is_cart_running()) {
+            lua_pushboolean(L, 0);
+            lua_pushstring(L, "could not find cart");
+            return 2;
+        } else {
+            return luaL_error(L, "could not find cart");
+        }
     }
 
     const char *breadcrumb = NULL;
@@ -1747,9 +1755,13 @@ int _load(lua_State *L)
     int ret = p8_load(resolved_path, param, bbs_cart_id, breadcrumb);
     if (ret != 0) {
         m_load_result = -1;
-        lua_pushboolean(L, 0);
-        lua_pushstring(L, "could not load cart");
-        return ret;
+        if (p8_is_cart_running()) {
+            lua_pushboolean(L, 0);
+            lua_pushstring(L, "could not load cart");
+            return 2;
+        } else {
+            return luaL_error(L, "could not load cart");
+        }
     }
 
     m_load_result = 1;
