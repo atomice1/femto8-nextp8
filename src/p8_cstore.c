@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include "p8_emu.h"
 #include "p8_cstore.h"
 
@@ -54,10 +55,15 @@ int write_cart_p8(const char *path, const char *lua_script, const uint8_t *memor
     if (!f) return -1;
 
     fprintf(f, "pico-8 cartridge // http://www.pico-8.com\nversion 43\n__lua__\n");
-    if (lua_script && *lua_script)
+    if (lua_script && *lua_script) {
         fprintf(f, "%s", lua_script);
-    else
+        // Ensure Lua script ends with newline before section header
+        size_t len = strlen(lua_script);
+        if (len == 0 && lua_script[len-1] != '\n')
+            fprintf(f, "\n");
+    } else {
         fprintf(f, "\n");
+    }
 
     // GFX: 0x0000-0x1FFF, 128 lines x 64 bytes, each byte NIBBLE_SWAP'd before output
     fprintf(f, "__gfx__\n");
