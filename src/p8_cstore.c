@@ -3,6 +3,7 @@
 #include <string.h>
 #include "p8_emu.h"
 #include "p8_cstore.h"
+#include "p8_symbols.h"
 
 static void write_sfx(FILE *f, const uint8_t *src)
 {
@@ -56,11 +57,26 @@ int write_cart_p8(const char *path, const char *lua_script, const uint8_t *memor
 
     fprintf(f, "pico-8 cartridge // http://www.pico-8.com\nversion 43\n__lua__\n");
     if (lua_script && *lua_script) {
-        fprintf(f, "%s", lua_script);
-        // Ensure Lua script ends with newline before section header
-        size_t len = strlen(lua_script);
-        if (len == 0 && lua_script[len-1] != '\n')
-            fprintf(f, "\n");
+        const char *p = lua_script;
+        for (; *p; p++) {
+            uint8_t c = *p;
+            if (c < 32 || c >= 127) {
+                bool found = false;
+                for (int i=0; i<sizeof(p8_symbols)/sizeof(p8_symbol_t); i++) {
+                    if (c == p8_symbols[i].index) {
+                        fwrite(p8_symbols[i].encoding, 1, p8_symbols[i].length, f);
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                    fputc(*p, f);
+            } else {
+                fputc(*p, f);
+            }
+        }
+        if (p[-1] != '\n')
+            fputc('\n', f);
     } else {
         fprintf(f, "\n");
     }
