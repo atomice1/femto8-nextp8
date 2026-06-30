@@ -14,6 +14,7 @@
 #include "p8_emu.h"
 #include "p8_input.h"
 #include "p8_lua.h"
+#include "p8_repl.h"
 #if defined(_WIN32)
 #include <windows.h>
 #include <psapi.h>    // GetProcessMemoryInfo
@@ -2194,6 +2195,14 @@ int save(lua_State *L)
 // Returns nil when called from a BBS cart.
 int ls(lua_State *L)
 {
+    // If not running a cart (REPL mode), show visual listing via repl_handle_ls
+    if (!p8_is_cart_running()) {
+        const char *path = NULL;
+        if (lua_gettop(L) >= 1 && !lua_isnil(L, 1))
+            path = lua_tostring(L, 1);
+        repl_handle_ls(path);
+        return 0;  // No result for REPL visual listing
+    }
     if (m_bbs_cart_id[0])
         return 0; /* nil */
 

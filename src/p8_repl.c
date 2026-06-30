@@ -187,7 +187,7 @@ static int repl_dir_entry_cmp(const void *pa, const void *pb)
 /* Render a directory listing into the REPL overlay with pagination.
  * `arg` is the optional path argument (may be NULL or empty).
  */
-static void repl_handle_ls(const char *arg)
+void repl_handle_ls(const char *arg)
 {
     char resolved[PATH_MAX];
     const char *path;
@@ -323,30 +323,8 @@ static void repl_execute(void)
     repl_print(">", COLOUR_COMMAND, false);
     repl_print(repl_input, COLOUR_COMMAND, true);
 
-    /* Special-case: if this looks like the `ls` command, handle listing in the REPL overlay
-     * instead of invoking the Lua `ls` function. Copy the original input first because
-     * convert_command_to_function_call mutates the buffer. */
-    char orig[REPL_INPUT_MAX + 4];
-    int orig_len = repl_input_len;
-    strtcpy(orig, repl_input, sizeof(orig));
-    if (is_command(orig, orig_len)) {
-        /* extract first token */
-        int i = 0;
-        while (i < orig_len && orig[i] != ' ' && orig[i] != '\t') i++;
-        if (i == 2 && strncmp(orig, "ls", 2) == 0) {
-            /* argument (if any) starts after whitespace */
-            const char *arg = NULL;
-            while (i < orig_len && (orig[i] == ' ' || orig[i] == '\t')) i++;
-            if (i < orig_len)
-                arg = &orig[i];
-            repl_handle_ls(arg);
-            /* Clear input and return to prompt */
-            repl_input[0] = '\0';
-            repl_input_len = 0;
-            return;
-        }
+    if (is_command(repl_input, repl_input_len))
         convert_command_to_function_call(repl_input, &repl_input_len);
-    }
 
     /* Run: only show errors, swallow success results */
     char err_msg[REPL_LINE_MAX];
