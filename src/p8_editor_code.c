@@ -63,6 +63,7 @@ static int select_end_line = -1;
 static int select_end_col = -1;
 static bool puny_mode = false;
 static bool sync_required = false;
+static bool showing = false;
 
 /* --- Clipboard, search, and undo state ------------------------------------- */
 
@@ -999,6 +1000,12 @@ static void code_show(void)
         select_anchor_line = -1;
         select_anchor_col  = -1;
     }
+    showing = true;
+}
+
+static void code_hide(void)
+{
+    showing = false;
 }
 
 static void code_init(void)
@@ -1041,6 +1048,8 @@ static void code_shutdown(void)
 static void code_invalidate(void)
 {
     free_lines();
+    if (showing)
+        code_show();
 }
 
 static void code_sync(void)
@@ -1075,6 +1084,7 @@ p8_editor_tab_t p8_subeditor_code = {
     .init=code_init,
     .shutdown=code_shutdown,
     .show=code_show,
+    .hide=code_hide,
     .draw=code_draw,
     .sync=code_sync,
     .invalidate=code_invalidate,

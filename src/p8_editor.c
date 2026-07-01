@@ -38,6 +38,7 @@ static void editor_screen_hide();
 #define SCANCODE_F7       64
 /* Letter scancodes for ctrl-key handling */
 #define SCANCODE_A         4
+#define SCANCODE_N        17
 #define SCANCODE_R        21
 #define SCANCODE_S        22
 #define SCANCODE_LEFT     80
@@ -174,6 +175,24 @@ static void handle_action(p8_dialog_t *dialog, int action)
             if (p8_run() != 0)
                 p8_show_lua_error_dialog();
             editor_screen_show();
+            break;
+        }
+        case EDITOR_ACTION_NEW: {
+            if (cart_modified) {
+                p8_dialog_t dlg;
+                p8_dialog_control_t ctrls[] = {
+                    DIALOG_LABEL("cart is modified"),
+                    DIALOG_LABEL("discard changes?"),
+                    DIALOG_SPACING(),
+                    DIALOG_BUTTONBAR_YES_NO(),
+                };
+                p8_dialog_init(&dlg, "new cart", ctrls, 4, 0);
+                p8_dialog_action_t res = p8_dialog_run(&dlg);
+                p8_dialog_cleanup(&dlg);
+                if (res.type != DIALOG_RESULT_ACCEPTED)
+                    break;
+            }
+            p8_new_cart();
             break;
         }
         case EDITOR_ACTION_QUIT: {
@@ -326,6 +345,7 @@ static void editor_screen_handle_keypress(int scancode, int keypress, int keymod
         case SCANCODE_RIGHT: if (keymod & KMOD_ALT) editor_action = EDITOR_ACTION_SWITCH_TAB((active_tab == P8_TAB_COUNT - 1) ? 0 : active_tab + 1); break;
         case SCANCODE_R: if (keymod & KMOD_CTRL) editor_action = EDITOR_ACTION_RUN; break;
         case SCANCODE_S: if (keymod & KMOD_CTRL) editor_action = EDITOR_ACTION_SAVE; break;
+        case SCANCODE_N: if (keymod & KMOD_CTRL) editor_action = EDITOR_ACTION_NEW; break;
         //case SCANCODE_A: if (keymod & KMOD_CTRL) editor_action = EDITOR_ACTION_SAVE_AS; break;
         default: break;
     }
@@ -379,6 +399,8 @@ void p8_editor_invalidate(void)
         if (tab_subeditors[i]->invalidate)
             tab_subeditors[i]->invalidate();
     }
+    if (m_lua_script[0] == '\0')
+        cart_modified = false;
 }
 
 void p8_editor_mark_modified(void)

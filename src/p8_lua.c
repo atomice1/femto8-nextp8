@@ -2331,6 +2331,13 @@ int lua_mkdir(lua_State *L)
     return 1;
 }
 
+// new()
+static int lua_new(lua_State *L)
+{
+    p8_new_cart();
+    return 0;
+}
+
 void lua_register_functions(lua_State *L)
 {
     // ****************************************************************
@@ -2473,6 +2480,7 @@ void lua_register_functions(lua_State *L)
     lua_register(L, "reboot", reboot);
     lua_register(L, "cd", cd);
     lua_register(L, "mkdir", lua_mkdir);
+    lua_register(L, "new", lua_new);
     // ****************************************************************
     // *** Debugging ***
     // ****************************************************************

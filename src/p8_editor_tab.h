@@ -19,6 +19,7 @@
 #define EDITOR_ACTION_SAVE         2
 #define EDITOR_ACTION_SAVE_AS      3
 #define EDITOR_ACTION_RUN          4
+#define EDITOR_ACTION_NEW          5
 /* Switch to a different sub-editor tab (F1-F5).
  * Use EDITOR_ACTION_SWITCH_TAB(P8_TAB_SPRITE) etc. */
 #define EDITOR_ACTION_SWITCH_TAB(n)     (10 + (n))
