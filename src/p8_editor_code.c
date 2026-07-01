@@ -48,6 +48,7 @@
 #define SCANCODE_PAGEUP   75
 #define SCANCODE_PAGEDOWN 78
 #define SCANCODE_HOME     74
+#define SCANCODE_DEL      76
 #define SCANCODE_END      77
 static char **lines = NULL;
 static int *line_lengths = NULL;
@@ -725,6 +726,34 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
             BEGIN_SHIFT_MOVE();
             cursor_col = line_lengths[cursor_line];
             END_SHIFT_MOVE();
+            break;
+        case SCANCODE_DEL:
+            // Delete forward
+            if (select_start_line != -1) {
+                push_undo(); delete_selected_text();
+            } else if (cursor_col < line_lengths[cursor_line]) {
+                push_undo();
+                memmove(&lines[cursor_line][cursor_col],
+                        &lines[cursor_line][cursor_col + 1],
+                        line_lengths[cursor_line] - cursor_col);
+                line_lengths[cursor_line]--;
+                syn_valid_lines = MIN(syn_valid_lines, cursor_line);
+            } else if (cursor_line < line_count - 1) {
+                push_undo();
+                lines[cursor_line] = realloc(lines[cursor_line],
+                    line_lengths[cursor_line] + line_lengths[cursor_line + 1] + 1);
+                memmove(&lines[cursor_line][line_lengths[cursor_line]],
+                        lines[cursor_line + 1], line_lengths[cursor_line + 1] + 1);
+                line_lengths[cursor_line] += line_lengths[cursor_line + 1];
+                memmove(&lines[cursor_line + 1], &lines[cursor_line + 2],
+                        (line_count - cursor_line - 2) * sizeof(char *));
+                memmove(&line_lengths[cursor_line + 1], &line_lengths[cursor_line + 2],
+                        (line_count - cursor_line - 2) * sizeof(int));
+                line_count--;
+                syn_valid_lines = MIN(syn_valid_lines, cursor_line);
+            }
+            sync_required = true;
+            p8_editor_mark_modified();
             break;
         default:
             if (keymod & KMOD_CTRL) {
