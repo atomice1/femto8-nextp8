@@ -142,8 +142,11 @@ static void handle_action(p8_dialog_t *dialog, int action)
             p8_dialog_action_t result = p8_dialog_run(&save_dialog);
             p8_dialog_cleanup(&save_dialog);
             if (result.type == DIALOG_RESULT_ACCEPTED) {
-                strtcpy(m_current_cart_file_name, file_name, sizeof(m_current_cart_file_name) - 1);
-                m_current_cart_file_name[sizeof(m_current_cart_file_name) - 1] = '\0';
+                if (p8_resolve_relative_path(m_current_cart_file_name, file_name, sizeof(m_current_cart_file_name), true) < 0) {
+                    const char *error_lines[] = { "invalid file name" };
+                    p8_show_error_dialog(error_lines, 1, P8_ERROR_ERROR);
+                    break;
+                }
                 handle_action(dialog, EDITOR_ACTION_SAVE);
             }
             break;
