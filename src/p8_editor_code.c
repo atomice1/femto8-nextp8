@@ -639,13 +639,11 @@ static void code_draw(const p8_dialog_t *dialog, void *user_data, int x, int y, 
     /* Status bar: last row of the content area. */
     {
         int sy = y + height - GLYPH_HEIGHT;
-        int total_chars = 0;
-        for (int l = 0; l < line_count; l++) total_chars += line_lengths[l];
-        char status[48];
-        snprintf(status, sizeof(status), "ln:%d col:%d  %dch",
-                 cursor_line + 1, cursor_col + 1, total_chars);
+        char status[32];
+        snprintf(status, sizeof(status), "ln:%d col:%d",
+                 cursor_line + 1, cursor_col + 1);
         overlay_draw_rectfill(x, sy, x + width - 1, sy + GLYPH_HEIGHT - 1, EDITOR_BG_HIGHLIGHT);
-        overlay_draw_simple_text(status, x, sy, EDITOR_TEXT_NORMAL);
+        overlay_draw_simple_text(status, x, sy, EDITOR_TEXT_HIGHLIGHT);
     }
 }
 
