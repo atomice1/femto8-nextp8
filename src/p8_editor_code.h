@@ -7,7 +7,7 @@
 extern p8_editor_tab_t p8_subeditor_code;
 
 /** Invalidate the code editor line cache */
-void p8_editor_code_invalidate(void);
+void p8_editor_invalidate(void);
 
 /** Set current line number */
 void p8_editor_code_set_line(int line);

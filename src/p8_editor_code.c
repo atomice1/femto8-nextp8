@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "p8_cstore.h"
 #include "p8_dialog.h"
 #include "p8_editor.h"
 #include "p8_editor_code.h"
@@ -60,7 +61,7 @@ static int select_start_col = -1;
 static int select_end_line = -1;
 static int select_end_col = -1;
 static bool puny_mode = false;
-static bool code_modified = false;
+static bool sync_required = false;
 
 /* --- Clipboard, search, and undo state ------------------------------------- */
 
@@ -122,7 +123,7 @@ static void free_lines(void)
         line_count = 0;
     }
 
-    code_modified = true;
+    sync_required = true;
 }
 
 /* Extend the per-line colour cache from syn_valid_lines up to line_count.
@@ -334,7 +335,8 @@ static void delete_selected_text(void)
         line_count -= rm;
     }
     syn_valid_lines = MIN(syn_valid_lines, cursor_line);
-    code_modified = true;
+    sync_required = true;
+    p8_editor_mark_modified();
     clear_selection();
 }
 
@@ -371,7 +373,8 @@ static void insert_text_at_cursor(const char *text)
             break;
         }
     }
-    code_modified = true;
+    sync_required = true;
+    p8_editor_mark_modified();
 }
 
 /* --- Undo / redo ----------------------------------------------------------- */
@@ -504,7 +507,8 @@ static void duplicate_line(void)
     line_lengths[cursor_line + 1] = line_lengths[cursor_line];
     cursor_line++;
     syn_valid_lines = MIN(syn_valid_lines, cursor_line);
-    code_modified = true;
+    sync_required = true;
+    p8_editor_mark_modified();
 }
 
 /* --- Comment / uncomment --------------------------------------------------- */
@@ -531,7 +535,8 @@ static void comment_uncomment(void)
         }
     }
     syn_valid_lines = MIN(syn_valid_lines, sl);
-    code_modified = true;
+    sync_required = true;
+    p8_editor_mark_modified();
 }
 
 /* --- Indent / unindent ----------------------------------------------------- */
@@ -561,7 +566,8 @@ static void indent_lines(bool unindent)
         if (cursor_col > line_lengths[cursor_line]) cursor_col = line_lengths[cursor_line];
     }
     syn_valid_lines = MIN(syn_valid_lines, sl);
-    code_modified = true;
+    sync_required = true;
+    p8_editor_mark_modified();
 }
 
 /* Draw one line of source text with syntax highlighting.
@@ -818,7 +824,8 @@ text_input:;
                             cursor_line--;
                             syn_valid_lines = MIN(syn_valid_lines, cursor_line);
                         }
-                        code_modified = true;
+                        sync_required = true;
+                        p8_editor_mark_modified();
                         break;
                     case 13: /* return */
                         clear_selection();
@@ -836,7 +843,8 @@ text_input:;
                         cursor_line++;
                         cursor_col = 0;
                         syn_valid_lines = MIN(syn_valid_lines, cursor_line - 1);
-                        code_modified = true;
+                        sync_required = true;
+                        p8_editor_mark_modified();
                         break;
                     default:
                         if (keypress >= 32) {
@@ -854,7 +862,8 @@ text_input:;
                             lines[cursor_line][cursor_col] = (char)keypress;
                             cursor_col++;
                             syn_valid_lines = MIN(syn_valid_lines, cursor_line);
-                            code_modified = true;
+                            sync_required = true;
+                            p8_editor_mark_modified();
                         }
                 }
             }
@@ -961,11 +970,6 @@ static void code_show(void)
     }
 }
 
-static void code_hide(void)
-{
-    p8_editor_code_sync();
-}
-
 static void code_init(void)
 {
     assert(lines == NULL);
@@ -989,7 +993,7 @@ static void code_init(void)
     select_end_line   = -1;
     select_end_col    = -1;
     puny_mode = false;
-    code_modified = false;
+    sync_required = false;
 }
 
 static void code_shutdown(void)
@@ -1003,12 +1007,20 @@ static void code_shutdown(void)
     undo_depth = 0;
 }
 
-/* --- Public API --- */
-
-void p8_editor_code_invalidate(void)
+static void code_invalidate(void)
 {
     free_lines();
 }
+
+static void code_sync(void)
+{
+    if (sync_required) {
+        join_lines(&m_lua_script);
+        sync_required = false;
+    }
+}
+
+/* --- Public API --- */
 
 void p8_editor_code_set_line(int line)
 {
@@ -1018,21 +1030,14 @@ void p8_editor_code_set_line(int line)
     cursor_col = 0;
 }
 
-void p8_editor_code_sync(void)
-{
-    if (code_modified) {
-        join_lines(&m_lua_script);
-        code_modified = false;
-    }
-}
-
 p8_editor_tab_t p8_subeditor_code = {
     "cod",
     .init=code_init,
     .shutdown=code_shutdown,
     .show=code_show,
-    .hide=code_hide,
     .draw=code_draw,
+    .sync=code_sync,
+    .invalidate=code_invalidate,
     .handle_keypress=code_handle_keypress,
-    .handle_mouse=code_handle_mouse,
+    .handle_mouse=code_handle_mouse
 };

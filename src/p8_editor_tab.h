@@ -57,6 +57,11 @@ typedef struct {
     void (*hide)(void);
 
     /**
+     * Synchronize the sub-editor with the current cart state. Called when the cart is saved or when the sub-editor is shown. May be NULL if no synchronization is needed.
+     */
+    void (*sync)(void);
+
+    /**
      * Invalidate any cached data from the current cart. Called when a new cart is loaded. May be NULL if no cached data needs invalidating.
      */
     void (*invalidate)(void);

@@ -18,4 +18,10 @@ typedef enum {
 
 extern p8_screen_t p8_screen_edit;
 
+/** Invalidate the editors after cart load or reset */
+extern void p8_editor_invalidate(void);
+
+/** Mark the cart as modified */
+extern void p8_editor_mark_modified(void);
+
 #endif

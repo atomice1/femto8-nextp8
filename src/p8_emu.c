@@ -304,7 +304,7 @@ int p8_load(const char *file_name, const char *param, const char *bbs_cart_id, c
     strtcpy(m_bbs_cart_id, bbs_cart_id ? bbs_cart_id : "", sizeof(m_bbs_cart_id));
     strtcpy(m_breadcrumb, breadcrumb ? breadcrumb : "", sizeof(m_breadcrumb));
 
-    p8_editor_code_invalidate();
+    p8_editor_invalidate();
 
     if (bbs_cart_id) {
         m_current_cart_file_name[0] = '\0';
@@ -1032,7 +1032,7 @@ void p8_new_cart(void)
     memset(m_cart_memory, 0, CART_MEMORY_SIZE);
     memset(m_memory, 0, CART_MEMORY_SIZE);
     m_lua_script[0] = '\0';
-    p8_editor_code_invalidate();
+    p8_editor_invalidate();
     p8_common_reset_cart();
 }
 
