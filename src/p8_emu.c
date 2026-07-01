@@ -1341,12 +1341,16 @@ void p8_show_lua_error_dialog(void)
 {
     const char *err_type;
     char err_msg[256];
+    int lineno = 0;
     err_msg[0] = '\0';
-    lua_get_error(&err_type, err_msg, sizeof(err_msg), NULL, NULL);
+    lua_get_error(&err_type, err_msg, sizeof(err_msg), NULL, &lineno);
 
     const char *lines[] = {
         err_type ? err_type : "",
         err_msg
     };
     p8_show_error_dialog(lines, 2, P8_ERROR_ERROR);
+
+    if (lineno > 0)
+        p8_editor_code_set_line(lineno);
 }

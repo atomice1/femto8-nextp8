@@ -1053,8 +1053,17 @@ void p8_editor_code_set_line(int line)
 {
     if (line < 1) line = 1;
     if (line > line_count) line = line_count;
-    cursor_line = line - 1;
-    cursor_col = 0;
+    if (cursor_line != line) {
+        cursor_line = line - 1;
+        cursor_col = 0;
+        scroll_offset_x = 0;
+        const int height = P8_HEIGHT - GLYPH_HEIGHT - 1;
+        const int lines_per_page = (height - GLYPH_HEIGHT) / GLYPH_HEIGHT;
+        if (cursor_line < scroll_offset_y + 4)
+            scroll_offset_y = MAX(MIN(cursor_line - 4, line_count - lines_per_page), 0);
+        if (cursor_line >= scroll_offset_y + lines_per_page - 4)
+            scroll_offset_y = MAX(cursor_line - lines_per_page + 5, 0);
+    }
 }
 
 p8_editor_tab_t p8_subeditor_code = {
