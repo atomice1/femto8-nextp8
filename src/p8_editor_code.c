@@ -830,6 +830,7 @@ text_input:;
                         if (select_start_line != -1) {
                             push_undo(); delete_selected_text();
                         } else if (cursor_col > 0) {
+                            push_undo();
                             memmove(&lines[cursor_line][cursor_col - 1],
                                     &lines[cursor_line][cursor_col],
                                     line_lengths[cursor_line] - cursor_col + 1);
@@ -837,6 +838,7 @@ text_input:;
                             line_lengths[cursor_line]--;
                             syn_valid_lines = MIN(syn_valid_lines, cursor_line);
                         } else if (cursor_line > 0) {
+                            push_undo();
                             cursor_col = line_lengths[cursor_line - 1];
                             lines[cursor_line - 1] = realloc(lines[cursor_line - 1],
                                 line_lengths[cursor_line - 1] + line_lengths[cursor_line] + 1);
@@ -856,6 +858,7 @@ text_input:;
                         break;
                     case 13: /* return */
                         clear_selection();
+                        push_undo();
                         line_count++;
                         lines = realloc(lines, line_count * sizeof(char *));
                         line_lengths = realloc(line_lengths, line_count * sizeof(int));
@@ -875,6 +878,7 @@ text_input:;
                         break;
                     default:
                         if (keypress >= 32) {
+                            push_undo();
                             if (select_start_line != -1) delete_selected_text();
                             if (keypress >= 'A' && keypress <= 'Z')
                                 keypress = keypress - 'A' + 128;
