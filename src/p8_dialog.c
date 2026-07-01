@@ -736,6 +736,10 @@ p8_dialog_action_t p8_dialog_run(p8_dialog_t *dialog)
 
     p8_dialog_set_showing(dialog, false);
 
+    while (p8_get_next_keypress(NULL, NULL, NULL)) {
+        // Clear any remaining keypresses to avoid them affecting the next dialog
+    }
+
     return result;
 }
 
