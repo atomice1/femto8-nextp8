@@ -14,7 +14,6 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#pragma comment(lib, "ws2_32.lib")
 typedef int socklen_t;
 #define close(s) closesocket(s)
 #else
@@ -199,13 +198,13 @@ int net_send(const void *data, unsigned length)
         ssize_t n;
 
         if (is_ssl_connection) {
-            n = SSL_write(ssl, ptr + sent, length - sent);
+            n = SSL_write(ssl, (const void *) ptr + sent, length - sent);
             if (n <= 0) {
                 errno = EIO;
                 return -1;
             }
         } else {
-            n = send(sockfd, ptr + sent, length - sent, 0);
+            n = send(sockfd, (const void *) ptr + sent, length - sent, 0);
             if (n < 0) {
                 return -1;
             }

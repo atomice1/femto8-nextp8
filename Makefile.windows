@@ -1,6 +1,7 @@
 # SDL2: use system-installed SDL2 dev package via pkg-config.
 SDL_CFLAGS_RAW := $(shell pkg-config --cflags sdl2 2>/dev/null)
 SDL_LIBS_RAW   := $(shell pkg-config --libs   sdl2 2>/dev/null)
+OPENSSL_LIBS   ?= -lssl -lcrypto -lws2_32 -lgdi32
 
 ifeq ($(strip $(SDL_CFLAGS_RAW)),)
   $(error SDL development files not found. In MSYS2 UCRT64 install mingw-w64-ucrt-x86_64-SDL2 and mingw-w64-ucrt-x86_64-pkgconf.)
@@ -14,4 +15,4 @@ SDL_LIBS := $(filter-out -lSDLmain -lmingw32 -mwindows,$(SDL_LIBS_RAW))
 
 LDFLAGS += -mconsole
 
-LIBS += $(SDL_LIBS) -lpsapi -lws2_32 -lwinmm -lssl -lcrypto
+LIBS += $(SDL_LIBS) -lpsapi -lws2_32 -lwinmm $(OPENSSL_LIBS)

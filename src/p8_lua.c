@@ -1822,7 +1822,7 @@ int printh(lua_State *L)
 }
 
 // stat(n)
-int _stat(lua_State *L)
+int lua_stat(lua_State *L)
 {
     int n = lua_tointeger(L, 1);
 
@@ -2486,7 +2486,7 @@ void lua_register_functions(lua_State *L)
     // ****************************************************************
     // lua_register(L, "assert", assert);
     lua_register(L, "printh", printh);
-    lua_register(L, "stat", _stat);
+    lua_register(L, "stat", lua_stat);
     lua_register(L, "stop", _stop);
     lua_register(L, "trace", _trace);
     // ****************************************************************
@@ -2787,9 +2787,9 @@ void lua_get_error(const char **err_type, char *err, int err_size, const char **
             const char *colon = strrchr(err_msg, ':');
             if (colon)
                 err_msg = colon + 2;
-            const char *near = strstr(err_msg, " near ");
-            if (near)
-                *(char *)near = '\0';
+            const char *near_kw = strstr(err_msg, " near ");
+            if (near_kw)
+                *(char *)near_kw = '\0';
             if (strstr(err_msg, "syntax error") == NULL)
                 strtcpy(err, err_msg, err_size);
         }
