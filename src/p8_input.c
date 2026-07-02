@@ -244,7 +244,7 @@ void p8_update_input()
             break;
         case SDL_MOUSEBUTTONDOWN:
             if (event.button.button == 1) {
-                if (!m_mouse_buttons & 0x1)
+                if (!(m_mouse_buttons & 0x1))
                     m_mouse_buttonsp |= 0x1;
                 m_mouse_buttons |= 0x1;
                 if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)

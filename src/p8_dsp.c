@@ -13,7 +13,7 @@
 
 int random_range(int min, int max)
 {
-    return min + ((float)rand() / RAND_MAX) * (max - min);
+    return min + ((float)rand() / (float)RAND_MAX) * (max - min);
 }
 
 void dsp_square_wave(uint32_t frequency, int16_t amplitude, int16_t offset, int position, int dest_offset, int dest_length, int16_t *dest)

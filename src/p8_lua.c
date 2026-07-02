@@ -545,7 +545,7 @@ int print(lua_State *L)
         draw_text(str, len, x, y, col, left_margin_get(), false, &x, &y, &right);
         cursor_set(x, y, -1);
     }
-    else if (lua_gettop(L) >= 3)
+    else
     {
         int x = lua_tointeger(L, 2);
         int y = lua_tointeger(L, 3);
@@ -2236,7 +2236,7 @@ int ls(lua_State *L)
 
 // reboot()
 // Reboot the machine / start a new project.
-int reboot(lua_State *L)
+int lua_reboot(lua_State *L)
 {
     (void)L;
     p8_abort();
@@ -2435,7 +2435,7 @@ void lua_register_functions(lua_State *L)
     lua_register(L, "_set_fps", set_fps);
     lua_register(L, "save", save);
     lua_register(L, "ls", ls);
-    lua_register(L, "reboot", reboot);
+    lua_register(L, "reboot", lua_reboot);
     lua_register(L, "cd", cd);
     lua_register(L, "mkdir", lua_mkdir);
     // ****************************************************************

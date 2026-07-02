@@ -450,7 +450,6 @@ static int parse_p8_ram(const char *file_name, uint8_t *buffer, int size, uint8_
     int lua_start = 0, lua_end = 0;
     int p8_type = P8TYPE_START;
     int file_offset = 0;
-    int read_offset = 0;
     int write_offset = 0;
     int read_length = 0;
     int write_length = 0;
@@ -477,7 +476,6 @@ static int parse_p8_ram(const char *file_name, uint8_t *buffer, int size, uint8_
             if (strncmp(line, m_p8_name[i], strlen(m_p8_name[i])) == 0)
             {
                 p8_type = i;
-                read_offset = 0;
                 write_offset = 0;
                 token_found = 1;
                 break;
@@ -542,7 +540,6 @@ static int parse_p8_ram(const char *file_name, uint8_t *buffer, int size, uint8_
             if (read_length > 0)
                 read_sfx(write_mem, tmpbuf, read_length, &write_length);
 
-            read_offset += read_length;
             write_offset += write_length;
             break;
         }
@@ -555,7 +552,6 @@ static int parse_p8_ram(const char *file_name, uint8_t *buffer, int size, uint8_
             if (read_length > 0)
                 read_music(write_mem, tmpbuf, read_length, &write_length);
 
-            read_offset += read_length;
             write_offset += write_length;
             break;
         }
