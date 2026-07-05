@@ -408,6 +408,14 @@ void p8_editor_mark_modified(void)
     cart_modified = true;
 }
 
+void p8_editor_sync(void)
+{
+    for (int i = 0; i < P8_TAB_COUNT; i++) {
+        if (tab_subeditors[i]->sync)
+            tab_subeditors[i]->sync();
+    }
+}
+
 p8_screen_t p8_screen_edit = {
     .init = editor_screen_init,
     .shutdown = editor_screen_shutdown,

@@ -121,7 +121,9 @@ static void free_lines(void)
         for (int i = 0; i < line_count; i++)
             free(lines[i]);
         free(lines);
+        free(line_lengths);
         lines = NULL;
+        line_lengths = NULL;
         line_count = 0;
     }
 
@@ -186,10 +188,13 @@ static void split_lines(const char *script)
 {
     assert(lines == NULL);
 
-    // Count lines
+    // Count lines - a trailing newline doesn't create an extra empty line
     line_count = 1;
-    for (const char *p = script; *p; p++) {
-        if (*p == '\n')
+    int len = strlen(script);
+
+    // Count newline characters
+    for (int i = 0; i < len - 1; i++) {
+        if (script[i] == '\n')
             line_count++;
     }
 
@@ -210,11 +215,15 @@ static void split_lines(const char *script)
     for (const char *p = script; ; p++) {
         if (*p == '\n' || *p == '\0') {
             bool eof = *p == '\0';
-            lines[line_index] = malloc(p - start_of_line + 1);
-            memcpy(lines[line_index], start_of_line, p - start_of_line);
-            lines[line_index][p - start_of_line] = '\0';
-            line_lengths[line_index] = p - start_of_line;
-            line_index++;
+            // Don't create an empty line at the end if the string ends with \n
+            int line_len = p - start_of_line;
+            if (line_len > 0 || len == 0 || !eof) {
+                lines[line_index] = malloc(line_len + 1);
+                memcpy(lines[line_index], start_of_line, line_len);
+                lines[line_index][line_len] = '\0';
+                line_lengths[line_index] = line_len;
+                line_index++;
+            }
             start_of_line = p + 1;
             if (eof)
                 break;
@@ -857,6 +866,7 @@ text_input:;
                         sync_required = true;
                         p8_editor_mark_modified();
                         break;
+                    case '\n': /* newline */
                     case 13: /* return */
                         clear_selection();
                         push_undo();

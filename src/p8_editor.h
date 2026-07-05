@@ -24,4 +24,7 @@ extern void p8_editor_invalidate(void);
 /** Mark the cart as modified */
 extern void p8_editor_mark_modified(void);
 
+/** Synchronize all editor tabs with the current cart state */
+extern void p8_editor_sync(void);
+
 #endif
