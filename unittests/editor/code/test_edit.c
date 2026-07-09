@@ -346,3 +346,17 @@ void test_comment(void **state)
 
     assert_line_equal(0, "Hello");
 }
+
+void test_long_line(void **state)
+{
+    split_lines("");
+
+    char expected[65537];
+    for (int i=0;i<65536;++i) {
+        code_handle_keypress(0, '0'+(i%10), 0);
+        expected[i] = '0'+(i%10);
+    }
+    expected[65536] = '\0';
+
+    assert_line_equal(0, expected);
+}
