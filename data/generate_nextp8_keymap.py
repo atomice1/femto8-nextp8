@@ -41,9 +41,11 @@ def get_usb_hid_name_from_ps2_name(ps2_name):
             return 'Delete Forward'
         case 'NumberLock':
             return 'Locking Num Lock'
+        case '0 (zero)':
+            return '0 and )'
     best_match = None
     for _, usb_name in USB_HID_SCANCODES:
-        print(usb_name)
+        #print(usb_name)
         if usb_name.lower() == ps2_name.lower():
             best_match = usb_name
             break
@@ -98,9 +100,16 @@ def get_unicode_from_usb_hid_name(keymod, usb_hid_name):
             return ''
         case 'Return (ENTER)' | 'Keypad ENTER':
             return '\n'
+        case 'Non-US # and ˜':
+            return '~' if keymod & SHIFT else '#'
     match = re.match(r'(?:Keypad )?([^ ]+) and ([^ ]+)', usb_hid_name)
     if match:
-        return match.group(2) if keymod & SHIFT else match.group(1)
+        c = match.group(2) if keymod & SHIFT else match.group(1)
+        return c if len(c) == 1 else None
+    match = re.match(r'Keypad ([^ ]+)', usb_hid_name)
+    if match:
+        c = match.group(1)
+        return c if len(c) == 1 else None
     return None
 
 def get_unicode_from_ps2_name(keymod, ps2_name):
@@ -137,6 +146,10 @@ def get_ps2_name_from_spectrum_name(spectrum_name):
         case '0':
             return '0 (zero)'
     return spectrum_name
+
+def get_usb_hid_name_from_spectrum_name(spectrum_name):
+    ps2_name = get_ps2_name_from_spectrum_name(spectrum_name)
+    return ps2_name_to_usb_hid_name[ps2_name]
 
 def get_ps2_scancode_from_nextp8_scancode(nextp8_scancode):
     if nextp8_scancode < 0x80:
@@ -223,19 +236,19 @@ for scancode, key_name in MKEYBOARD_SCANCODES:
 
 mkeyboard_keymap = [{}, {}, {}, {}]
 for keymod in range(0, 2):
-    for scancode, unicode in ps2_keymap[keymod].items():
+    for scancode, unicode in usb_hid_keymap[keymod].items():
         mkeyboard_keymap[keymod][scancode] = unicode
         mkeyboard_keymap[keymod | CTRL][scancode] = None
 
 for (key_name, keymod, unicode) in SPECTRUM_KEYMAP:
-    ps2_name = get_ps2_name_from_spectrum_name(key_name)
-    ps2_scancode = name_to_ps2_scancode[ps2_name]
+    usb_hid_name = get_usb_hid_name_from_spectrum_name(key_name)
+    usb_hid_scancode = name_to_usb_hid_scancode[usb_hid_name]
     if unicode == '↑':
         unicode = '^'
     elif unicode == '£':
         unicode = '$'
     if len(unicode) == 1 and ord(unicode) >= 32 and ord(unicode) <= 127:
-        mkeyboard_keymap[keymod][ps2_scancode] = unicode
+        mkeyboard_keymap[keymod][usb_hid_scancode] = unicode
 
 def main():
     # Build rows first so we can compute column widths for neat alignment
@@ -278,13 +291,8 @@ def main():
         print(' | '.join(r[i].ljust(widths[i])[0:widths[i]] for i in range(len(r))))
 
     # PS/2 scancodes to USB HID / SDL2 scancodes:
-    '''
-    unsigned nextp8_scancode_to_sdl_scancode[NUM_SCANCODES] = {
-        0, 66, 0, 62, 60, 58, 59, 69,     // F9, F5, F3, F1, F2, F12
-        ...
-    '''
 
-    print('unsigned nextp8_scancode_to_sdl_scancode[NUM_SCANCODES] = {')
+    print('unsigned ps2_scancode_to_usb_hid_scancode[256] = {')
     row = []
     comment = []
     for nextp8_scancode in range(0, 256):
@@ -303,22 +311,21 @@ def main():
             comment = []
     print('};')
 
-    # PS/2 scancodes + modifiers to ASCII:
+    # USB HID scancodes + modifiers to ASCII:
 
     '''
-    char ps2_scancode_to_name[2][256] = {
+    char usb_hid_scancode_to_name[2][256] = {
         {
             ...
     '''
-    print('char ps2_scancode_to_name[2][256] = {')
+    print('char usb_hid_scancode_to_name[2][256] = {')
     row = []
     comment = []
     for keymod in range(0, 2):
         print(f'    // {"Shift" if keymod & SHIFT else "Unshifted"}')
         print('    {')
-        for nextp8_scancode in range(0, 256):
-            ps2_scancode = get_ps2_scancode_from_nextp8_scancode(nextp8_scancode)
-            unicode = ps2_keymap[keymod].get(ps2_scancode)
+        for usb_hid_scancode in range(0, 256):
+            unicode = usb_hid_keymap[keymod].get(usb_hid_scancode)
             if not unicode:
                 unicode = '\\0'
             else:
@@ -330,7 +337,7 @@ def main():
             elif unicode == '\b':
                 unicode = '\\b'
             row.append(unicode)
-            name = ps2_scancode_to_name.get(ps2_scancode)
+            name = usb_hid_scancode_to_name.get(usb_hid_scancode)
             if name:
                 name = name.replace('(keypad) ', 'KP ').replace('(multimedia) ', '').replace('(ACPI) ', '').replace('WWW ', '')
                 comment.append(name)
@@ -343,7 +350,7 @@ def main():
         print('    },')
     print('};')
 
-    # nextp8 membrane scancodes (PS/2 scancodes) + modifiers to PS/2 scancodes + modifiers
+    # membrane scancodes (USB HID scancode) + modifiers to USB HID scancodes + modifiers
     '''
     char memb_scancode_to_name[4][256] = {
         {
@@ -351,13 +358,12 @@ def main():
     '''
     print('char memb_scancode_to_name[4][256] = {')
     row = []
-    comment = []
+    #comment = []
     for keymod in range(0, 4):
         print(f'    // {["Unshifted", "Shift", "Ctrl", "Shift + Ctrl"][keymod]}')
         print('    {')
-        for nextp8_scancode in range(0, 256):
-            ps2_scancode = get_ps2_scancode_from_nextp8_scancode(nextp8_scancode)
-            unicode = mkeyboard_keymap[keymod].get(ps2_scancode)
+        for memb_scancode in range(0, 256):
+            unicode = mkeyboard_keymap[keymod].get(memb_scancode)
             if not unicode:
                 unicode = '\\0'
             else:
@@ -369,16 +375,17 @@ def main():
             elif unicode == '\b':
                 unicode = '\\b'
             row.append(unicode)
-            name = ps2_scancode_to_name.get(ps2_scancode)
-            if name:
-                name = name.replace('(keypad) ', 'KP ').replace('(multimedia) ', '').replace('(ACPI) ', '').replace('WWW ', '')
-                comment.append(name)
+            #name = usb_hid_scancode_to_name.get(memb_scancode)
+            #if name:
+            #    name = name.replace('(keypad) ', 'KP ').replace('(multimedia) ', '').replace('(ACPI) ', '').replace('WWW ', '')
+            #    comment.append(name)
             if len(row) == 8:
                 code = ', '.join([f"'{s}'" for s in row]) + ','
-                comment_str = ', '.join(comment)
-                print(f'        {code:<50} // {comment_str}')
+                #comment_str = ', '.join(comment)
+                #print(f'        {code:<50} // {comment_str}')
+                print(f'        {code:<50}')
                 row = []
-                comment = []
+                #comment = []
         print('    },')
     print('};')
 

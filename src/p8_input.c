@@ -67,36 +67,36 @@ static void update_buttons(int index, int button, bool state)
 #endif
 
 #ifdef NEXTP8
-#define KEY_CURSOR_LEFT  235
-#define KEY_CURSOR_DOWN  242
-#define KEY_CURSOR_RIGHT 244
-#define KEY_CURSOR_UP    245
-#define KEY_Z             26
-#define KEY_X             34
-#define KEY_N             49
-#define KEY_M             58
-#define KEY_C             33
-#define KEY_V             42
-#define KEY_S             27
-#define KEY_D             35
-#define KEY_F             43
-#define KEY_E             36
-#define KEY_TAB           13
-#define KEY_Q             21
-#define KEY_LEFT_SHIFT    18
-#define KEY_A             28
-#define KEY_RIGHT_SHIFT   89
-#define KEY_ENTER         0x5a
-#define KEY_BREAK         0x76
-#define KEY_P             0x4d
-#define KEY_PAGE_UP       0xfd
-#define KEY_PAGE_DOWN     0xfa
-#define KEY_LEFT_ALT      0x11
-#define KEY_RIGHT_ALT     0x91
-#define KEY_LEFT_CTRL     0x14
-#define KEY_RIGHT_CTRL    0x94
-#define KEY_LEFT_GUI      0x9F
-#define KEY_RIGHT_GUI     0xA7
+#define KEY_CURSOR_LEFT   0x50
+#define KEY_CURSOR_DOWN   0x51
+#define KEY_CURSOR_RIGHT  0x4f
+#define KEY_CURSOR_UP     0x52
+#define KEY_Z             0x1d
+#define KEY_X             0x1b
+#define KEY_N             0x11
+#define KEY_M             0x10
+#define KEY_C             0x06
+#define KEY_V             0x19
+#define KEY_S             0x16
+#define KEY_D             0x07
+#define KEY_F             0x09
+#define KEY_E             0x08
+#define KEY_TAB           0x2b
+#define KEY_Q             0x14
+#define KEY_LEFT_SHIFT    0xe1
+#define KEY_A             0x04
+#define KEY_RIGHT_SHIFT   0xe5
+#define KEY_ENTER         0x28
+#define KEY_BREAK         0x29
+#define KEY_P             0x13
+#define KEY_PAGE_UP       0x4b
+#define KEY_PAGE_DOWN     0x4e
+#define KEY_LEFT_ALT      0xe2
+#define KEY_RIGHT_ALT     0xe6
+#define KEY_LEFT_CTRL     0xe0
+#define KEY_RIGHT_CTRL    0xe4
+#define KEY_LEFT_GUI      0xe3
+#define KEY_RIGHT_GUI     0xe7
 
 #define JOY_UP      (1 << 0)
 #define JOY_DOWN    (1 << 1)
@@ -105,255 +105,220 @@ static void update_buttons(int index, int button, bool state)
 #define JOY_BUTTON1 (1 << 4)
 #define JOY_BUTTON2 (1 << 5)
 
-char ps2_scancode_to_name[2][256] = {
+char usb_hid_scancode_to_name[2][256] = {
     // Unshifted
     {
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F9, F5, F3, F1, F2, F12
-        '\0', '\0', '\0', '\0', '\0', '\t', '`', '\0',     // F10, F8, F6, F4, tab, ` (back tick)
-        '\0', '\0', '\0', '\0', '\0', 'q', '1', '\0',      // left alt, left shift, left control, Q, 1
-        '\0', '\0', 'z', 's', 'a', 'w', '2', '\0',         // Z, S, A, W, 2
-        '\0', 'c', 'x', 'd', 'e', '4', '3', '\0',          // C, X, D, E, 4, 3
-        '\0', ' ', 'v', 'f', 't', 'r', '5', '\0',          // space, V, F, T, R, 5
-        '\0', 'n', 'b', 'h', 'g', 'y', '6', '\0',          // N, B, H, G, Y, 6
-        '\0', '\0', 'm', 'j', 'u', '7', '8', '\0',         // M, J, U, 7, 8
-        '\0', ',', 'k', 'i', 'o', '0', '9', '\0',          // ,, K, I, O, 0 (zero), 9
-        '\0', '.', '/', 'l', ';', 'p', '-', '\0',          // ., /, L, ;, P, -
-        '\0', '\0', '\'', '\0', '[', '=', '\0', '\0',      // ', [, =
-        '\0', '\0', '\n', ']', '\0', '\\', '\0', '\0',     // CapsLock, right shift, enter, ],
-        '\0', '\0', '\0', '\0', '\0', '\0', '\b', '\0',    // backspace
-        '\0', '1', '\0', '4', '7', '\0', '\0', '\0',       // KP 1, KP 4, KP 7
-        '0', '.', '2', '\0', '6', '8', '\0', '\0',         // KP 0, KP ., KP 2, KP 5, KP 6, KP 8, escape, NumberLock
-        '\0', '\0', '3', '\0', '\0', '9', '\0', '\0',      // F11, KP +, KP 3, KP -, KP *, KP 9, ScrollLock
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // search, right alt, right control, previous track
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // favourites, left GUI
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // refresh, volume down, mute, right GUI
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // stop, calculator, apps
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // forward, volume up, play/pause, power
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // back, home, stop, sleep
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // my computer
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // email, KP /, next track
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // media select
-        '\0', '\0', '\n', '\0', '\0', '\0', '\0', '\0',    // KP enter, wake
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // end, cursor left, home
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // insert, delete, cursor down, cursor right, cursor up
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // page down, page up
+        '\0', '\0', '\0', '\0', 'a', 'b', 'c', 'd',        // ErrorRollOver, POSTFail, ErrorUndefined, a and A, b and B, c and C, d and D
+        'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',            // e and E, f and F, g and G, h and H, i and I, j and J, k and K, l and L
+        'm', 'n', 'o', 'p', 'q', 'r', 's', 't',            // m and M, n and N, o and O, p and P, q and Q, r and R, s and S, t and T
+        'u', 'v', 'w', 'x', 'y', 'z', '1', '2',            // u and U, v and V, w and W, x and X, y and Y, z and Z, 1 and !, 2 and @
+        '3', '4', '5', '6', '7', '8', '9', '0',            // 3 and #, 4 and $, 5 and %, 6 and ^, 7 and &, 8 and *, 9 and (, 0 and )
+        '\n', '\0', '\b', '\t', ' ', '-', '=', '[',        // Return (ENTER), ESCAPE, DELETE (Backspace), Tab, Spacebar, - and (underscore), = and +, [ and {
+        ']', '\\', '#', ';', '\'', '`', ',', '.',          // ] and }, \ and |, Non-US # and ˜, ; and :, ‘ and “, Grave Accent and Tilde, , and <, . and >
+        '/', '\0', '\0', '\0', '\0', '\0', '\0', '\0',     // / and ?, Caps Lock, F1, F2, F3, F4, F5, F6
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F7, F8, F9, F10, F11, F12, PrintScreen, Scroll Lock
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Pause, Insert, Home, PageUp, Delete Forward, End, PageDown, RightArrow
+        '\0', '\0', '\0', '\0', '/', '*', '-', '+',        // LeftArrow, DownArrow, UpArrow, Keypad Num Lock and Clear, Keypad /, Keypad *, Keypad -, Keypad +
+        '\n', '1', '2', '3', '4', '5', '6', '7',           // Keypad ENTER, Keypad 1 and End, Keypad 2 and Down Arrow, Keypad 3 and PageDn, Keypad 4 and Left Arrow, Keypad 5, Keypad 6 and Right Arrow, Keypad 7 and Home
+        '8', '9', '0', '.', '\0', '\0', '\0', '=',         // Keypad 8 and Up Arrow, Keypad 9 and PageUp, Keypad 0 and Insert, Keypad . and Delete, Non-US \and |, Application, Power, Keypad =
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F13, F14, F15, F16, F17, F18, F19, F20
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F21, F22, F23, F24, Execute, Help, Menu, Keyboard
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Stop, Again, Undo, Cut, Copy, Paste, Find, Mute
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Volume Up, Volume Down, Locking Caps Lock, Locking Num Lock, Locking Scroll Lock, Keypad Comma, Keypad Equal Sign, International1
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // International2, International3, International4, International5, International6, International7, International82, International
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // LANG1, LANG2, LANG3, LANG4, LANG5, LANG6, LANG7, LANG8
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // LANG9, Alternate Erase, SysReq/Attention, Cancel, Clear, Prior, Return, Separator
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Out, Oper, Clear/Again, CrSel/Props, ExSel, Reserved, Reserved, Reserved
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Reserved, Reserved, Reserved, Reserved, Reserved, Reserved, Reserved, Reserved
+        '\0', '\0', '\0', '\0', '\0', '\0', '(', ')',      // Keypad 00, Keypad 000, Thousands Separator, Decimal Separator, Currency Unit, Currency Sub-unit, Keypad (, Keypad )
+        '{', '}', '\0', '\0', 'A', 'B', 'C', 'D',          // Keypad {, Keypad }, Keypad Tab, Keypad Backspace, Keypad A, Keypad B, Keypad C, Keypad D
+        'E', 'F', '\0', '^', '%', '<', '>', '&',           // Keypad E, Keypad F, Keypad XOR, Keypad ^, Keypad %, Keypad <, Keypad >, Keypad &
+        '\0', '|', '\0', ':', '#', '\0', '@', '!',         // Keypad &&, Keypad |, Keypad ||, Keypad :, Keypad #, Keypad Space, Keypad @, Keypad !
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Keypad Memory Store, Keypad Memory Recall, Keypad Memory Clear, Keypad Memory Add, Keypad Memory Subtract, Keypad Memory Multiply, Keypad Memory Divide, Keypad +/-
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Keypad Clear, Keypad Clear Entry, Keypad Binary, Keypad Octal, Keypad Decimal, Keypad Hexadecimal, Reserved, Reserved
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // LeftControl, LeftShift, LeftAlt, Left GUI, RightControl, RightShift, RightAlt, Right GUI
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    //
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    //
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    //
     },
     // Shift
     {
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F9, F5, F3, F1, F2, F12
-        '\0', '\0', '\0', '\0', '\0', '\t', '~', '\0',     // F10, F8, F6, F4, tab, ` (back tick)
-        '\0', '\0', '\0', '\0', '\0', 'Q', '!', '\0',      // left alt, left shift, left control, Q, 1
-        '\0', '\0', 'Z', 'S', 'A', 'W', '@', '\0',         // Z, S, A, W, 2
-        '\0', 'C', 'X', 'D', 'E', '$', '#', '\0',          // C, X, D, E, 4, 3
-        '\0', ' ', 'V', 'F', 'T', 'R', '%', '\0',          // space, V, F, T, R, 5
-        '\0', 'N', 'B', 'H', 'G', 'Y', '^', '\0',          // N, B, H, G, Y, 6
-        '\0', '\0', 'M', 'J', 'U', '&', '*', '\0',         // M, J, U, 7, 8
-        '\0', '<', 'K', 'I', 'O', ')', '(', '\0',          // ,, K, I, O, 0 (zero), 9
-        '\0', '>', '?', 'L', ':', 'P', '_', '\0',          // ., /, L, ;, P, -
-        '\0', '\0', '"', '\0', '{', '+', '\0', '\0',       // ', [, =
-        '\0', '\0', '\n', '}', '\0', '|', '\0', '\0',      // CapsLock, right shift, enter, ],
-        '\0', '\0', '\0', '\0', '\0', '\0', '\b', '\0',    // backspace
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // KP 1, KP 4, KP 7
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // KP 0, KP ., KP 2, KP 5, KP 6, KP 8, escape, NumberLock
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F11, KP +, KP 3, KP -, KP *, KP 9, ScrollLock
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // search, right alt, right control, previous track
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // favourites, left GUI
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // refresh, volume down, mute, right GUI
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // stop, calculator, apps
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // forward, volume up, play/pause, power
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // back, home, stop, sleep
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // my computer
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // email, KP /, next track
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // media select
-        '\0', '\0', '\n', '\0', '\0', '\0', '\0', '\0',    // KP enter, wake
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // end, cursor left, home
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // insert, delete, cursor down, cursor right, cursor up
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // page down, page up
+        '\0', '\0', '\0', '\0', 'A', 'B', 'C', 'D',        // ErrorRollOver, POSTFail, ErrorUndefined, a and A, b and B, c and C, d and D
+        'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',            // e and E, f and F, g and G, h and H, i and I, j and J, k and K, l and L
+        'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',            // m and M, n and N, o and O, p and P, q and Q, r and R, s and S, t and T
+        'U', 'V', 'W', 'X', 'Y', 'Z', '!', '@',            // u and U, v and V, w and W, x and X, y and Y, z and Z, 1 and !, 2 and @
+        '#', '$', '%', '^', '&', '*', '(', ')',            // 3 and #, 4 and $, 5 and %, 6 and ^, 7 and &, 8 and *, 9 and (, 0 and )
+        '\n', '\0', '\b', '\t', ' ', '_', '+', '{',        // Return (ENTER), ESCAPE, DELETE (Backspace), Tab, Spacebar, - and (underscore), = and +, [ and {
+        '}', '|', '~', ':', '"', '~', '<', '>',            // ] and }, \ and |, Non-US # and ˜, ; and :, ‘ and “, Grave Accent and Tilde, , and <, . and >
+        '?', '\0', '\0', '\0', '\0', '\0', '\0', '\0',     // / and ?, Caps Lock, F1, F2, F3, F4, F5, F6
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F7, F8, F9, F10, F11, F12, PrintScreen, Scroll Lock
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Pause, Insert, Home, PageUp, Delete Forward, End, PageDown, RightArrow
+        '\0', '\0', '\0', '\0', '/', '*', '-', '+',        // LeftArrow, DownArrow, UpArrow, Keypad Num Lock and Clear, Keypad /, Keypad *, Keypad -, Keypad +
+        '\n', '\0', '\0', '\0', '\0', '5', '\0', '\0',     // Keypad ENTER, Keypad 1 and End, Keypad 2 and Down Arrow, Keypad 3 and PageDn, Keypad 4 and Left Arrow, Keypad 5, Keypad 6 and Right Arrow, Keypad 7 and Home
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '=',     // Keypad 8 and Up Arrow, Keypad 9 and PageUp, Keypad 0 and Insert, Keypad . and Delete, Non-US \and |, Application, Power, Keypad =
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F13, F14, F15, F16, F17, F18, F19, F20
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F21, F22, F23, F24, Execute, Help, Menu, Keyboard
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Stop, Again, Undo, Cut, Copy, Paste, Find, Mute
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Volume Up, Volume Down, Locking Caps Lock, Locking Num Lock, Locking Scroll Lock, Keypad Comma, Keypad Equal Sign, International1
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // International2, International3, International4, International5, International6, International7, International82, International
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // LANG1, LANG2, LANG3, LANG4, LANG5, LANG6, LANG7, LANG8
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // LANG9, Alternate Erase, SysReq/Attention, Cancel, Clear, Prior, Return, Separator
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Out, Oper, Clear/Again, CrSel/Props, ExSel, Reserved, Reserved, Reserved
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Reserved, Reserved, Reserved, Reserved, Reserved, Reserved, Reserved, Reserved
+        '\0', '\0', '\0', '\0', '\0', '\0', '(', ')',      // Keypad 00, Keypad 000, Thousands Separator, Decimal Separator, Currency Unit, Currency Sub-unit, Keypad (, Keypad )
+        '{', '}', '\0', '\0', 'A', 'B', 'C', 'D',          // Keypad {, Keypad }, Keypad Tab, Keypad Backspace, Keypad A, Keypad B, Keypad C, Keypad D
+        'E', 'F', '\0', '^', '%', '<', '>', '&',           // Keypad E, Keypad F, Keypad XOR, Keypad ^, Keypad %, Keypad <, Keypad >, Keypad &
+        '\0', '|', '\0', ':', '#', '\0', '@', '!',         // Keypad &&, Keypad |, Keypad ||, Keypad :, Keypad #, Keypad Space, Keypad @, Keypad !
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Keypad Memory Store, Keypad Memory Recall, Keypad Memory Clear, Keypad Memory Add, Keypad Memory Subtract, Keypad Memory Multiply, Keypad Memory Divide, Keypad +/-
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Keypad Clear, Keypad Clear Entry, Keypad Binary, Keypad Octal, Keypad Decimal, Keypad Hexadecimal, Reserved, Reserved
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // LeftControl, LeftShift, LeftAlt, Left GUI, RightControl, RightShift, RightAlt, Right GUI
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    //
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    //
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    //
     },
 };
 
 char memb_scancode_to_name[4][256] = {
     // Unshifted
     {
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F9, F5, F3, F1, F2, F12
-        '\0', '\0', '\0', '\0', '\0', '\t', '`', '\0',     // F10, F8, F6, F4, tab, ` (back tick)
-        '\0', '\0', '\0', '\0', '\0', 'q', '1', '\0',      // left alt, left shift, left control, Q, 1
-        '\0', '\0', 'z', 's', 'a', 'w', '2', '\0',         // Z, S, A, W, 2
-        '\0', 'c', 'x', 'd', 'e', '4', '3', '\0',          // C, X, D, E, 4, 3
-        '\0', ' ', 'v', 'f', 't', 'r', '5', '\0',          // space, V, F, T, R, 5
-        '\0', 'n', 'b', 'h', 'g', 'y', '6', '\0',          // N, B, H, G, Y, 6
-        '\0', '\0', 'm', 'j', 'u', '7', '8', '\0',         // M, J, U, 7, 8
-        '\0', ',', 'k', 'i', 'o', '0', '9', '\0',          // ,, K, I, O, 0 (zero), 9
-        '\0', '.', '/', 'l', ';', 'p', '-', '\0',          // ., /, L, ;, P, -
-        '\0', '\0', '\'', '\0', '[', '=', '\0', '\0',      // ', [, =
-        '\0', '\0', '\n', ']', '\0', '\\', '\0', '\0',     // CapsLock, right shift, enter, ],
-        '\0', '\0', '\0', '\0', '\0', '\0', '\b', '\0',    // backspace
-        '\0', '1', '\0', '4', '7', '\0', '\0', '\0',       // KP 1, KP 4, KP 7
-        '0', '.', '2', '\0', '6', '8', '\0', '\0',         // KP 0, KP ., KP 2, KP 5, KP 6, KP 8, escape, NumberLock
-        '\0', '\0', '3', '\0', '\0', '9', '\0', '\0',      // F11, KP +, KP 3, KP -, KP *, KP 9, ScrollLock
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // search, right alt, right control, previous track
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // favourites, left GUI
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // refresh, volume down, mute, right GUI
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // stop, calculator, apps
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // forward, volume up, play/pause, power
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // back, home, stop, sleep
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // my computer
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // email, KP /, next track
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // media select
-        '\0', '\0', '\n', '\0', '\0', '\0', '\0', '\0',    // KP enter, wake
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // end, cursor left, home
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // insert, delete, cursor down, cursor right, cursor up
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // page down, page up
+        '\0', '\0', '\0', '\0', 'a', 'b', 'c', 'd',
+        'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
+        'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+        'u', 'v', 'w', 'x', 'y', 'z', '1', '2',
+        '3', '4', '5', '6', '7', '8', '9', '0',
+        '\n', '\0', '\b', '\t', ' ', '-', '=', '[',
+        ']', '\\', '#', ';', '\'', '`', ',', '.',
+        '/', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '/', '*', '-', '+',
+        '\n', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9', '0', '.', '\0', '\0', '\0', '=',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '(', ')',
+        '{', '}', '\0', '\0', 'A', 'B', 'C', 'D',
+        'E', 'F', '\0', '^', '%', '<', '>', '&',
+        '\0', '|', '\0', ':', '#', '\0', '@', '!',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
     },
     // Shift
     {
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F9, F5, F3, F1, F2, F12
-        '\0', '\0', '\0', '\0', '\0', '\t', '~', '\0',     // F10, F8, F6, F4, tab, ` (back tick)
-        '\0', '\0', '\0', '\0', '\0', 'Q', '!', '\0',      // left alt, left shift, left control, Q, 1
-        '\0', '\0', 'Z', 'S', 'A', 'W', '@', '\0',         // Z, S, A, W, 2
-        '\0', 'C', 'X', 'D', 'E', '$', '#', '\0',          // C, X, D, E, 4, 3
-        '\0', ' ', 'V', 'F', 'T', 'R', '%', '\0',          // space, V, F, T, R, 5
-        '\0', 'N', 'B', 'H', 'G', 'Y', '^', '\0',          // N, B, H, G, Y, 6
-        '\0', '\0', 'M', 'J', 'U', '&', '*', '\0',         // M, J, U, 7, 8
-        '\0', '<', 'K', 'I', 'O', ')', '(', '\0',          // ,, K, I, O, 0 (zero), 9
-        '\0', '>', '?', 'L', ':', 'P', '_', '\0',          // ., /, L, ;, P, -
-        '\0', '\0', '"', '\0', '{', '+', '\0', '\0',       // ', [, =
-        '\0', '\0', '\n', '}', '\0', '|', '\0', '\0',      // CapsLock, right shift, enter, ],
-        '\0', '\0', '\0', '\0', '\0', '\0', '\b', '\0',    // backspace
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // KP 1, KP 4, KP 7
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // KP 0, KP ., KP 2, KP 5, KP 6, KP 8, escape, NumberLock
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F11, KP +, KP 3, KP -, KP *, KP 9, ScrollLock
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // search, right alt, right control, previous track
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // favourites, left GUI
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // refresh, volume down, mute, right GUI
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // stop, calculator, apps
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // forward, volume up, play/pause, power
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // back, home, stop, sleep
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // my computer
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // email, KP /, next track
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // media select
-        '\0', '\0', '\n', '\0', '\0', '\0', '\0', '\0',    // KP enter, wake
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // end, cursor left, home
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // insert, delete, cursor down, cursor right, cursor up
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // page down, page up
+        '\0', '\0', '\0', '\0', 'A', 'B', 'C', 'D',
+        'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
+        'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
+        'U', 'V', 'W', 'X', 'Y', 'Z', '!', '@',
+        '#', '$', '%', '^', '&', '*', '(', ')',
+        '\n', '\0', '\b', '\t', ' ', '_', '+', '{',
+        '}', '|', '~', ':', '"', '~', '<', '>',
+        '?', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '/', '*', '-', '+',
+        '\n', '\0', '\0', '\0', '\0', '5', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '=',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '(', ')',
+        '{', '}', '\0', '\0', 'A', 'B', 'C', 'D',
+        'E', 'F', '\0', '^', '%', '<', '>', '&',
+        '\0', '|', '\0', ':', '#', '\0', '@', '!',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
     },
     // Ctrl
     {
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F9, F5, F3, F1, F2, F12
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F10, F8, F6, F4, tab, ` (back tick)
-        '\0', '\0', '\0', '\0', '\0', '\0', '!', '\0',     // left alt, left shift, left control, Q, 1
-        '\0', '\0', ':', '\0', '\0', '\0', '@', '\0',      // Z, S, A, W, 2
-        '\0', '?', '$', '\0', '\0', '$', '#', '\0',        // C, X, D, E, 4, 3
-        '\0', '\0', '/', '\0', '>', '<', '%', '\0',        // space, V, F, T, R, 5
-        '\0', ',', '*', '^', '\0', '\0', '&', '\0',        // N, B, H, G, Y, 6
-        '\0', '\0', '.', '-', '\0', '\0', '(', '\0',       // M, J, U, 7, 8
-        '\0', '\0', '+', '\0', ';', '_', ')', '\0',        // ,, K, I, O, 0 (zero), 9
-        '\0', '\0', '\0', '=', '\0', '"', '\0', '\0',      // ., /, L, ;, P, -
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // ', [, =
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // CapsLock, right shift, enter, ],
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // backspace
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // KP 1, KP 4, KP 7
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // KP 0, KP ., KP 2, KP 5, KP 6, KP 8, escape, NumberLock
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F11, KP +, KP 3, KP -, KP *, KP 9, ScrollLock
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // search, right alt, right control, previous track
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // favourites, left GUI
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // refresh, volume down, mute, right GUI
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // stop, calculator, apps
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // forward, volume up, play/pause, power
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // back, home, stop, sleep
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // my computer
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // email, KP /, next track
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // media select
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // KP enter, wake
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // end, cursor left, home
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // insert, delete, cursor down, cursor right, cursor up
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // page down, page up
+        '\0', '\0', '\0', '\0', '\0', '*', '?', '\0',
+        '\0', '\0', '\0', '^', '\0', '-', '+', '=',
+        '.', ',', ';', '"', '\0', '<', '\0', '>',
+        '\0', '/', '\0', '$', '\0', ':', '!', '@',
+        '#', '$', '%', '&', '\0', '(', ')', '_',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
     },
     // Shift + Ctrl
     {
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F9, F5, F3, F1, F2, F12
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F10, F8, F6, F4, tab, ` (back tick)
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // left alt, left shift, left control, Q, 1
-        '\0', '\0', '\0', '|', '~', '\0', '\0', '\0',      // Z, S, A, W, 2
-        '\0', '\0', '\0', '\\', '\0', '\0', '\0', '\0',     // C, X, D, E, 4, 3
-        '\0', '\0', '\0', '{', '\0', '\0', '\0', '\0',     // space, V, F, T, R, 5
-        '\0', '\0', '\0', '\0', '}', '[', '\0', '\0',      // N, B, H, G, Y, 6
-        '\0', '\0', '\0', '\0', ']', '\0', '\0', '\0',     // M, J, U, 7, 8
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // ,, K, I, O, 0 (zero), 9
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // ., /, L, ;, P, -
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // ', [, =
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // CapsLock, right shift, enter, ],
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // backspace
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // KP 1, KP 4, KP 7
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // KP 0, KP ., KP 2, KP 5, KP 6, KP 8, escape, NumberLock
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F11, KP +, KP 3, KP -, KP *, KP 9, ScrollLock
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // search, right alt, right control, previous track
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // favourites, left GUI
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // refresh, volume down, mute, right GUI
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // stop, calculator, apps
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // forward, volume up, play/pause, power
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // back, home, stop, sleep
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // my computer
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // email, KP /, next track
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // media select
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // KP enter, wake
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // 
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // end, cursor left, home
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // insert, delete, cursor down, cursor right, cursor up
-        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // page down, page up
+        '\0', '\0', '\0', '\0', '~', '\0', '\0', '\\',
+        '\0', '{', '}', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '|', '\0',
+        ']', '\0', '\0', '\0', '[', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
+        '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
     },
-};
-
-unsigned nextp8_scancode_to_sdl_scancode[NUM_SCANCODES] = {
-    0, 66, 0, 62, 60, 58, 59, 69,    // F9, F5, F3, F1, F2, F12
-    0, 67, 65, 63, 61, 43, 53, 0,    // F10, F8, F6, F4, tab, ` (back tick)
-    0, 226, 225, 0, 224, 20, 30, 0,  // left alt, left shift, left control, Q, 1
-    0, 0, 29, 22, 4, 26, 31, 0,      // Z, S, A, W, 2
-    0, 6, 27, 7, 8, 33, 32, 0,       // C, X, D, E, 4, 3
-    0, 44, 25, 9, 23, 21, 34, 0,     // space, V, F, T, R, 5
-    0, 17, 5, 11, 10, 28, 35, 0,     // N, B, H, G, Y, 6
-    0, 0, 16, 13, 24, 36, 37, 0,     // M, J, U, 7, 8
-    0, 54, 14, 12, 18, 39, 38, 0,    // ,, K, I, O, 0 (zero), 9
-    0, 55, 56, 15, 51, 19, 45, 0,    // ., /, L, ;, P, -
-    0, 0, 52, 0, 47, 46, 0, 0,       // ', [, =
-    57, 229, 158, 48, 0, 49, 0, 0,   // CapsLock, right shift, enter, ],
-    0, 0, 0, 0, 0, 0, 42, 0,         // backspace
-    0, 89, 0, 92, 95, 0, 0, 0,       // KP 1, KP 4, KP 7
-    98, 99, 90, 93, 94, 96, 41, 131, // KP 0, KP ., KP 2, KP 5, KP 6, KP 8, escape, NumberLock
-    68, 87, 91, 86, 85, 97, 71, 0,   // F11, KP +, KP 3, KP -, KP *, KP 9, ScrollLock
-    0, 0, 0, 0, 0, 0, 0, 0,          // 
-    0, 0, 0, 0, 0, 0, 0, 0,          // 
-    0, 230, 0, 0, 228, 0, 0, 0,      // search, right alt, right control, previous track
-    0, 0, 0, 0, 0, 0, 0, 227,        // favourites, left GUI
-    0, 0, 0, 0, 0, 0, 0, 231,        // refresh, volume down, mute, right GUI
-    0, 0, 0, 0, 0, 0, 0, 0,          // stop, calculator, apps
-    0, 0, 0, 0, 0, 0, 0, 0,          // forward, volume up, play/pause, power
-    0, 0, 0, 0, 0, 0, 0, 0,          // back, home, stop, sleep
-    0, 0, 0, 0, 0, 0, 0, 0,          // my computer
-    0, 0, 84, 0, 0, 0, 0, 0,         // email, KP /, next track
-    0, 0, 0, 0, 0, 0, 0, 0,          // media select
-    0, 0, 88, 0, 0, 0, 0, 0,         // KP enter, wake
-    0, 0, 0, 0, 0, 0, 0, 0,          // 
-    0, 77, 0, 80, 74, 0, 0, 0,       // end, cursor left, home
-    73, 76, 81, 0, 79, 82, 0, 0,     // insert, delete, cursor down, cursor right, cursor up
-    0, 0, 78, 0, 0, 75, 0, 0,        // page down, page up
 };
 
 static uint32_t keyboard_matrix_prev[8];
@@ -361,23 +326,6 @@ static uint32_t keyboard_matrix_prev[8];
 static unsigned is_down(volatile uint8_t *base, unsigned index)
 {
     return base[index >> 3] & (1 << (index & 0x7));
-}
-
-static bool is_nextp8_modifier(unsigned index)
-{
-    switch (index) {
-        case KEY_LEFT_SHIFT:
-        case KEY_RIGHT_SHIFT:
-        case KEY_LEFT_CTRL:
-        case KEY_RIGHT_CTRL:
-        case KEY_LEFT_ALT:
-        case KEY_RIGHT_ALT:
-        case KEY_LEFT_GUI:
-        case KEY_RIGHT_GUI:
-            return true;
-        default:
-            return false;
-    }
 }
 
 static uint16_t player0_mask(volatile uint8_t *keyboard_matrix, uint8_t joy0)
@@ -935,28 +883,27 @@ void p8_update_input()
             if (keymod & KMOD_CTRL)
                 keymap_page = NULL;
             else
-                keymap_page = ps2_scancode_to_name[(keymod & KMOD_SHIFT) ? 1 : 0];
+                keymap_page = usb_hid_scancode_to_name[(keymod & KMOD_SHIFT) ? 1 : 0];
         }
         if (keymap_page){
             for (unsigned i=0;i<256;++i) {
                 bool down = is_down(keyboard_matrix, i);
                 bool prev_down = is_down((uint8_t *)keyboard_matrix_prev, i);
-                unsigned sdl2_sc = nextp8_scancode_to_sdl_scancode[i];
                 if (down && !prev_down) {
                     // Key press event: fire immediately and arm repeat
                     char ch = keymap_page[i];
-                    queue_keypress(sdl2_sc, ch, keymod);
-                    if (!is_nextp8_modifier(sdl2_sc)) {
-                        repeat_sc = sdl2_sc;
+                    queue_keypress(i, ch, keymod);
+                    if (!is_modifier(i)) {
+                        repeat_sc = i;
                         repeat_char = ch;
                         repeat_mod = keymod;
                         repeat_down_time = p8_clock();
                         repeat_first = false;
                     }
-                } else if (!down && prev_down && nextp8_scancode_to_sdl_scancode[i] == repeat_sc) {
+                } else if (!down && prev_down && i == repeat_sc) {
                     repeat_sc = 0;
                 }
-                m_scancodes[sdl2_sc] = down;
+                m_scancodes[i] = down;
             }
         }
         for (unsigned i = 0; i < 8; ++i)
