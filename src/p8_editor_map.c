@@ -280,7 +280,7 @@ static void map_handle_mouse(int mx, int my, int buttons, int buttonsp, int keym
     int map_area_h = MAP_VIEW_ROWS * 8;            /* = 96 px              */
 
     /* Space held + LMB drag: pan the viewport */
-    bool space_held = m_scancodes[SCANCODE_SPACE];
+    bool space_held = p8_is_key_down(SCANCODE_SPACE);
     if (space_held && lmb_held && mx >= 0 && mx < MAP_VIEW_COLS * 8 &&
         my >= cy && my < cy + map_area_h) {
         if (map_pan_last_mx >= 0) {

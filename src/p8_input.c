@@ -39,10 +39,20 @@ static int16_t mouse_y_accum_prev = 0;
 static int16_t mouse_z_accum_prev = 0;
 #endif
 
-static uint8_t m_keypress;
-static unsigned m_keymod;
-static unsigned m_scancode;
+#define MAX_KEY_EVENTS 8
+
+struct key_event {
+    unsigned scancode;
+    unsigned keymod;
+    uint8_t ch;
+};
+
+static int m_key_queue_write_index = 0;
+static int m_key_queue_read_index  = 0;
+static struct key_event m_key_queue_buffer[MAX_KEY_EVENTS];
+#ifndef NEXTP8
 bool m_scancodes[NUM_SCANCODES];
+#endif
 
 uint16_t m_buttons[PLAYER_COUNT];
 uint16_t m_buttonsp[PLAYER_COUNT];
@@ -321,8 +331,6 @@ char memb_scancode_to_name[4][256] = {
     },
 };
 
-static uint32_t keyboard_matrix_prev[8];
-
 static unsigned is_down(volatile uint8_t *base, unsigned index)
 {
     return base[index >> 3] & (1 << (index & 0x7));
@@ -394,6 +402,17 @@ static uint16_t player1_mask(volatile uint8_t *keyboard_matrix, uint8_t joy1)
 }
 #endif
 
+bool p8_is_key_down(unsigned scancode)
+{
+    if (scancode >= NUM_SCANCODES)
+        return false;
+#ifdef NEXTP8
+    return is_down((volatile uint8_t *) _KEYBOARD_MATRIX, scancode);
+#else
+    return m_scancodes[scancode];
+#endif
+}
+
 static bool is_modifier(unsigned sdl2_sc)
 {
     switch (sdl2_sc) {
@@ -413,9 +432,7 @@ static bool is_modifier(unsigned sdl2_sc)
 
 static void clear_input_queue(void)
 {
-    m_keypress = 0;
-    m_keymod = 0;
-    m_scancode = 0;
+	m_key_queue_read_index = m_key_queue_write_index;
     m_mouse_click_buttons = 0;
     m_mouse_click_x = 0;
     m_mouse_click_y = 0;
@@ -424,11 +441,17 @@ static void clear_input_queue(void)
 
 static void queue_keypress(unsigned scancode, uint8_t keychar, unsigned mod)
 {
-    if (is_modifier(scancode) && m_scancode != 0)
+    if (is_modifier(scancode))
         return;
-    m_scancode = scancode;
-    m_keypress = keychar;
-    m_keymod = mod;
+    if ((m_key_queue_write_index + 1) % MAX_KEY_EVENTS == m_key_queue_read_index)
+    {
+       // buffer is full, avoid overflow
+       return;
+    }
+    m_key_queue_buffer[m_key_queue_write_index].scancode = scancode;
+    m_key_queue_buffer[m_key_queue_write_index].ch = keychar;
+    m_key_queue_buffer[m_key_queue_write_index].keymod = mod;
+    m_key_queue_write_index = (m_key_queue_write_index + 1) % MAX_KEY_EVENTS;
 }
 
 static void queue_mouse_click(int buttons, int x, int y, unsigned mod)
@@ -441,17 +464,16 @@ static void queue_mouse_click(int buttons, int x, int y, unsigned mod)
 
 bool p8_get_next_keypress(unsigned *scancode, uint8_t *keychar, unsigned *mod)
 {
-    bool has_keypress = (m_keypress != 0) || (m_scancode != 0);
+    if (m_key_queue_read_index == m_key_queue_write_index) {
+       // buffer is empty
+       return false;
+    }
 
-    if (scancode) *scancode = m_scancode;
-    if (keychar) *keychar = m_keypress;
-    if (mod) *mod = m_keymod;
-
-    m_scancode = 0;
-    m_keypress = 0;
-    m_keymod = 0;
-
-    return has_keypress;
+    *scancode = m_key_queue_buffer[m_key_queue_read_index].scancode;
+    *keychar = m_key_queue_buffer[m_key_queue_read_index].ch;
+    *mod = m_key_queue_buffer[m_key_queue_read_index].keymod;
+    m_key_queue_read_index = (m_key_queue_read_index + 1) % MAX_KEY_EVENTS;
+    return true;
 }
 
 bool p8_get_next_mouse_click(int *x, int *y, int *button, unsigned *mod)
@@ -471,7 +493,7 @@ bool p8_get_next_mouse_click(int *x, int *y, int *button, unsigned *mod)
 
 bool p8_has_pending_keypress(void)
 {
-    return (m_keypress != 0);
+    return m_key_queue_read_index != m_key_queue_write_index;
 }
 
 void p8_init_input(void)
@@ -658,8 +680,9 @@ void p8_update_input()
             }
             break;
         case SDL_TEXTINPUT:
-            if (event.text.text[0] != '\0')
-                m_keypress = (uint8_t)event.text.text[0];
+            if (event.text.text[0] != '\0') {
+                queue_keypress(0, (uint8_t)event.text.text[0], 0);
+            }
             break;
         case SDL_KEYDOWN:
             switch (event.key.keysym.sym)
@@ -839,12 +862,6 @@ void p8_update_input()
     // Clear all keyboard latched bits
     memset((void *)keyboard_matrix_latched, 0xff, 32);
 
-    bool need_update = false;
-    volatile uint32_t *keyboard_matrix32 = (volatile  uint32_t *) keyboard_matrix;
-    for (unsigned i = 0; i < 8; ++i) {
-        if (keyboard_matrix32[i] != keyboard_matrix_prev[i])
-            need_update = true;
-    }
     // Repeat state for software key-repeat (nextp8 has no hardware-level repeat)
     static unsigned repeat_sc = 0;
     static uint8_t repeat_char = 0;
@@ -852,21 +869,13 @@ void p8_update_input()
     static uint64_t repeat_down_time = 0;
     static bool repeat_first = false;
     static unsigned keymod = 0;
-    if (need_update) {
-        keymod = 0;
-        if (is_down(keyboard_matrix, KEY_LEFT_SHIFT))
-            keymod |= KMOD_LSHIFT;
-        if (is_down(keyboard_matrix, KEY_RIGHT_SHIFT))
-            keymod |= KMOD_RSHIFT;
-        if (is_down(keyboard_matrix, KEY_LEFT_CTRL))
-            keymod |= KMOD_LCTRL;
-        if (is_down(keyboard_matrix, KEY_RIGHT_CTRL))
-            keymod |= KMOD_RCTRL;
-        if (is_down(keyboard_matrix, KEY_LEFT_ALT))
-            keymod |= KMOD_LALT;
-        if (is_down(keyboard_matrix, KEY_RIGHT_ALT))
-            keymod |= KMOD_RALT;
-        bool membrane_mode = is_down(keyboard_matrix, 0);
+    uint32_t key_event;
+    while ((key_event = *(volatile uint32_t *)_KEYBOARD_EVENT_QUEUE_HI) != 0) {
+        bool press = (key_event & 0x80000000) != 0;
+        uint16_t scancode = key_event & 0xffff;
+        uint16_t keymod = ((key_event >> 16) & 3) |
+                          ((key_event >> 12) & 0xc3f0);
+        bool membrane_mode = (key_event & 0x40000000);
         char *keymap_page;
         if (membrane_mode) {
             unsigned page_index;
@@ -885,32 +894,25 @@ void p8_update_input()
             else
                 keymap_page = usb_hid_scancode_to_name[(keymod & KMOD_SHIFT) ? 1 : 0];
         }
-        if (keymap_page){
-            for (unsigned i=0;i<256;++i) {
-                bool down = is_down(keyboard_matrix, i);
-                bool prev_down = is_down((uint8_t *)keyboard_matrix_prev, i);
-                if (down && !prev_down) {
-                    // Key press event: fire immediately and arm repeat
-                    char ch = keymap_page[i];
-                    queue_keypress(i, ch, keymod);
-                    if (!is_modifier(i)) {
-                        repeat_sc = i;
-                        repeat_char = ch;
-                        repeat_mod = keymod;
-                        repeat_down_time = p8_clock();
-                        repeat_first = false;
-                    }
-                } else if (!down && prev_down && i == repeat_sc) {
-                    repeat_sc = 0;
+        if (keymap_page) {
+            if (press) {
+                // Key press event: fire immediately and arm repeat
+                char ch = keymap_page[scancode];
+                queue_keypress(scancode, ch, keymod);
+                if (!is_modifier(scancode)) {
+                    repeat_sc = scancode;
+                    repeat_char = ch;
+                    repeat_mod = keymod;
+                    repeat_down_time = p8_clock();
+                    repeat_first = false;
                 }
-                m_scancodes[i] = down;
+            } else if (!press && scancode == repeat_sc) {
+                repeat_sc = 0;
             }
         }
-        for (unsigned i = 0; i < 8; ++i)
-            keyboard_matrix_prev[i] = keyboard_matrix32[i];
     }
     // Software key repeat: re-fire queue_keypress while a key is held
-    if (repeat_sc != 0 && !m_scancodes[repeat_sc]) {
+    if (repeat_sc != 0 && !is_down(keyboard_matrix, repeat_sc)) {
         repeat_sc = 0;
     } else if (repeat_sc != 0) {
         uint64_t now = p8_clock();

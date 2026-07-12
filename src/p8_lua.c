@@ -1881,8 +1881,8 @@ case STAT_MEM_USAGE: {
         lua_pushinteger(L, P8_HEIGHT);
         break;
     case STAT_RAW_KEYBOARD: {
-        int key = lua_tointeger(L, 2);
-        lua_pushboolean(L, (key < NUM_SCANCODES) ? m_scancodes[key] : false);
+        int scancode = lua_tointeger(L, 2);
+        lua_pushboolean(L, p8_is_key_down(scancode));
         break;
     }
     case STAT_KEY_PRESSED:
