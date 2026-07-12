@@ -82,7 +82,9 @@ extern int16_t m_mouse_xrel, m_mouse_yrel;
 extern uint8_t m_mouse_buttons, m_mouse_buttonsp;
 extern int8_t m_mouse_wheel;
 extern unsigned m_mouse_keymod;
+#ifndef NEXTP8
 extern bool m_scancodes[NUM_SCANCODES];
+#endif
 
 extern uint16_t m_buttons[PLAYER_COUNT];
 extern uint16_t m_buttonsp[PLAYER_COUNT];
@@ -90,6 +92,7 @@ extern uint16_t m_buttonsp[PLAYER_COUNT];
 bool p8_get_next_keypress(unsigned *scancode, uint8_t *keychar, unsigned *mod);
 bool p8_get_next_mouse_click(int *x, int *y, int *button, unsigned *mod);
 bool p8_has_pending_keypress(void);
+bool p8_is_key_down(unsigned scancode);
 void p8_init_input(void);
 void p8_pump_events(void);
 void p8_reset_input(void);
