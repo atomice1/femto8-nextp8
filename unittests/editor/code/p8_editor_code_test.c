@@ -12,6 +12,7 @@ extern void test_insert_char(void **state);
 extern void test_insert_text_middle(void **state);
 extern void test_insert_text_end(void **state);
 extern void test_insert_newline(void **state);
+extern void test_newline(void **state);
 extern void test_backspace(void **state);
 extern void test_backspace_join_line(void **state);
 extern void test_delete_char(void **state);
@@ -40,6 +41,7 @@ extern void test_undo_paste(void **state);
 extern void test_undo_duplicate_line(void **state);
 extern void test_undo_comment(void **state);
 extern void test_undo_twice_with_one_edit(void **state);
+extern void test_undo_delete_selected_text(void **state);
 extern void test_undo_stack_limit(void **state);
 extern void test_undo_empty_stack(void **state);
 extern void test_redo_empty_stack(void **state);
@@ -73,6 +75,7 @@ int main(int argc, char *argv[])
         cmocka_unit_test_setup_teardown(test_insert_text_middle, setup, teardown),
         cmocka_unit_test_setup_teardown(test_insert_text_end, setup, teardown),
         cmocka_unit_test_setup_teardown(test_insert_newline, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_newline, setup, teardown),
         cmocka_unit_test_setup_teardown(test_backspace, setup, teardown),
         cmocka_unit_test_setup_teardown(test_backspace_join_line, setup, teardown),
         cmocka_unit_test_setup_teardown(test_delete_char, setup, teardown),
@@ -98,6 +101,7 @@ int main(int argc, char *argv[])
         cmocka_unit_test_setup_teardown(test_undo_paste, setup, teardown),
         cmocka_unit_test_setup_teardown(test_undo_duplicate_line, setup, teardown),
         cmocka_unit_test_setup_teardown(test_undo_comment, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_undo_delete_selected_text, setup, teardown),
         cmocka_unit_test_setup_teardown(test_undo_empty_stack, setup, teardown),
         cmocka_unit_test_setup_teardown(test_undo_twice_with_one_edit, setup, teardown),
         cmocka_unit_test_setup_teardown(test_undo_stack_limit, setup, teardown),

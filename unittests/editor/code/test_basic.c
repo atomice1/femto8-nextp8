@@ -22,7 +22,10 @@ void test_shutdown(void **state)
     split_lines("Hello\nWorld\n");
     cursor_line = 1;
     cursor_col = 2;
-    insert_text_at_cursor("Test");
+    code_handle_keypress(0, 't', 0);
+    code_handle_keypress(0, 'e', 0);
+    code_handle_keypress(0, 's', 0);
+    code_handle_keypress(0, 't', 0);
 
     code_shutdown();
     code_init();

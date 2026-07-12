@@ -28,9 +28,10 @@ void test_insert_text_middle(void **state)
     cursor_col = 2;
 
     /* Insert "XY" */
-    insert_text_at_cursor("XY");
+    code_handle_keypress(0, 'x', 0);
+    code_handle_keypress(0, 'y', 0);
 
-    assert_line_equal(0, "HeXYllo");
+    assert_line_equal(0, "Hexyllo");
     assert_int_equal(line_lengths[0], 7);
 }
 
@@ -42,9 +43,10 @@ void test_insert_text_end(void **state)
     /* Insert at end of line 0 */
     cursor_line = 0;
     cursor_col = line_lengths[0];  /* Position at end */
-    insert_text_at_cursor("YZ");
+    code_handle_keypress(0, 'y', 0);
+    code_handle_keypress(0, 'z', 0);
 
-    assert_line_equal(0, "HelloYZ");
+    assert_line_equal(0, "Helloyz");
     assert_int_equal(line_lengths[0], 7);
 }
 
@@ -62,6 +64,26 @@ void test_insert_newline(void **state)
     assert_int_equal(line_count, 2);
     assert_line_equal(0, "He");
     assert_line_equal(1, "llo");
+    assert_int_equal(cursor_line, 1);
+    assert_int_equal(cursor_col, 0);
+}
+
+/* Test: newline at tend of line */
+void test_newline(void **state)
+{
+    split_lines("Hello\n");
+
+    /* Insert newline at position 2 of line 0 */
+    cursor_line = 0;
+    cursor_col = 5;
+
+    code_handle_keypress(0, '\n', 0);
+
+    assert_int_equal(line_count, 2);
+    assert_line_equal(0, "Hello");
+    assert_line_equal(1, "");
+    assert_int_equal(cursor_line, 1);
+    assert_int_equal(cursor_col, 0);
 }
 
 /* Test: Backspace deletes character before cursor */

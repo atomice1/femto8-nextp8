@@ -278,6 +278,40 @@ void test_undo_stack_limit(void **state)
     assert_line_equal(0, "Hello0");
 }
 
+void test_undo_delete_selected_text(void **state)
+{
+    split_lines("Line 1\nLine 2 ABC\nLine 3 CDECDE\nLine 4 FGH\nLine 5\nLine 6IJKL\n");
+
+    select_start_line = 1;
+    select_start_col = 4;
+    select_end_line = 4;
+    select_end_col = 2;
+
+    /* Delete selected text */
+    code_handle_keypress(0, 8, 0);
+
+    assert_line_equal(0, "Line 1");
+    assert_line_equal(1, "Linene 5");
+    assert_line_equal(2, "Line 6IJKL");
+
+    /* Undo (Ctrl+Z) */
+    code_handle_keypress(SCANCODE_Z, 0, KMOD_CTRL);
+
+    assert_line_equal(0, "Line 1");
+    assert_line_equal(1, "Line 2 ABC");
+    assert_line_equal(2, "Line 3 CDECDE");
+    assert_line_equal(3, "Line 4 FGH");
+    assert_line_equal(4, "Line 5");
+    assert_line_equal(5, "Line 6IJKL");
+
+    /* Redo (Ctrl+Y) */
+    code_handle_keypress(SCANCODE_Y, 0, KMOD_CTRL);
+
+    assert_line_equal(0, "Line 1");
+    assert_line_equal(1, "Linene 5");
+    assert_line_equal(2, "Line 6IJKL");
+}
+
 /* Test: Redo with empty stack - should be no-op */
 void test_redo_empty_stack(void **state)
 {
