@@ -1,5 +1,6 @@
 # Code editor unit tests
 
+# Main test executable
 add_executable(p8_editor_code_test
     p8_editor_code_test.c
     test_basic.c
@@ -42,9 +43,6 @@ add_custom_command(
 add_custom_target(p8_editor_header DEPENDS ${GENERATED_HEADER})
 
 target_include_directories(p8_editor_code_test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-
-find_package(cmocka REQUIRED)
-find_package(SDL2 REQUIRED)
 
 target_link_libraries(p8_editor_code_test PRIVATE cmocka ${SDL2_LIBRARIES})
 

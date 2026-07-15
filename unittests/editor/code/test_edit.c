@@ -24,8 +24,7 @@ void test_insert_text_middle(void **state)
     split_lines("Hello\n");
 
     /* Set cursor at position 2 */
-    cursor_line = 0;
-    cursor_col = 2;
+    move_cursor_to(0, 2);
 
     /* Insert "XY" */
     code_handle_keypress(0, 'x', 0);
@@ -41,8 +40,7 @@ void test_insert_text_end(void **state)
     split_lines("Hello\n");
 
     /* Insert at end of line 0 */
-    cursor_line = 0;
-    cursor_col = line_lengths[0];  /* Position at end */
+    move_cursor_to(0, line_lengths[0]);  /* Position at end */
     code_handle_keypress(0, 'y', 0);
     code_handle_keypress(0, 'z', 0);
 
@@ -56,8 +54,7 @@ void test_insert_newline(void **state)
     split_lines("Hello\n");
 
     /* Insert newline at position 2 of line 0 */
-    cursor_line = 0;
-    cursor_col = 2;
+    move_cursor_to(0, 2);
 
     code_handle_keypress(0, '\n', 0);
 
@@ -74,8 +71,7 @@ void test_newline(void **state)
     split_lines("Hello\n");
 
     /* Insert newline at position 2 of line 0 */
-    cursor_line = 0;
-    cursor_col = 5;
+    move_cursor_to(0, 5);
 
     code_handle_keypress(0, '\n', 0);
 
@@ -92,8 +88,7 @@ void test_backspace(void **state)
     split_lines("Hello\n");
 
     /* Set cursor at position 2 */
-    cursor_line = 0;
-    cursor_col = 2;
+    move_cursor_to(0, 2);
 
     /* Backspace should delete 'e' at position 1 */
     code_handle_keypress(0, 8, 0);  /* 8 = backspace */
@@ -109,8 +104,7 @@ void test_backspace_join_line(void **state)
     split_lines("Hello\nWorld\n");
 
     /* Set cursor at start of line 1 */
-    cursor_line = 1;
-    cursor_col = 0;
+    move_cursor_to(1, 0);
 
     /* Backspace should join with line 0 */
     code_handle_keypress(0, 8, 0);  /* 8 = backspace */
@@ -128,8 +122,7 @@ void test_delete_char(void **state)
     split_lines("Hello\n");
 
     /* Set cursor at position 1 */
-    cursor_line = 0;
-    cursor_col = 1;
+    move_cursor_to(0, 1);
 
     /* DEL should delete 'e' at position 1 */
     code_handle_keypress(SCANCODE_DEL, 0, 0);
@@ -144,8 +137,7 @@ void test_delete_join_line(void **state)
     split_lines("Hello\nWorld\n");
 
     /* Set cursor at end of line 0 */
-    cursor_line = 0;
-    cursor_col = line_lengths[0];
+    move_cursor_to(0, line_lengths[0]);
 
     /* DEL should join with line 1 */
     code_handle_keypress(SCANCODE_DEL, 0, 0);
@@ -161,8 +153,7 @@ void test_movement_up(void **state)
     split_lines("Hello\nWorld\nFoo\n");
 
     /* Start at line 2 */
-    cursor_line = 2;
-    cursor_col = 2;
+    move_cursor_to(2, 2);
 
     /* Press UP */
     code_handle_keypress(SCANCODE_UP, 0, 0);
@@ -177,8 +168,7 @@ void test_movement_down(void **state)
     split_lines("Hello\nWorld\nFoo\n");
 
     /* Start at line 0 */
-    cursor_line = 0;
-    cursor_col = 2;
+    move_cursor_to(0, 2);
 
     /* Press DOWN twice */
     code_handle_keypress(SCANCODE_DOWN, 0, 0);
@@ -194,8 +184,7 @@ void test_movement_left(void **state)
     split_lines("Hello\n");
 
     /* Start at position 3 */
-    cursor_line = 0;
-    cursor_col = 3;
+    move_cursor_to(0, 3);
 
     /* Press LEFT */
     code_handle_keypress(SCANCODE_LEFT, 0, 0);
@@ -210,8 +199,7 @@ void test_movement_left_across_lines(void **state)
     split_lines("Hello\nWorld\n");
 
     /* Start at start of line 1 */
-    cursor_line = 1;
-    cursor_col = 0;
+    move_cursor_to(1, 0);
 
     /* Press LEFT - should go to end of previous line */
     code_handle_keypress(SCANCODE_LEFT, 0, 0);
@@ -226,8 +214,7 @@ void test_movement_right(void **state)
     split_lines("Hello\n");
 
     /* Start at position 2 */
-    cursor_line = 0;
-    cursor_col = 2;
+    move_cursor_to(0, 2);
 
     /* Press RIGHT */
     code_handle_keypress(SCANCODE_RIGHT, 0, 0);
@@ -242,8 +229,7 @@ void test_movement_right_across_lines(void **state)
     split_lines("Hello\nWorld\n");
 
     /* Start at end of line 0 */
-    cursor_line = 0;
-    cursor_col = line_lengths[0];
+    move_cursor_to(0, line_lengths[0]);
 
     /* Press RIGHT - should go to start of next line */
     code_handle_keypress(SCANCODE_RIGHT, 0, 0);
@@ -262,8 +248,7 @@ void test_paste(void **state)
     clipboard = strdup("XYZ");
 
     /* Set cursor at position 2 */
-    cursor_line = 0;
-    cursor_col = 2;
+    move_cursor_to(0, 2);
 
     /* Paste (Ctrl+V) */
     code_handle_keypress(SCANCODE_V, 0, KMOD_CTRL);
@@ -280,23 +265,19 @@ void test_cut(void **state)
 {
     split_lines("Hello World\n");
 
-    /* Select "Hello" by moving with shift */
-    cursor_line = 0;
-    cursor_col = 5;  /* At end of "Hello" */
-    select_start_line = 0;
-    select_start_col = 0;
-    select_end_line = 0;
-    select_end_col = 5;
+    /* Select "Hello" using keypresses */
+    move_cursor_to(0, 0);
+    select_text(0, 0, 0, 5);
 
     /* Cut (Ctrl+X) */
     code_handle_keypress(SCANCODE_X, 0, KMOD_CTRL);
 
     assert_line_equal(0, " World");
     assert_int_equal(cursor_col, 0);
-    
+
     /* Verify clipboard contains "Hello" */
     assert_string_equal(clipboard, "Hello");
-    
+
     free(clipboard);
     clipboard = NULL;
 }
@@ -306,23 +287,19 @@ void test_copy(void **state)
 {
     split_lines("Hello World\n");
 
-    /* Set selection */
-    cursor_line = 0;
-    cursor_col = 5;
-    select_start_line = 0;
-    select_start_col = 0;
-    select_end_line = 0;
-    select_end_col = 5;
+    /* Select "Hello" using keypresses */
+    move_cursor_to(0, 0);
+    select_text(0, 0, 0, 5);
 
     /* Copy (Ctrl+C) */
     code_handle_keypress(SCANCODE_C, 0, KMOD_CTRL);
 
     /* Line should be unchanged */
     assert_line_equal(0, "Hello World");
-    
+
     /* Verify clipboard contains "Hello" */
     assert_string_equal(clipboard, "Hello");
-    
+
     free(clipboard);
     clipboard = NULL;
 }

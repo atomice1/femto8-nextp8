@@ -23,8 +23,7 @@ void test_undo_insert_char(void **state)
     split_lines("Hello\n");
 
     /* Insert 'x' at position 0 */
-    cursor_line = 0;
-    cursor_col = 0;
+    move_cursor_to(0, 0);
     code_handle_keypress(0, 'x', 0);
 
     assert_line_equal(0, "xHello");
@@ -46,8 +45,7 @@ void test_undo_backspace(void **state)
     split_lines("Hello\n");
 
     /* Set cursor at position 2 and backspace */
-    cursor_line = 0;
-    cursor_col = 2;
+    move_cursor_to(0, 2);
     code_handle_keypress(0, 8, 0);  /* backspace */
 
     assert_line_equal(0, "Hllo");
@@ -69,8 +67,7 @@ void test_undo_delete_char(void **state)
     split_lines("Hello\n");
 
     /* Set cursor at position 1 and press DEL */
-    cursor_line = 0;
-    cursor_col = 1;
+    move_cursor_to(0, 1);
     code_handle_keypress(SCANCODE_DEL, 0, 0);
 
     assert_line_equal(0, "Hllo");
@@ -92,8 +89,7 @@ void test_undo_insert_newline(void **state)
     split_lines("Hello\n");
 
     /* Insert newline at position 2 */
-    cursor_line = 0;
-    cursor_col = 2;
+    move_cursor_to(0, 2);
     code_handle_keypress(0, '\n', 0);
 
     assert_int_equal(line_count, 2);
@@ -120,8 +116,7 @@ void test_undo_tab(void **state)
     split_lines("Hello\n");
 
     /* Press tab */
-    cursor_line = 0;
-    cursor_col = 0;
+    move_cursor_to(0, 0);
     code_handle_keypress(SCANCODE_TAB, 0, 0);
 
     assert_line_equal(0, " Hello");
@@ -145,8 +140,7 @@ void test_undo_paste(void **state)
     /* Set clipboard and paste */
     free(clipboard);
     clipboard = strdup("XYZ");
-    cursor_line = 0;
-    cursor_col = 2;
+    move_cursor_to(0, 2);
     code_handle_keypress(SCANCODE_V, 0, KMOD_CTRL);
 
     assert_line_equal(0, "HeXYZllo");
@@ -171,8 +165,7 @@ void test_undo_duplicate_line(void **state)
     split_lines("Hello\n");
 
     /* Duplicate line */
-    cursor_line = 0;
-    cursor_col = 0;
+    move_cursor_to(0, 0);
     code_handle_keypress(SCANCODE_D, 0, KMOD_CTRL);
 
     assert_int_equal(line_count, 2);
@@ -199,8 +192,7 @@ void test_undo_comment(void **state)
     split_lines("Hello\n");
 
     /* Comment line */
-    cursor_line = 0;
-    cursor_col = 0;
+    move_cursor_to(0, 0);
     code_handle_keypress(SCANCODE_B, 0, KMOD_CTRL);
 
     assert_line_equal(0, "--Hello");
@@ -238,8 +230,7 @@ void test_undo_twice_with_one_edit(void **state)
     split_lines("Hello\n");
 
     /* Make one edit */
-    cursor_line = 0;
-    cursor_col = 0;
+    move_cursor_to(0, 0);
     code_handle_keypress(0, 'x', 0);
     assert_line_equal(0, "xHello");
 
@@ -259,8 +250,7 @@ void test_undo_stack_limit(void **state)
 
     /* Make 9 edits using digits (0-9) which aren't transformed */
     for (int i = 0; i < 9; i++) {
-        cursor_line = 0;
-        cursor_col = strlen("Hello") + i;  /* Append at end */
+        move_cursor_to(0, line_lengths[0]);  /* Append at end */
         code_handle_keypress(0, '0' + i, 0);
     }
     assert_line_equal(0, "Hello012345678");
@@ -282,10 +272,8 @@ void test_undo_delete_selected_text(void **state)
 {
     split_lines("Line 1\nLine 2 ABC\nLine 3 CDECDE\nLine 4 FGH\nLine 5\nLine 6IJKL\n");
 
-    select_start_line = 1;
-    select_start_col = 4;
-    select_end_line = 4;
-    select_end_col = 2;
+    /* Select text using keypresses */
+    select_text(1, 4, 4, 2);
 
     /* Delete selected text */
     code_handle_keypress(0, 8, 0);
@@ -334,8 +322,7 @@ void test_redo_twice_with_one_edit(void **state)
     split_lines("Hello\n");
 
     /* Make one edit */
-    cursor_line = 0;
-    cursor_col = 0;
+    move_cursor_to(0, 0);
     code_handle_keypress(0, 'x', 0);
     assert_line_equal(0, "xHello");
 
@@ -359,8 +346,7 @@ void test_redo_stack_limit(void **state)
 
     /* Make 9 edits using digits (0-9) which aren't transformed */
     for (int i = 0; i < 9; i++) {
-        cursor_line = 0;
-        cursor_col = strlen("Hello") + i;  /* Append at end */
+        move_cursor_to(0, line_lengths[0]);  /* Append at end */
         code_handle_keypress(0, '0' + i, 0);
     }
     assert_line_equal(0, "Hello012345678");

@@ -20,8 +20,7 @@ void test_init(void **state)
 void test_shutdown(void **state)
 {
     split_lines("Hello\nWorld\n");
-    cursor_line = 1;
-    cursor_col = 2;
+    move_cursor_to(1, 2);
     code_handle_keypress(0, 't', 0);
     code_handle_keypress(0, 'e', 0);
     code_handle_keypress(0, 's', 0);

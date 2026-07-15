@@ -146,8 +146,10 @@ static int                syn_cache_alloc     = 0;
 static void free_edit(edit_t *edit)
 {
     if (edit->type == EDIT_TYPE_COMPLEX) {
-        for (int i=0;i<edit->old_end_line_excl-edit->start_line_incl;i++)
-            free(edit->old_lines[i]);
+        if (edit->old_lines) {
+            for (int i=0;i<edit->old_end_line_excl-edit->start_line_incl;i++)
+                free(edit->old_lines[i]);
+        }
         free(edit->old_lines);
         free(edit->old_line_lengths);
         edit->old_lines = NULL;
@@ -188,6 +190,10 @@ static void free_lines(void)
         line_lengths = NULL;
         line_capacities = NULL;
         line_count = 0;
+    } else {
+        assert(line_count == 0);
+        assert(line_lengths == NULL);
+        assert(line_capacities == NULL);
     }
 
     sync_required = true;
@@ -263,20 +269,16 @@ static void split_lines(const char *script)
 
     // Allocate line pointers
     lines = malloc(line_count * sizeof(char *));
-    if (!lines)
-        return;
     line_lengths = malloc(line_count * sizeof(int));
-    if (!line_lengths) {
-        free(lines);
-        lines = NULL;
-        return;
-    }
     line_capacities = malloc(line_count * sizeof(int));
-    if (!line_capacities) {
+    if (!lines || !line_lengths || !line_capacities) {
         free(lines);
         free(line_lengths);
+        free(line_capacities);
         lines = NULL;
         line_lengths = NULL;
+        line_capacities = NULL;
+        line_count = 0;
         return;
     }
 
@@ -290,6 +292,19 @@ static void split_lines(const char *script)
             int line_len = p - start_of_line;
             if (line_len > 0 || len == 0 || !eof) {
                 lines[line_index] = malloc(line_len);
+                if (!lines[line_index]) {
+                    // Keep as many lines as we were able to allocate
+                    line_count = line_index;
+                    if (line_count == 0) {
+                        free(lines);
+                        free(line_lengths);
+                        free(line_capacities);
+                        lines = NULL;
+                        line_lengths = NULL;
+                        line_capacities = NULL;
+                    }
+                    return;
+                }
                 memcpy(lines[line_index], start_of_line, line_len);
                 line_lengths[line_index] = line_len;
                 line_capacities[line_index] = line_len;
@@ -327,15 +342,19 @@ static void join_lines(char **out_script)
     }
     *p = '\0';
 }
-
-static void line_resize(int index, int new_len)
+\
+static bool line_resize(int index, int new_len)
 {
     assert(index >= 0 && index < line_count);
     if (new_len > line_capacities[index]) {
-        lines[index] = realloc(lines[index], new_len + EXTRA_CAPACITY);
+        char *new_line = realloc(lines[index], new_len + EXTRA_CAPACITY);
+        if (!new_line)
+            return false;
+        lines[index] = new_line;
         line_capacities[index] = new_len + EXTRA_CAPACITY;
     }
     line_lengths[index] = new_len;
+    return true;
 }
 
 static void invalidate_lines_from(int index)
@@ -349,6 +368,9 @@ static void invalidate_lines_from(int index)
 static void add_lines_to_undo(int start_line_incl, int old_end_line_excl, int new_end_line_excl)
 {
     assert(undo_depth > 0);
+    assert(start_line_incl >= 0 && start_line_incl <= line_count);
+    assert(old_end_line_excl >= 0 && old_end_line_excl <= line_count);
+    assert(new_end_line_excl >= 0);
     edit_t *edit = &undo_stack[undo_depth - 1];
     assert(edit->type == EDIT_TYPE_NONE || edit->type == EDIT_TYPE_COMPLEX);
     if (edit->type == EDIT_TYPE_NONE) {
@@ -361,34 +383,66 @@ static void add_lines_to_undo(int start_line_incl, int old_end_line_excl, int ne
         assert(edit->old_lines == NULL);
         assert(edit->old_line_lengths == NULL);
         if (old_end_line_excl > start_line_incl) {
-            edit->old_lines = malloc(sizeof(char *) * (old_end_line_excl - start_line_incl));
-            edit->old_line_lengths = malloc(sizeof(int) * (old_end_line_excl - start_line_incl));
-            for (int i=0;i<old_end_line_excl - start_line_incl;++i) {
-                edit->old_lines[i] = memdup(lines[i + start_line_incl], line_lengths[i + start_line_incl]);
-                edit->old_line_lengths[i] = line_lengths[i + start_line_incl];
+            size_t count = old_end_line_excl - start_line_incl;
+            char **old_lines = malloc(sizeof(char *) * count);
+            int *old_line_lengths = malloc(sizeof(int) * count);
+            if (!old_lines || !old_line_lengths) {
+                edit->type = EDIT_TYPE_NONE;
+                free(old_lines);
+                free(old_line_lengths);
+                return;
             }
+            for (int i=0; i<count; ++i) {
+                old_lines[i] = memdup(lines[i + start_line_incl], line_lengths[i + start_line_incl]);
+                if (!old_lines[i]) {
+                    edit->type = EDIT_TYPE_NONE;
+                    for (int j=0; j<i; ++j)
+                        free(old_lines[j]);
+                    free(old_lines);
+                    free(old_line_lengths);
+                    return;
+                }
+                old_line_lengths[i] = line_lengths[i + start_line_incl];
+            }
+            edit->old_lines = old_lines;
+            edit->old_line_lengths = old_line_lengths;
         }
     } else {
         // Extend the old_lines snapshot to cover the new lines as well.
         // Copy the old snapshot into the new window, and then extend it by copying from lines.
 
+        assert(edit->start_line_incl >= 0 && edit->start_line_incl <= line_count);
+        assert(edit->old_end_line_excl >= 0 && edit->old_end_line_excl <= line_count);
+        assert(edit->new_end_line_excl >= 0);
         int start0 = edit->start_line_incl;
         int old_end0 = edit->old_end_line_excl;
-        edit->start_line_incl = MIN(edit->start_line_incl, start_line_incl);
-        edit->new_end_line_excl = MAX(edit->new_end_line_excl, new_end_line_excl);
-        edit->old_end_line_excl = MAX(edit->old_end_line_excl, old_end_line_excl);
-        int old_range = edit->old_end_line_excl - edit->start_line_incl;
+        start_line_incl = MIN(edit->start_line_incl, start_line_incl);
+        new_end_line_excl = MAX(edit->new_end_line_excl, new_end_line_excl);
+        old_end_line_excl = MAX(edit->old_end_line_excl, old_end_line_excl);
+        int old_range = old_end_line_excl - start_line_incl;
 
         if (old_range > 0){
             char **old_lines = malloc(sizeof(char *) * old_range);
             int *old_line_lengths = malloc(sizeof(int) * old_range);
+            if (!old_lines || !old_line_lengths) {
+                free(old_lines);
+                free(old_line_lengths);
+                return;
+            }
 
             int old_range0 = old_end0 - start0;
-            int offset = start0 - edit->start_line_incl;
+            int offset = start0 - start_line_incl;
             for (int i = 0; i < old_range; i++) {
                 if (i < offset || i >= offset + old_range0) {
-                    old_lines[i] = memdup(lines[i + edit->start_line_incl], line_lengths[i + edit->start_line_incl]);
-                    old_line_lengths[i] = line_lengths[i + edit->start_line_incl];
+                    old_lines[i] = memdup(lines[i + start_line_incl], line_lengths[i + start_line_incl]);
+                    if (!old_lines[i]) {
+                        for (int j=0; j<i; ++j)
+                            free(old_lines[j]);
+                        free(old_lines);
+                        free(old_line_lengths);
+                        return;
+                    }
+                    old_line_lengths[i] = line_lengths[i + start_line_incl];
                 } else {
                     old_lines[i] = edit->old_lines[i - offset];
                     old_line_lengths[i] = edit->old_line_lengths[i - offset];
@@ -403,6 +457,9 @@ static void add_lines_to_undo(int start_line_incl, int old_end_line_excl, int ne
                 assert(edit->old_lines == NULL);
                 assert(edit->old_line_lengths == NULL);
             }
+            edit->start_line_incl = start_line_incl;
+            edit->new_end_line_excl = new_end_line_excl;
+            edit->old_end_line_excl = old_end_line_excl;
             edit->old_lines = old_lines;
             edit->old_line_lengths = old_line_lengths;
         } else {
@@ -412,52 +469,81 @@ static void add_lines_to_undo(int start_line_incl, int old_end_line_excl, int ne
     }
 }
 
-static void insert_line_raw(int index, const char *text, int len)
+static bool insert_line_raw(int index, const char *text, int len)
 {
     assert(index >= 0 && index <= line_count);
-    lines = realloc(lines, (line_count + 1) * sizeof(char *));
-    line_lengths = realloc(line_lengths, (line_count + 1) * sizeof(int));
-    line_capacities = realloc(line_capacities, (line_count + 1) * sizeof(int));
+    char **new_lines = realloc(lines, (line_count + 1) * sizeof(char *));
+    if (!new_lines) return false;
+    lines = new_lines;
+    int *new_line_lengths = realloc(line_lengths, (line_count + 1) * sizeof(int));
+    if (!new_line_lengths) return false;
+    line_lengths = new_line_lengths;
+    int *new_line_capacities = realloc(line_capacities, (line_count + 1) * sizeof(int));
+    if (!new_line_capacities) return false;
+    line_capacities = new_line_capacities;
+
+    char *new_line = malloc(len + EXTRA_CAPACITY);
+    if (!new_line)
+        return false;
+
     memmove(&lines[index + 1], &lines[index], (line_count - index) * sizeof(char *));
     memmove(&line_lengths[index + 1], &line_lengths[index], (line_count - index) * sizeof(int));
     memmove(&line_capacities[index + 1], &line_capacities[index], (line_count - index) * sizeof(int));
-    lines[index] = malloc(len + EXTRA_CAPACITY);
+    lines[index] = new_line;
     memcpy(lines[index], text, len);
     line_lengths[index] = len;
     line_capacities[index] = len + EXTRA_CAPACITY;
     line_count++;
+    return true;
 }
 
-static void insert_line(int index, const char *text, int len)
+static bool insert_line(int index, const char *text, int len)
 {
+    assert(index >= 0 && index <= line_count);
     invalidate_lines_from(index);
     add_lines_to_undo(index, index, index + 1);
-    insert_line_raw(index, text, len);
+    if (!insert_line_raw(index, text, len)) return false;
     if (select_start_line >= index) select_start_line++;
     if (select_end_line   >= index) select_end_line++;
     if (cursor_line       >= index) cursor_line++;
     assert(cursor_line < line_count);
     assert(cursor_col <= line_lengths[cursor_line]);
+    return true;
 }
 
-static void insert_lines_raw(int start, int count, const char **old_lines, int *old_line_lengths)
+static bool insert_lines_raw(int start, int count, const char **lines_to_insert, int *line_lengths_to_insert)
 {
     assert(start >= 0 && start <= line_count);
     assert(count > 0);
-    lines = realloc(lines, (line_count + count) * sizeof(char *));
-    line_lengths = realloc(line_lengths, (line_count + count) * sizeof(int));
-    line_capacities = realloc(line_capacities, (line_count + count) * sizeof(int));
+    char **new_lines = realloc(lines, (line_count + count) * sizeof(char *));
+    if (!new_lines) return false;
+    lines = new_lines;
+    int *new_line_lengths = realloc(line_lengths, (line_count + count) * sizeof(int));
+    if (!new_line_lengths) return false;
+    line_lengths = new_line_lengths;
+    int *new_line_capacities = realloc(line_capacities, (line_count + count) * sizeof(int));
+    if (!new_line_capacities) return false;
+    line_capacities = new_line_capacities;
     memmove(&lines[start + count], &lines[start], (line_count - start) * sizeof(char *));
     memmove(&line_lengths[start + count], &line_lengths[start], (line_count - start) * sizeof(int));
     memmove(&line_capacities[start + count], &line_capacities[start], (line_count - start) * sizeof(int));
     for (int i=0;i<count;++i) {
-        int len = old_line_lengths[i];
+        int len = line_lengths_to_insert[i];
         lines[i + start] = malloc(len + EXTRA_CAPACITY);
-        memcpy(lines[i + start], old_lines[i], len);
+        if (!lines[i + start]) {
+            // Move the remaining lines back to fill the gap.
+            memmove(&lines[start + i], &lines[start + count], (line_count - start) * sizeof(char *));
+            memmove(&line_lengths[start + i], &line_lengths[start + count], (line_count - start) * sizeof(int));
+            memmove(&line_capacities[start + i], &line_capacities[start + count], (line_count - start) * sizeof(int));
+            line_count += i;
+            return false;
+        }
+        memcpy(lines[i + start], lines_to_insert[i], len);
         line_lengths[i + start] = len;
         line_capacities[i + start] = len + EXTRA_CAPACITY;
     }
     line_count += count;
+    return true;
 }
 
 static void delete_lines_raw(int start, int end)
@@ -472,45 +558,64 @@ static void delete_lines_raw(int start, int end)
     line_count -= (end - start + 1);
 }
 
-static void replace_line_raw(int index, const char *new_text, int new_len)
+static bool replace_line_raw(int index, const char *new_text, int new_len)
 {
     assert(index >= 0 && index <= line_count);
     if (new_len > line_capacities[index]) {
         char *new_line = malloc(new_len + EXTRA_CAPACITY);
+        if (!new_line)
+            return false;
         free(lines[index]);
         lines[index] = new_line;
         line_capacities[index] = new_len + EXTRA_CAPACITY;
     }
     memcpy(lines[index], new_text, new_len);
     line_lengths[index] = new_len;
+    return true;
 }
 
-static void replace_lines_raw(int start, int old_count, int new_count, const char **old_lines, int *old_line_lengths)
+static bool replace_lines_raw(int start, int old_count, int new_count, const char **new_lines, int *new_line_lengths)
 {
     int count = MIN(old_count, new_count);
-    for (int i=0;i<count;++i)
-        replace_line_raw(start + i, old_lines[i], old_line_lengths[i]);
-    if (old_count > new_count)
+    assert(start >= 0 && start + count <= line_count);
+    if (new_count > 0) {
+        assert(new_lines != NULL);
+        assert(new_line_lengths != NULL);
+    }
+    for (int i=0;i<count;++i) {
+        assert(new_lines[i] != NULL);
+        if (!replace_line_raw(start + i, new_lines[i], new_line_lengths[i]))
+            return false;
+    }
+    if (old_count > new_count) {
         delete_lines_raw(start + new_count, start + old_count - 1);
-    else if (old_count < new_count)
-        insert_lines_raw(start + old_count, new_count - old_count, old_lines + old_count, old_line_lengths + old_count);
+        return true;
+    } else if (old_count < new_count) {
+        return insert_lines_raw(start + old_count, new_count - old_count, new_lines + old_count, new_line_lengths + old_count);
+    } else {
+        return true;
+    }
 }
 
-static void insert_text_single_line_raw(int line, int col, const char *text, int len)
+static bool insert_text_single_line_raw(int line, int col, const char *text, int len)
 {
+    if (lines == NULL) return false;
     assert(line >= 0 && line < line_count);
     assert(col >= 0 && col <= line_lengths[line]);
-    if (!text || !*text) return;
+    assert(text != NULL);
+    if (!*text) return true;
     int old_len = line_lengths[line];
-    line_resize(line, old_len + len);
+    if (!line_resize(line, old_len + len)) return false;
     memmove(lines[line] + col + len, lines[line] + col, old_len - col);
     memcpy(lines[line] + col, text, len);
+    return true;
 }
 
-static void insert_text_single_line_no_undo(int line, int col, const char *text, int len)
+static bool insert_text_single_line_no_undo(int line, int col, const char *text, int len)
 {
+    if (lines == NULL) return false;
     invalidate_lines_from(line);
-    insert_text_single_line_raw(line, col, text, len);
+    if (!insert_text_single_line_raw(line, col, text, len)) return false;
     if (select_start_line == line && select_start_col >= col)
         select_start_col += len;
     if (select_end_line == line && select_end_col >= col)
@@ -519,28 +624,30 @@ static void insert_text_single_line_no_undo(int line, int col, const char *text,
         cursor_col += len;
     assert(cursor_line < line_count);
     assert(cursor_col <= line_lengths[cursor_line]);
+    return true;
 }
 
-static void insert_text_single_line(int line, int col, const char *text, int len)
+static bool insert_text_single_line(int line, int col, const char *text, int len)
 {
     add_lines_to_undo(line, line + 1, line + 1);
-    insert_text_single_line_no_undo(line, col, text, len);
+    return insert_text_single_line_no_undo(line, col, text, len);
 }
 
-static void insert_text_multi_line_raw(int line, int col, const char *text, int len)
+static bool insert_text_multi_line_raw(int line, int col, const char *text, int len)
 {
     assert(line >= 0 && line < line_count);
     assert(col >= 0 && col <= line_lengths[line]);
-    if (!text || !*text) return;
+    assert(text != NULL);
+    if (!*text) return true;
     const char *end = text + len;
     for (const char *p = text; p < end; ) {
         const char *nl = memchr(p, '\n', end - p);
         int slen = nl ? (int)(nl - p) : len;
-        insert_text_single_line_raw(line, col, p, slen);
+        if (!insert_text_single_line_raw(line, col, p, slen)) return false;
         if (nl) {
             int remaining_len = line_lengths[line] - col;
             line_resize(line, col + slen);
-            insert_line_raw(line + 1, &lines[line][col], remaining_len);
+            if (!insert_line_raw(line + 1, &lines[line][col], remaining_len)) return false;
             line++;
             col = 0;
             p = nl + 1;
@@ -548,48 +655,44 @@ static void insert_text_multi_line_raw(int line, int col, const char *text, int 
             break;
         }
     }
+    return true;
 }
 
-static void insert_text_multi_line_no_undo_pre(int start_line, int col, const char *text, int len)
+static bool insert_text_multi_line_no_undo(int start_line, int col, const char *text, int len)
 {
-    int line = start_line;
-    int orig_col = col;
-    int new_cursor_col = 0;
-    const char *end = text + len;
-    for (const char *p = text; p < end; ) {
-        const char *nl = memchr(p, '\n', end - p);
-        if (nl) {
-            line++;
-            col = 0;
-            p = nl + 1;
-        } else {
-            new_cursor_col = orig_col + end - p;
-            break;
-        }
-    }
-    cursor_line = line;
-    cursor_col = new_cursor_col;
-}
-
-static void insert_text_multi_line_main(int start_line, int col, const char *text, int len)
-{
+    assert(start_line >= 0 && start_line < line_count);
+    assert(col >= 0 && col <= line_lengths[start_line]);
     invalidate_lines_from(start_line);
-    insert_text_multi_line_raw(start_line, col, text, len);
+    int old_line_count = line_count;
+    int old_line_length = line_lengths[start_line];
+    int to_end_of_line = line_lengths[start_line] - col;
+    if (!insert_text_multi_line_raw(start_line, col, text, len)) return false;
+    cursor_line += line_count - old_line_count;
+    if (line_count == old_line_count) {
+        if (line_lengths[start_line] > old_line_length)
+            cursor_col += line_lengths[start_line] - old_line_length;
+        else
+            cursor_col = line_lengths[start_line];
+    } else {
+        if (line_lengths[start_line + line_count - old_line_count] >= to_end_of_line)
+            cursor_col = line_lengths[start_line + line_count - old_line_count] - to_end_of_line;
+        else
+            cursor_col = line_lengths[start_line + line_count - old_line_count];
+    }
     assert(cursor_line < line_count);
     assert(cursor_col <= line_lengths[cursor_line]);
+    return true;
 }
 
-static void insert_text_multi_line_no_undo(int start_line, int col, const char *text, int len)
+static bool insert_text_multi_line(int start_line, int col, const char *text, int len)
 {
-    insert_text_multi_line_no_undo_pre(start_line, col, text, len);
-    insert_text_multi_line_main(start_line, col, text, len);
-}
-
-static void insert_text_multi_line(int start_line, int col, const char *text, int len)
-{
-    insert_text_multi_line_no_undo_pre(start_line, col, text, len);
-    add_lines_to_undo(start_line, start_line + 1, cursor_line);
-    insert_text_multi_line_main(start_line, col, text, len);
+    add_lines_to_undo(start_line, start_line + 1, start_line + 1);
+    int old_line_count = line_count;
+    if (!insert_text_multi_line_no_undo(start_line, col, text, len)) return false;
+    undo_stack[undo_depth-1].new_end_line_excl = start_line + 1 + (line_count - old_line_count);
+    assert(cursor_line < line_count);
+    assert(cursor_col <= line_lengths[cursor_line]);
+    return true;
 }
 
 static void delete_text_single_line_raw(int line, int start_col, int end_col)
@@ -642,7 +745,7 @@ static void delete_text_multi_line_raw(int start_line, int start_col, int end_li
         delete_text_single_line_raw(start_line, start_col, end_col);
     } else {
         int new_len = start_col + (line_lengths[end_line] - end_col);
-        line_resize(start_line, new_len);
+        if (!line_resize(start_line, new_len)) return;
         memcpy(lines[start_line] + start_col,
                lines[end_line] + end_col,
                line_lengths[end_line] - end_col);
@@ -691,6 +794,8 @@ static void delete_text_multi_line_no_undo(int start_line, int start_col, int en
 
 static void delete_text_multi_line(int start_line, int start_col, int end_line, int end_col)
 {
+    assert(start_line >= 0 && start_line < line_count);
+    assert(end_line >= 0 && end_line < line_count);
     add_lines_to_undo(start_line, end_line + 1, start_line + ((start_col > 0 || end_col < line_lengths[end_line]) ? 1 : 0));
     delete_text_multi_line_no_undo(start_line, start_col, end_line, end_col);
 }
@@ -764,19 +869,25 @@ static char *get_selected_text(void)
 static void delete_selected_text(void)
 {
     if (select_start_line == -1) return;
+    assert(select_start_line >= 0 && select_start_line < line_count);
+    assert(select_end_line >= 0 && select_end_line < line_count);
+    assert(select_start_col >= 0 && select_start_col <= line_lengths[select_start_line]);
+    assert(select_end_col >= 0 && select_end_col <= line_lengths[select_end_line]);
     delete_text_multi_line(select_start_line, select_start_col, select_end_line, select_end_col);
 }
 
-static void insert_text_at_cursor(const char *text)
+static bool insert_text_at_cursor(const char *text)
 {
-    if (!text || !*text) return;
-    insert_text_multi_line(cursor_line, cursor_col, text, (int)strlen(text));
+    assert(text != NULL);
+    if (!*text) return true;
+    return insert_text_multi_line(cursor_line, cursor_col, text, (int)strlen(text));
 }
 
 /* --- Undo / redo ----------------------------------------------------------- */
 
-static void undo_edit(const edit_t *edit)
+static bool undo_edit(const edit_t *edit)
 {
+    bool success = true;
     switch (edit->type) {
     case EDIT_TYPE_NONE:
         break;
@@ -797,34 +908,34 @@ static void undo_edit(const edit_t *edit)
     case EDIT_TYPE_SIMPLE_DELETE_BACKWARD:
         assert(select_start_line == -1);
         if (edit->ch == '\n')
-            insert_text_multi_line_no_undo(cursor_line, cursor_col, "\n", 1);
+            success = insert_text_multi_line_no_undo(cursor_line, cursor_col, "\n", 1);
         else
-            insert_text_single_line_no_undo(cursor_line, cursor_col, (char *)&edit->ch, 1);
-        break;
+            success = insert_text_single_line_no_undo(cursor_line, cursor_col, (char *)&edit->ch, 1);
     case EDIT_TYPE_SIMPLE_DELETE_FORWARD:
         assert(select_start_line == -1);
-        insert_text_single_line_no_undo(cursor_line, cursor_col, (char *)&edit->ch, 1);
-        cursor_col--;
+        success = insert_text_single_line_no_undo(cursor_line, cursor_col, (char *)&edit->ch, 1);
+        if (success)
+            cursor_col--;
         break;
     case EDIT_TYPE_COMPLEX:
         invalidate_lines_from(edit->start_line_incl);
-        replace_lines_raw(edit->start_line_incl, edit->new_end_line_excl - edit->start_line_incl,
-                          edit->old_end_line_excl - edit->start_line_incl,
-                          (const char **) edit->old_lines, edit->old_line_lengths);
-        cursor_line = edit->old_cursor_line;
-        cursor_col = edit->old_cursor_col;
-        select_start_line = edit->old_select_start_line;
-        select_end_line = edit->old_select_end_line;
-        select_start_col = edit->old_select_start_col;
-        select_end_col = edit->old_select_end_col;
-        assert(cursor_line < line_count);
-        assert(cursor_col <= line_lengths[cursor_line]);
-        break;
+        success = replace_lines_raw(edit->start_line_incl, edit->new_end_line_excl - edit->start_line_incl,
+                                    edit->old_end_line_excl - edit->start_line_incl,
+                                    (const char **) edit->old_lines, edit->old_line_lengths);
+        cursor_line = MIN(edit->old_cursor_line, line_count - 1);
+        cursor_col = MIN(edit->old_cursor_col, line_lengths[cursor_line]);
+        select_start_line = MIN(edit->old_select_start_line, line_count - 1);
+        select_end_line = MIN(edit->old_select_end_line, line_count - 1);
+        select_start_col = select_start_line != -1 ? MIN(edit->old_select_start_col, line_lengths[select_start_line]) : -1;
+        select_end_col = select_end_line != -1 ? MIN(edit->old_select_end_col, line_lengths[select_end_line]) : -1;
     }
+    return success;
 }
 
-static void reverse_edit(edit_t *dest, const edit_t *src)
+static bool reverse_edit(edit_t *dest, const edit_t *src)
 {
+    assert(cursor_line >= 0);
+    assert(cursor_line < line_count);
     switch (src->type) {
     case EDIT_TYPE_NONE:
         dest->type = EDIT_TYPE_NONE;
@@ -851,6 +962,9 @@ static void reverse_edit(edit_t *dest, const edit_t *src)
             dest->ch = lines[cursor_line][cursor_col];
         break;
     case EDIT_TYPE_COMPLEX:
+        assert(src->start_line_incl >= 0 && src->start_line_incl <= line_count);
+        assert(src->new_end_line_excl >= 0 && src->new_end_line_excl <= line_count);
+        assert(src->old_end_line_excl >= 0);
         dest->type = EDIT_TYPE_COMPLEX;
         dest->start_line_incl = src->start_line_incl;
         dest->new_end_line_excl = src->old_end_line_excl;
@@ -861,18 +975,38 @@ static void reverse_edit(edit_t *dest, const edit_t *src)
         dest->old_select_end_line = select_end_line;
         dest->old_select_start_col = select_start_col;
         dest->old_select_end_col = select_end_col;
-        dest->old_lines = malloc(sizeof(char *) * (dest->old_end_line_excl - dest->start_line_incl));
-        dest->old_line_lengths = malloc(sizeof(int) * (dest->old_end_line_excl - dest->start_line_incl));
-        for (int i=0;i<dest->old_end_line_excl - dest->start_line_incl;++i) {
-            dest->old_lines[i] = memdup(lines[i + dest->start_line_incl], line_lengths[i + dest->start_line_incl]);
-            dest->old_line_lengths[i] = line_lengths[i + dest->start_line_incl];
+        {
+            size_t count = dest->old_end_line_excl - dest->start_line_incl;
+            char **old_lines = malloc(sizeof(char *) * count);
+            int *old_line_lengths = malloc(sizeof(int) * count);
+            if (!old_lines || !old_line_lengths) {
+                dest->type = EDIT_TYPE_NONE;
+                free(old_lines);
+                free(old_line_lengths);
+                return false;
+            }
+            for (int i=0; i<count; ++i) {
+                old_lines[i] = memdup(lines[i + dest->start_line_incl], line_lengths[i + dest->start_line_incl]);
+                if (!old_lines[i]) {
+                    dest->type = EDIT_TYPE_NONE;
+                    for (int j=0; j<i; ++j)
+                        free(old_lines[j]);
+                    free(old_lines);
+                    free(old_line_lengths);
+                    return false;
+                }
+                old_line_lengths[i] = line_lengths[i + dest->start_line_incl];
+            }
+            dest->old_lines = old_lines;
+            dest->old_line_lengths = old_line_lengths;
         }
         break;
     }
+    return true;
 }
 
 static void push_undo(void)
-{
+{ 
     if (undo_depth == UNDO_LIMIT) {
         free_edit(&undo_stack[0]);
         memmove(undo_stack, undo_stack + 1, (UNDO_LIMIT - 1) * sizeof(edit_t));
@@ -886,6 +1020,18 @@ static void push_undo(void)
     redo_depth = 0;
 }
 
+static void pop_undo(void)
+{
+    if (undo_depth == 0) return;
+    free_edit(&undo_stack[--undo_depth]);
+}
+
+static void pop_redo(void)
+{
+    if (redo_depth == 0) return;
+    free_edit(&redo_stack[--redo_depth]);
+}
+
 static void do_undo(void)
 {
     if (undo_depth == 0) return;
@@ -894,11 +1040,8 @@ static void do_undo(void)
         memmove(redo_stack, redo_stack + 1, (UNDO_LIMIT - 1) * sizeof(edit_t));
         redo_depth--;
     }
-    redo_depth[redo_stack].type = EDIT_TYPE_NONE;
-    redo_depth[redo_stack].old_lines = NULL;
-    redo_depth[redo_stack].old_line_lengths = NULL;
-    reverse_edit(&redo_stack[redo_depth++], &undo_stack[undo_depth - 1]);
-    undo_edit(&undo_stack[--undo_depth]);
+    if (reverse_edit(&redo_stack[redo_depth], &undo_stack[undo_depth - 1])) redo_depth++;
+    if (!undo_edit(&undo_stack[undo_depth - 1])) pop_redo();
     free_edit(&undo_stack[undo_depth]);
 }
 
@@ -910,9 +1053,9 @@ static void do_redo(void)
         memmove(undo_stack, undo_stack + 1, (UNDO_LIMIT - 1) * sizeof(edit_t));
         undo_depth--;
     }
-    reverse_edit(&undo_stack[undo_depth++], &redo_stack[redo_depth - 1]);
-    undo_edit(&redo_stack[--redo_depth]);
-    free_edit(&redo_stack[redo_depth]);
+    if (reverse_edit(&undo_stack[undo_depth], &redo_stack[redo_depth - 1])) undo_depth++;
+    if (!undo_edit(&redo_stack[redo_depth - 1])) { pop_undo(); }
+    pop_redo();
 }
 
 /* --- Search ---------------------------------------------------------------- */
@@ -979,14 +1122,14 @@ static void move_word_right(void)
 
 /* --- Duplicate line -------------------------------------------------------- */
 
-static void duplicate_line(void)
+static bool duplicate_line(void)
 {
-    insert_line(cursor_line + 1, lines[cursor_line], line_lengths[cursor_line]);
+    return insert_line(cursor_line + 1, lines[cursor_line], line_lengths[cursor_line]);
 }
 
 /* --- Comment / uncomment --------------------------------------------------- */
 
-static void comment_uncomment(void)
+static bool comment_uncomment(void)
 {
     int sl = (select_start_line != -1) ? select_start_line : cursor_line;
     int el = (select_end_line   != -1) ? select_end_line   : cursor_line;
@@ -998,20 +1141,21 @@ static void comment_uncomment(void)
         if (all) {
             delete_text_single_line(l, 0, 2);
         } else {
-            insert_text_single_line(l, 0, "--", 2);
+            if (!insert_text_single_line(l, 0, "--", 2)) return false;
         }
     }
+    return true;
 }
 
 /* --- Indent / unindent ----------------------------------------------------- */
 
-static void indent_lines(bool unindent)
+static bool indent_lines(bool unindent)
 {
     int sl = (select_start_line != -1) ? select_start_line : cursor_line;
     int el = (select_end_line   != -1) ? select_end_line   : cursor_line;
     for (int l = sl; l <= el; l++) {
         if (!unindent) {
-            insert_text_single_line(l, 0, " ", 1);
+            if (!insert_text_single_line(l, 0, " ", 1)) return false;
         } else if (line_lengths[l] > 0 && lines[l][0] == ' ') {
             delete_text_single_line(l, 0, 1);
         }
@@ -1029,6 +1173,7 @@ static void indent_lines(bool unindent)
         assert(cursor_line < line_count);
         assert(cursor_col <= line_lengths[cursor_line]);
     }
+    return true;
 }
 
 /* Draw one line of source text with syntax highlighting.
@@ -1110,6 +1255,8 @@ static void code_draw(const p8_dialog_t *dialog, void *user_data, int x, int y, 
 
 static void code_handle_keypress(int scancode, int keypress, int keymod)
 {
+    if (lines == NULL)
+        return;
     const int width = P8_WIDTH;
     const int height = P8_HEIGHT - GLYPH_HEIGHT - 1;
     const int lines_per_page = (height - GLYPH_HEIGHT) / GLYPH_HEIGHT;
@@ -1235,9 +1382,13 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
                         clear_selection(); cursor_col = line_lengths[cursor_line];
                         break;
                     case SCANCODE_D: /* duplicate line */
-                        push_undo(); duplicate_line(); break;
+                        push_undo();
+                        if (!duplicate_line()) pop_undo();
+                        break;
                     case SCANCODE_B: /* comment / uncomment */
-                        push_undo(); comment_uncomment(); break;
+                        push_undo();
+                        if (!comment_uncomment()) pop_undo();
+                        break;
                     case SCANCODE_X: { /* cut */
                         char *sel = get_selected_text();
                         if (sel) { push_undo(); free(clipboard); clipboard = sel; delete_selected_text(); }
@@ -1250,7 +1401,7 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
                         if (clipboard) {
                             push_undo();
                             if (select_start_line != -1) delete_selected_text();
-                            insert_text_at_cursor(clipboard);
+                            if (!insert_text_at_cursor(clipboard)) pop_undo();
                         }
                         break;
                     case SCANCODE_Z: do_undo(); break;
@@ -1295,7 +1446,7 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
 text_input:;
                 if (scancode == SCANCODE_TAB) {
                     push_undo();
-                    indent_lines(shift);
+                    if (!indent_lines(shift)) pop_undo();
                     break;
                 }
                 switch (keypress) {
@@ -1319,10 +1470,10 @@ text_input:;
                         push_undo();
                         if (select_start_line == -1) {
                             undo_stack[undo_depth-1].type = EDIT_TYPE_SIMPLE_INSERT_CHAR;
-                            insert_text_multi_line_no_undo(cursor_line, cursor_col, "\n", 1);
+                            if (!insert_text_multi_line_no_undo(cursor_line, cursor_col, "\n", 1)) pop_undo();
                         } else {
                             delete_selected_text();
-                            insert_text_multi_line(cursor_line, cursor_col, "\n", 1);
+                            if (!insert_text_multi_line(cursor_line, cursor_col, "\n", 1)) pop_undo();
                         }
                         break;
                     default:
@@ -1334,10 +1485,10 @@ text_input:;
                             push_undo();
                             if (select_start_line == -1) {
                                 undo_stack[undo_depth-1].type = EDIT_TYPE_SIMPLE_INSERT_CHAR;
-                                insert_text_single_line_no_undo(cursor_line, cursor_col, (char *)&keypress, 1);
+                                if (!insert_text_single_line_no_undo(cursor_line, cursor_col, (char *)&keypress, 1)) pop_undo();
                             } else {
                                 delete_selected_text();
-                                insert_text_single_line(cursor_line, cursor_col, (char *)&keypress, 1);
+                                if (!insert_text_single_line(cursor_line, cursor_col, (char *)&keypress, 1)) pop_undo();
                             }
                         }
                 }
