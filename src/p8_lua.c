@@ -2095,15 +2095,6 @@ int get_mouse_y(lua_State *L)
     return 1;
 }
 
-int note_to_hz(lua_State *L)
-{
-    int note = lua_tointeger(L, 1);
-
-    lua_pushinteger(L, 440 * 2 ^ ((note - 33 / 12)));
-
-    return 1;
-}
-
 // serial(channel, address, [length])
 int serial(lua_State *L)
 {
