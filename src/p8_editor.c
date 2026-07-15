@@ -130,9 +130,8 @@ static void handle_action(p8_dialog_t *dialog, int action)
         case EDITOR_ACTION_SAVE_AS: {
             p8_dialog_t save_dialog;
             char file_name[128];
-            strncpy(file_name, m_current_cart_file_name[0] ? m_current_cart_file_name : "untitled.p8",
-                    sizeof(file_name) - 1);
-            file_name[127] = '\0';
+            strtcpy(file_name, m_current_cart_file_name[0] ? m_current_cart_file_name : "untitled.p8",
+                    sizeof(file_name));
             p8_dialog_control_t controls[] = {
                 DIALOG_INPUTBOX("file name", file_name, 128),
                 DIALOG_SPACING(),

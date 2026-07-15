@@ -291,8 +291,7 @@ int parse_cart_file(const char *file_name, uint8_t *memory, uint8_t *file_buffer
                 memcpy(cart_dir, file_name, dir_len);
                 cart_dir[dir_len] = '\0';
             } else {
-                strncpy(cart_dir, ".", sizeof(cart_dir));
-                cart_dir[sizeof(cart_dir) - 1] = '\0';
+                strtcpy(cart_dir, ".", sizeof(cart_dir));
             }
 
             // process_includes writes into lua_script_out directly
