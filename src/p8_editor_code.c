@@ -259,10 +259,10 @@ static void split_lines(const char *script)
 
     // Count lines - a trailing newline doesn't create an extra empty line
     line_count = 1;
-    int len = strlen(script);
+    size_t len = strlen(script);
 
     // Count newline characters
-    for (int i = 0; i < len - 1; i++) {
+    for (size_t i = 0; i + 1 < len; i++) {
         if (script[i] == '\n')
             line_count++;
     }
