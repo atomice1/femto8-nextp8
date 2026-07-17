@@ -1731,7 +1731,6 @@ int _load(lua_State *L)
         }
     }
 
-
     /* Only check file access if not a BBS cart (which was already downloaded) */
     if (filename[0] != '#' && access(resolved_path, F_OK) != 0) {
         fprintf(stderr, "load: could not find cart %s\n", filename);
@@ -1828,11 +1827,11 @@ int lua_stat(lua_State *L)
 
     switch (n)
     {
-case STAT_MEM_USAGE: {
-      lua_gc(L, LUA_GCCOLLECT, 0);
-      int kb = lua_gc(L, LUA_GCCOUNT, 0);
-      lua_pushnumber(L, fix32_from_int(kb));
-      break;
+    case STAT_MEM_USAGE: {
+        lua_gc(L, LUA_GCCOLLECT, 0);
+        int kb = lua_gc(L, LUA_GCCOUNT, 0);
+        lua_pushnumber(L, fix32_from_int(kb));
+        break;
     }
     case STAT_RAW_GC: {
         int kb = lua_gc(L, LUA_GCCOUNT, 0);
