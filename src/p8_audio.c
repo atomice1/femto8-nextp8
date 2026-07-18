@@ -277,7 +277,7 @@ int32_t audio_stat(int32_t index)
         }
         return any_music ? m_music_state.pattern : -1;
     }
-    if (index == 26 && index == 56) {
+    if (index == 26 || index == 56) {
         int ticks = 0;
         for (int i = 0; i < CHANNEL_COUNT; ++i)
             if (m_channels[i].sound_mode == SOUNDMODE_MUSIC)
@@ -610,7 +610,7 @@ void render_sounds(int16_t *buffer, int total_samples)
     }
 }
 
-void audio_pcm_write(uint16_t address, uint16_t length)
+void audio_pcm_write(unsigned address, unsigned length)
 {
 #ifdef ENABLE_AUDIO
     if (address >= MEMORY_SIZE || length == 0)

@@ -21,12 +21,15 @@ This project has been significantly influenced by the work of [Jacopo Santoni](h
 
 ## Building
 
-To build femto8:
+To build femto8 (desktop):
 
 1. Clone the repository: `git clone https://github.com/benbaker76/femto8.git`
 2. Navigate to the femto8 directory: `cd femto8`
-3. Download SDL: `git submodule update --init`
-3. Configure SDL: `cd SDL-1.2 && ./configure && cd ..`
+3. Install SDL2 development files for your platform:
+	- Debian/Ubuntu: `sudo apt install libsdl2-dev pkg-config`
+	- Fedora: `sudo dnf install SDL2-devel pkgconfig`
+	- macOS (Homebrew): `brew install sdl2 pkg-config`
+	- MSYS2 (Windows): install `mingw-w64-*-SDL2` and `pkgconf` via pacman
 4. Build a local binary: `make`
 
 ## Credits

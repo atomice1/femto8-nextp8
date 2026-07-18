@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <math.h>
 #include <assert.h>
+#include "strtcpy.h"
 #ifdef OS_FREERTOS
 #include <FreeRTOS.h>
 #include <task.h>
@@ -24,6 +25,7 @@
 #include "p8_audio.h"
 #include "p8_dialog.h"
 #include "p8_emu.h"
+#include "p8_input.h"
 #include "p8_lua.h"
 #include "p8_lua_helper.h"
 #include "p8_overlay_helper.h"
@@ -57,12 +59,16 @@ static inline int color_index(uint8_t c)
 }
 
 static int p8_init_lcd(void);
-static void p8_main_loop();
+static int p8_main_loop();
 
 uint8_t *m_memory = NULL;
 uint8_t *m_cart_memory = NULL;
-
+uint8_t *m_temp_cart_memory = NULL;
 uint8_t *m_overlay_memory = NULL;
+uint8_t *m_file_buffer = NULL;
+uint8_t *m_decompression_buffer = NULL;
+char    *m_lua_script  = NULL;
+char    *m_temp_lua_script  = NULL;
 
 unsigned m_fps = 30;
 unsigned m_actual_fps = 0;
@@ -70,48 +76,30 @@ unsigned m_frames = 0;
 
 p8_clock_t m_start_time;
 
-jmp_buf jmpbuf_restart;
+static jmp_buf jmpbuf_restart;
 static bool restart;
+static bool cart_running = false;
+static bool lua_running = false;
+static bool quit_requested = false;
 
-static jmp_buf jmpbuf_load;
-bool m_load_available = false;
-static bool load_requested = false;
-static char *load_filename = NULL;
-static char *load_param = NULL;
-char *current_cart_dir = NULL;
-char *current_cart_path = NULL;
-
-char *m_breadcrumb = NULL;
+char m_current_cart_dir[PATH_MAX];
+char m_current_cart_file_name[PATH_MAX];
+char m_breadcrumb[256];
+char m_param_string[256];
+char m_clipboard[1024];
 
 static bool skip_main_loop_if_no_callbacks = false;
 
-const char *m_param_string = "";
-
 #ifdef SDL
-SDL_Surface *m_screen = NULL;
+SDL_Window *m_window = NULL;
+SDL_Renderer *m_renderer = NULL;
+SDL_Texture *m_texture = NULL;
 SDL_Surface *m_output = NULL;
 SDL_PixelFormat *m_format = NULL;
 #else
 SemaphoreHandle_t m_drawSemaphore;
 #endif
 
-int16_t m_mouse_x, m_mouse_y;
-int16_t mouse_x4, mouse_y4;
-int16_t m_mouse_xrel, m_mouse_yrel;
-uint8_t m_mouse_buttons;
-int8_t m_mouse_wheel;
-uint8_t m_keypress;
-bool m_scancodes[NUM_SCANCODES];
-
-uint16_t m_buttons[PLAYER_COUNT];
-uint16_t m_buttonsp[PLAYER_COUNT];
-uint16_t m_button_first_repeat[PLAYER_COUNT];
-unsigned m_button_down_time[PLAYER_COUNT][BUTTON_INTERNAL_COUNT];
-#ifdef SDL
-uint16_t m_buttons_latch[PLAYER_COUNT];
-#endif
-
-static bool m_prev_pointer_lock;
 
 static FILE *cartdata = NULL;
 static bool cartdata_needs_flush = false;
@@ -129,7 +117,7 @@ const uint8_t io_icon[32] = {
     0x00, 0x00, 0x00, 0x00,
 };
 
-static p8_clock_t p8_clock(void)
+p8_clock_t p8_clock(void)
 {
 #ifdef OS_FREERTOS
     return xTaskGetTickCount();
@@ -140,7 +128,7 @@ static p8_clock_t p8_clock(void)
 #endif
 }
 
-static unsigned p8_clock_ms(p8_clock_t clocks)
+unsigned p8_clock_ms(p8_clock_t clocks)
 {
 #ifdef OS_FREERTOS
     return clocks * portTICK_PERIOD_MS;
@@ -149,7 +137,7 @@ static unsigned p8_clock_ms(p8_clock_t clocks)
 #endif
 }
 
-static p8_clock_t p8_clock_delta(p8_clock_t start, p8_clock_t end)
+p8_clock_t p8_clock_delta(p8_clock_t start, p8_clock_t end)
 {
     return end - start;
 }
@@ -179,40 +167,73 @@ int p8_init()
         return 1;
     }
 
-    SDL_ShowCursor(0);
-    SDL_EnableKeyRepeat(0, 0);
+    SDL_ShowCursor(SDL_DISABLE);
 
-    m_screen = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT, 32, SDL_HWSURFACE);
-    m_format = m_screen->format;
+    /* Create SDL2 window/renderer/texture and an output surface we render into. */
+    m_window = SDL_CreateWindow("femto-8", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                               SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+    if (!m_window) {
+        printf("Error creating SDL window.\n");
+        return 1;
+    }
+    m_renderer = SDL_CreateRenderer(m_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (!m_renderer) {
+        SDL_DestroyWindow(m_window);
+        m_window = NULL;
+        printf("Error creating SDL renderer.\n");
+        return 1;
+    }
 
-    m_output = SDL_CreateRGBSurface(0, P8_WIDTH, P8_HEIGHT, 32, m_format->Rmask, m_format->Gmask, m_format->Bmask, m_format->Amask);
+    /* Texture at native P8 resolution; we'll update it from the output surface. */
+    m_texture = SDL_CreateTexture(m_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, P8_WIDTH, P8_HEIGHT);
+    m_output = SDL_CreateRGBSurfaceWithFormat(0, P8_WIDTH, P8_HEIGHT, 32, SDL_PIXELFORMAT_ARGB8888);
+    m_format = m_output->format;
 
-    SDL_WM_SetCaption("femto-8", NULL);
-#else
+    SDL_SetWindowTitle(m_window, "femto-8");
+#endif
+#ifdef OS_FREERTOS
     m_drawSemaphore = xSemaphoreCreateBinary();
 
     xSemaphoreGive(m_drawSemaphore);
-
-    m_memory = (uint8_t *)rh_malloc(MEMORY_SIZE);
-    m_cart_memory = (uint8_t *)rh_malloc(CART_MEMORY_SIZE);
-    m_overlay_memory = (uint8_t *)rh_malloc(MEMORY_SCREEN_SIZE);
 #endif
+
+    m_memory = (uint8_t *)malloc(MEMORY_SIZE);
+    m_cart_memory = (uint8_t *)malloc(CART_MEMORY_SIZE);
+    m_temp_cart_memory = (uint8_t *)malloc(CART_MEMORY_SIZE);
+    m_overlay_memory = (uint8_t *)malloc(MEMORY_SCREEN_SIZE);
+    m_file_buffer = (uint8_t *)malloc(FILE_BUFFER_SIZE);
+    m_decompression_buffer = (uint8_t *)malloc(DECOMPRESSION_BUFFER_SIZE);
+    m_lua_script  = (char *)malloc(LUA_SCRIPT_SIZE);
+    m_temp_lua_script  = (char *)malloc(LUA_SCRIPT_SIZE);
+
+    if (!m_memory || !m_cart_memory || !m_overlay_memory || !m_file_buffer || !m_decompression_buffer || !m_lua_script || !m_temp_lua_script) {
+        fputs("Out of memory\n", stderr);
+        free(m_memory);
+        free(m_cart_memory);
+        free(m_temp_cart_memory);
+        free(m_overlay_memory);
+        free(m_file_buffer);
+        free(m_decompression_buffer);
+        free(m_lua_script);
+        free(m_temp_lua_script);
+        return 1;
+    }
 
     memset(m_memory, 0, MEMORY_SIZE);
     memset(m_cart_memory, 0, CART_MEMORY_SIZE);
     memset(m_overlay_memory, (OVERLAY_TRANSPARENT_COLOR << 4) | OVERLAY_TRANSPARENT_COLOR, MEMORY_SCREEN_SIZE);
+    m_lua_script[0] = '\0';
 
 #ifdef ENABLE_AUDIO
     audio_init();
 #endif
 
     p8_init_lcd();
+    p8_init_input();
 
-    for (unsigned p=0;p<2;++p) {
-        for (unsigned i=0;i<BUTTON_INTERNAL_COUNT;++i) {
-            m_button_down_time[p][i] = UINT_MAX;
-        }
-    }
+    int ret = lua_load_api();
+    if (ret != 0)
+        return ret;
 
     m_initialized = 1;
 
@@ -234,142 +255,113 @@ static int p8_init_lcd(void)
     return 0;
 }
 
-static int p8_init_common(const char *file_name, const char *lua_script)
+static void p8_wait_for_any_key(void)
 {
-    p8_show_io_icon(false);
+    int x, y;
+    cursor_get(&x, &y);
+    y = scroll(y, GLYPH_HEIGHT);
+    draw_simple_text("press any key...", 0, y, 7);
+    cursor_set(0, y + GLYPH_HEIGHT, -1);
+    p8_flip();
+    while (!p8_is_quit_requested()) {
+        p8_update_input();
+        unsigned scancode = 0, keymod = 0;
+        uint8_t keypress = 0;
+        if (p8_get_next_keypress(&scancode, &keypress, &keymod))
+            break;
+    }
+}
 
-    if (lua_script == NULL) {
-        if (file_name) fprintf(stderr, "%s: ", file_name);
-        fprintf(stderr, "invalid cart\n");
+int p8_load(const char *file_name, const char *param, const char *bbs_cart_id, const char *breadcrumb)
+{
+    assert(m_initialized);
+
+    p8_show_io_icon(true);
+
+    printf("Loading %s\n", file_name);
+    if (parse_cart_file(file_name, m_cart_memory, m_file_buffer, m_decompression_buffer, m_lua_script, NULL) != 0) {
+        p8_show_io_icon(false);
         return -1;
     }
 
-    if (setjmp(jmpbuf_restart)) {
-        if (!restart)
-            return 0;
-        lua_shutdown_api();
-        lua_load_api();
-    }
+    strtcpy(m_param_string, param ? param : "", sizeof(m_param_string));
+    strtcpy(m_breadcrumb, breadcrumb ? breadcrumb : "", sizeof(m_breadcrumb));
 
-    restart = false;
+    strtcpy(m_current_cart_file_name, file_name, sizeof(m_current_cart_file_name));
+    strtcpy(m_current_cart_dir, ".", sizeof(m_current_cart_dir));
 
-    memcpy(m_memory, m_cart_memory, CART_MEMORY_SIZE);
+    if (cart_running)
+        p8_reset_cart();
 
-    m_frames = 0;
-    for (unsigned p = 0; p < PLAYER_COUNT; ++p) {
-        for (unsigned i = 0; i < BUTTON_INTERNAL_COUNT; ++i)
-            m_button_down_time[p][i] = UINT_MAX;
-        m_button_first_repeat[p] = 0;
-    }
-
-    p8_reset();
-    clear_screen(0);
-    p8_update_input();
-
-    lua_init_script(file_name, lua_script);
-
-    lua_init();
-
-    if (!skip_main_loop_if_no_callbacks || lua_has_main_loop_callbacks())
-        p8_main_loop();
+    p8_show_io_icon(false);
     return 0;
 }
 
-int p8_init_file_with_param(const char *file_name, const char *param)
+int p8_load_ram(uint8_t *buffer, int size)
 {
-    if (!m_initialized)
-        p8_init();
-
-    m_param_string = param ? param : "";
-    m_load_available = true;
-
-    const char *lua_script = NULL;
-    uint8_t *file_buffer = NULL;
-
-    if (setjmp(jmpbuf_load)) {
-        load_requested = false;
-
-#ifdef OS_FREERTOS
-        rh_free(file_buffer);
-#else
-        free(file_buffer);
-#endif
-
-        lua_shutdown_api();
-
-        m_param_string = load_param ? load_param : "";
-        file_name = load_filename;
-    }
-
-    if (current_cart_dir) {
-#ifdef OS_FREERTOS
-        rh_free(current_cart_dir);
-#else
-        free(current_cart_dir);
-#endif
-    }
-
-    if (current_cart_path) {
-        free(current_cart_path);
-        current_cart_path = NULL;
-    }
-
-    const char *last_slash = strrchr(file_name, '/');
-    if (last_slash) {
-        size_t dir_len = last_slash - file_name;
-#ifdef OS_FREERTOS
-        current_cart_dir = rh_malloc(dir_len + 1);
-#else
-        current_cart_dir = malloc(dir_len + 1);
-#endif
-        memcpy(current_cart_dir, file_name, dir_len);
-        current_cart_dir[dir_len] = '\0';
-    } else {
-        current_cart_dir = strdup(".");
-    }
+    assert(m_initialized);
 
     p8_show_io_icon(true);
-    lua_load_api();
 
-    printf("Loading %s\n", file_name);
-    if (parse_cart_file(file_name, m_cart_memory, &lua_script, &file_buffer, NULL) != 0)
-        return -1;
+    int ret = parse_cart_ram(buffer, size, m_cart_memory, m_decompression_buffer, m_lua_script, NULL);
 
-    int ret = p8_init_common(file_name, lua_script);
-
-#ifdef OS_FREERTOS
-    rh_free(file_buffer);
-#else
-    free(file_buffer);
-#endif
-
+    p8_show_io_icon(false);
     return ret;
 }
 
-int p8_init_ram(uint8_t *buffer, int size)
+int p8_run(void)
 {
-    if (!m_initialized)
-        p8_init();
+    assert(m_initialized);
+    assert(m_lua_script);
 
-    p8_show_io_icon(true);
-    lua_load_api();
+    if (lua_running) {
+        restart = true;
+        longjmp(jmpbuf_restart, 1);
+    } else if (cart_running) {
+        p8_restart();
+        // should not be reachable
+        abort();
+    }
+    assert(!cart_running);
 
-    const char *lua_script = NULL;
-    uint8_t *decompression_buffer = NULL;
+    if (setjmp(jmpbuf_restart)) {
+        cart_running = false;
+        if (!restart)
+            return 0;
+    }
+    restart = false;
 
-    parse_cart_ram(buffer, size, m_cart_memory, &lua_script, &decompression_buffer);
+    p8_reset_cart();
 
-    // printf("%s", m_lua_script);
+    cart_running = true;
 
-    int init_ret = p8_init_common(NULL, lua_script);
+    int ret = lua_init_script(m_current_cart_file_name, m_lua_script);
+    if (ret != 0) {
+        cart_running = false;
+        return ret;
+    }
 
-#ifdef OS_FREERTOS
-    rh_free(decompression_buffer);
-#else
-    free(decompression_buffer);
-#endif
+    ret = lua_init();
+    if (ret != 0) {
+        cart_running = false;
+        return ret;
+    }
 
-    return init_ret;
+    if (lua_has_main_loop_callbacks()) {
+        ret = p8_main_loop();
+        if (ret != 0) {
+            cart_running = false;
+            return ret;
+        }
+    } else if (!skip_main_loop_if_no_callbacks) {
+        p8_wait_for_any_key();
+    }
+
+    cart_running = false;
+
+    p8_reset_cart();
+
+    return 0;
 }
 
 int p8_shutdown()
@@ -381,18 +373,28 @@ int p8_shutdown()
     p8_close_cartdata();
 
 #ifdef SDL
-    SDL_FreeSurface(m_output);
-    SDL_FreeSurface(m_screen);
+    if (m_texture) { SDL_DestroyTexture(m_texture); m_texture = NULL; }
+    if (m_renderer) { SDL_DestroyRenderer(m_renderer); m_renderer = NULL; }
+    if (m_window) { SDL_DestroyWindow(m_window); m_window = NULL; }
+    if (m_output) { SDL_FreeSurface(m_output); m_output = NULL; }
     SDL_Quit();
+#endif
 
     free(m_cart_memory);
+    free(m_temp_cart_memory);
     free(m_memory);
     free(m_overlay_memory);
-#else
-    rh_free(m_cart_memory);
-    rh_free(m_memory);
-    rh_free(m_overlay_memory);
-#endif
+    free(m_file_buffer);
+    free(m_decompression_buffer);
+    free(m_lua_script);
+    free(m_temp_lua_script);
+    m_cart_memory = NULL;
+    m_memory = NULL;
+    m_overlay_memory = NULL;
+    m_file_buffer = NULL;
+    m_decompression_buffer = NULL;
+    m_lua_script = NULL;
+    m_temp_lua_script = NULL;
 
     m_initialized = 0;
 
@@ -535,10 +537,17 @@ void p8_render()
         }
     }
 
-    SDL_Rect rect = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
-    // SDL_BlitSurface(m_output, NULL, m_screen, &rect);
-    SDL_SoftStretch(m_output, NULL, m_screen, &rect);
-    SDL_Flip(m_screen);
+    SDL_Rect rectDest = {0, 0, SCREEN_WIDTH, SCREEN_HEIGHT};
+#ifdef SDL
+    if (m_texture && m_renderer) {
+        SDL_UpdateTexture(m_texture, NULL, m_output->pixels, m_output->pitch);
+        SDL_RenderClear(m_renderer);
+        SDL_RenderCopy(m_renderer, m_texture, NULL, &rectDest);
+        SDL_RenderPresent(m_renderer);
+    }
+#else
+    (void)rectDest;
+#endif
 }
 #else
 
@@ -553,7 +562,7 @@ void p8_render()
         return;
 
     sprintf(m_str_buffer, "%d", (int)m_actual_fps);
-    draw_text(m_str_buffer, 0, 0, 1);
+    draw_text(m_str_buffer, strlen(m_str_buffer), 0, 0, 1, 0, false, NULL, NULL, NULL);
 
     uint16_t *output = gdi_get_frame_buffer_addr(HW_LCDC_LAYER_0);
     uint8_t *screen_mem = &m_memory[(m_memory[MEMORY_SCREEN_PHYS] << 8)];
@@ -769,331 +778,11 @@ void p8_render()
 }
 #endif
 
-#ifdef SDL
-/* Translate SDL 1.2 platform-specific scancode to SDL2 (USB HID) scancode.
- * SDL 1.2 scancode is platform-dependent:
- *   Linux  : X11 keycode = evdev + 8  (range 8-255)
- *   Windows: PS/2 Set 1 OEM code, (unsigned char) cast  (range 0-127)
- *   macOS  : Mac virtual keycode  (range 0-127)
- * m_scancodes[] and PICO-8 stat(28,k) use SDL2 scancodes. */
-#if defined(__linux__)
-static const unsigned s_sdl1_to_sdl2[256] = {
-    /* 0x00 */   0,   0,   0,   0,   0,   0,   0,   0,   0,  41,  30,  31,  32,  33,  34,  35,
-    /* 0x10 */  36,  37,  38,  39,  45,  46,  42,  43,  20,  26,   8,  21,  23,  28,  24,  12,
-    /* 0x20 */  18,  19,  47,  48,  40, 224,   4,  22,   7,   9,  10,  11,  13,  14,  15,  51,
-    /* 0x30 */  52,  53, 225,  49,  29,  27,   6,  25,   5,  17,  16,  54,  55,  56, 229,  85,
-    /* 0x40 */ 226,  44,  57,  58,  59,  60,  61,  62,  63,  64,  65,  66,  67,  83,  71,  95,
-    /* 0x50 */  96,  97,  86,  92,  93,  94,  87,  89,  90,  91,  98,  99,   0,   0, 100,  68,
-    /* 0x60 */  69,   0,   0,   0,   0,   0,   0,   0,  88, 228,  84,  70, 230,   0,  74,  82,
-    /* 0x70 */  75,  80,  79,  77,  81,  78,  73,  76,   0,   0,   0,   0,   0, 103,   0,  72,
-    /* 0x80 */   0,   0,   0,   0,   0, 227, 231, 101,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0x90 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0xa0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0xb0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0xc0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0xd0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0xe0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0xf0 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-};
-#elif defined(_WIN32)
-/* PS/2 Set 1 OEM scan codes (8-bit, extended-key bit stripped by SDL 1.2). */
-static const unsigned s_sdl1_to_sdl2[128] = {
-    /* 0x00 */   0,  41,  30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  45,  46,  42,  43,
-    /* 0x10 */  20,  26,   8,  21,  23,  28,  24,  12,  18,  19,  47,  48,  40, 224,   4,  22,
-    /* 0x20 */   7,   9,  10,  11,  13,  14,  15,  51,  52,  53, 225,  49,  29,  27,   6,  25,
-    /* 0x30 */   5,  17,  16,  54,  55,  56, 229,  85, 226,  44,  57,  58,  59,  60,  61,  62,
-    /* 0x40 */  63,  64,  65,  66,  67,  83,  71,  95,  96,  97,  86,  92,  93,  94,  87,  89,
-    /* 0x50 */  90,  91,  98,  99,  70,   0, 100,  68,  69,   0,   0,   0,   0,   0,   0,   0,
-    /* 0x60 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-    /* 0x70 */   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-};
-#elif defined(__APPLE__)
-/* Mac virtual keycodes (Carbon HIToolbox kVK_* constants). */
-static const unsigned s_sdl1_to_sdl2[128] = {
-    /* 0x00 */   4,  22,   7,   9,  11,  10,  29,  27,   6,  25,   0,   5,  20,  26,   8,  21,
-    /* 0x10 */  28,  23,  30,  31,  32,  33,  35,  34,  46,  38,  36,  45,  37,  39,  48,  18,
-    /* 0x20 */  24,  47,  12,  19,  40,  15,  13,  52,  14,  51,  49,  54,  56,  17,  16,  55,
-    /* 0x30 */  43,  44,  53,  42,   0,  41, 231, 227, 225,  57, 226, 224, 229, 230, 228,   0,
-    /* 0x40 */   0,  99,   0,  85,   0,  87,   0,  83,   0,   0,   0,  84,  88,   0,  86,   0,
-    /* 0x50 */   0,   0,  98,  89,  90,  91,  92,  93,  94,  95,   0,  96,  97,   0,   0,   0,
-    /* 0x60 */  62,  63,  64,  60,  65,  66,   0,  68,   0,   0,   0,   0,   0,  67,   0,  69,
-    /* 0x70 */   0,   0,  73,  74,  75,  76,  61,  77,  59,  78,  58,  80,  79,  81,  82,   0,
-};
-#else
-static const unsigned s_sdl1_to_sdl2[1] = {0};
-#endif
-static unsigned translate_scancode(unsigned raw) {
-    return (raw < sizeof(s_sdl1_to_sdl2)/sizeof(s_sdl1_to_sdl2[0]))
-        ? s_sdl1_to_sdl2[raw] : 0;
-}
-#endif /* SDL */
-
-void p8_update_input()
-{
-    bool pointer_lock = (m_memory[MEMORY_DEVKIT_MODE] & 0x4) != 0;
-    if (pointer_lock != m_prev_pointer_lock) {
-        m_prev_pointer_lock  = pointer_lock;
-#ifdef SDL
-        SDL_WM_GrabInput(pointer_lock ? SDL_GRAB_ON : SDL_GRAB_OFF);
-#endif
-    }
-
-#ifdef SDL
-    m_mouse_xrel = 0;
-    m_mouse_yrel = 0;
-    m_mouse_wheel = 0;
-
-    SDL_Event event;
-    while (SDL_PollEvent(&event))
-    {
-        switch (event.type)
-        {
-        case SDL_MOUSEMOTION:
-            m_mouse_x = event.motion.x * P8_WIDTH / SCREEN_WIDTH;
-            m_mouse_y = event.motion.y * P8_HEIGHT / SCREEN_HEIGHT;
-            m_mouse_xrel += event.motion.xrel * P8_WIDTH / SCREEN_WIDTH;
-            m_mouse_yrel += event.motion.yrel * P8_HEIGHT / SCREEN_HEIGHT;
-            break;
-        case SDL_MOUSEBUTTONDOWN:
-            if (event.button.button == 1) {
-                m_mouse_buttons |= 0x1;
-                if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
-                    update_buttons(0, BUTTON_ACTION1, true);
-            } else if (event.button.button == 3) {
-                m_mouse_buttons |= 0x2;
-                if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
-                    update_buttons(0, BUTTON_ACTION2, true);
-            } else if (event.button.button == 2) {
-                m_mouse_buttons |= 0x4;
-                if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
-                    update_buttons(0, BUTTON_PAUSE, true);
-            } else if (event.button.button == 4) {
-                m_mouse_wheel += 1;
-            } else if (event.button.button == 5) {
-                m_mouse_wheel -= 1;
-            }
-            break;
-        case SDL_MOUSEBUTTONUP:
-            if (event.button.button == 1) {
-                m_mouse_buttons &= ~0x1;
-                if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
-                    update_buttons(0, BUTTON_ACTION1, false);
-            } else if (event.button.button == 3) {
-                m_mouse_buttons &= ~0x2;
-                if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
-                    update_buttons(0, BUTTON_ACTION2, false);
-            } else if (event.button.button == 2) {
-                m_mouse_buttons &= ~0x4;
-                if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
-                    update_buttons(0, BUTTON_PAUSE, false);
-            }
-            break;
-        case SDL_KEYDOWN:
-            switch (event.key.keysym.sym)
-            {
-            case INPUT_LEFT:
-                update_buttons(0, BUTTON_LEFT, true);
-                break;
-            case INPUT_RIGHT:
-                update_buttons(0, BUTTON_RIGHT, true);
-                break;
-            case INPUT_UP:
-                update_buttons(0, BUTTON_UP, true);
-                break;
-            case INPUT_DOWN:
-                update_buttons(0, BUTTON_DOWN, true);
-                break;
-            case INPUT_ACTION1:
-                update_buttons(0, BUTTON_ACTION1, true);
-                break;
-            case INPUT_ACTION2:
-                update_buttons(0, BUTTON_ACTION2, true);
-                break;
-            case INPUT_ESCAPE:
-                update_buttons(0, BUTTON_ESCAPE, true);
-                break;
-            case SDLK_RETURN:
-                update_buttons(0, BUTTON_PAUSE, true);
-                update_buttons(0, BUTTON_RETURN, true);
-                break;
-            case SDLK_p:
-                update_buttons(0, BUTTON_PAUSE, true);
-                break;
-            case SDLK_SPACE:
-                update_buttons(0, BUTTON_SPACE, true);
-                break;
-            case SDLK_PAGEUP:
-                update_buttons(0, BUTTON_PAGE_UP, true);
-                break;
-            case SDLK_PAGEDOWN:
-                update_buttons(0, BUTTON_PAGE_DOWN, true);
-                break;
-            default:
-                break;
-            }
-            {
-                unsigned sdl2_sc = translate_scancode(event.key.keysym.scancode);
-                if (sdl2_sc > 0 && sdl2_sc < NUM_SCANCODES)
-                    m_scancodes[sdl2_sc] = true;
-            }
-            m_keypress = (event.key.keysym.unicode < 256) ? event.key.keysym.unicode : 0;
-            break;
-        case SDL_KEYUP:
-            switch (event.key.keysym.sym)
-            {
-            case INPUT_LEFT:
-                update_buttons(0, BUTTON_LEFT, false);
-                break;
-            case INPUT_RIGHT:
-                update_buttons(0, BUTTON_RIGHT, false);
-                break;
-            case INPUT_UP:
-                update_buttons(0, BUTTON_UP, false);
-                break;
-            case INPUT_DOWN:
-                update_buttons(0, BUTTON_DOWN, false);
-                break;
-            case INPUT_ACTION1:
-                update_buttons(0, BUTTON_ACTION1, false);
-                break;
-            case INPUT_ACTION2:
-                update_buttons(0, BUTTON_ACTION2, false);
-                break;
-            case SDLK_RETURN:
-                update_buttons(0, BUTTON_PAUSE, false);
-                update_buttons(0, BUTTON_RETURN, false);
-                break;
-            case SDLK_p:
-                update_buttons(0, BUTTON_PAUSE, false);
-                break;
-            case SDLK_SPACE:
-                update_buttons(0, BUTTON_SPACE, false);
-                break;
-            case SDLK_PAGEUP:
-                update_buttons(0, BUTTON_PAGE_UP, false);
-                break;
-            case SDLK_PAGEDOWN:
-                update_buttons(0, BUTTON_PAGE_DOWN, false);
-                break;
-            case INPUT_ESCAPE:
-                update_buttons(0, BUTTON_ESCAPE, false);
-                break;
-            default:
-                break;
-            }
-            {
-                unsigned sdl2_sc = translate_scancode(event.key.keysym.scancode);
-                if (sdl2_sc > 0 && sdl2_sc < NUM_SCANCODES)
-                    m_scancodes[sdl2_sc] = false;
-            }
-            break;
-        case SDL_QUIT:
-            p8_abort();
-            break;
-        default:
-            break;
-        }
-    }
-#else
-    uint16_t mask = 0;
-
-    if (gamepad & AXIS_L_LEFT)
-        mask |= BUTTON_MASK_LEFT;
-    if (gamepad & AXIS_L_RIGHT)
-        mask |= BUTTON_MASK_RIGHT;
-    if (gamepad & AXIS_L_UP)
-        mask |= BUTTON_MASK_UP;
-    if (gamepad & AXIS_L_DOWN)
-        mask |= BUTTON_MASK_DOWN;
-    if (gamepad & AXIS_L_TRIGGER)
-        mask |= BUTTON_MASK_ACTION1;
-    if (gamepad & AXIS_R_LEFT)
-        mask |= BUTTON_MASK_LEFT;
-    if (gamepad & AXIS_R_RIGHT)
-        mask |= BUTTON_MASK_RIGHT;
-    if (gamepad & AXIS_R_UP)
-        mask |= BUTTON_MASK_UP;
-    if (gamepad & AXIS_R_DOWN)
-        mask |= BUTTON_MASK_DOWN;
-    if (gamepad & AXIS_R_TRIGGER)
-        mask |= BUTTON_MASK_ACTION2;
-    if (gamepad & DPAD_UP)
-        mask |= BUTTON_MASK_UP;
-    if (gamepad & DPAD_RIGHT)
-        mask |= BUTTON_MASK_RIGHT;
-    if (gamepad & DPAD_DOWN)
-        mask |= BUTTON_MASK_DOWN;
-    if (gamepad & DPAD_LEFT)
-        mask |= BUTTON_MASK_LEFT;
-    if (gamepad & BUTTON_1)
-        mask |= BUTTON_MASK_ACTION1;
-    if (gamepad & BUTTON_2)
-        mask |= BUTTON_MASK_ACTION2;
-
-    m_buttons[0] = mask;
-
-#endif
-
-    if (m_memory[MEMORY_DEVKIT_MODE] & 0x2)
-        m_buttons[0] |= (((m_mouse_buttons >> 0) & 1) << 4) | (((m_mouse_buttons >> 1) & 1) << 5) | (((m_mouse_buttons >> 2) & 1) << 6);
-
-    uint8_t delay = m_memory[MEMORY_AUTO_REPEAT_DELAY];
-    if (delay == 0)
-        delay = DEFAULT_AUTO_REPEAT_DELAY;
-    uint8_t interval = m_memory[MEMORY_AUTO_REPEAT_INTERVAL];
-    if (interval == 0)
-        interval = DEFAULT_AUTO_REPEAT_INTERVAL;
-    for (unsigned p=0;p<PLAYER_COUNT;++p) {
-        m_buttonsp[p] = 0;
-        for (unsigned i=0;i<BUTTON_INTERNAL_COUNT;++i) {
-            if (m_buttons[p] & (1 << i)) {
-                if (m_button_down_time[p][i] == UINT_MAX) {
-                    // ignore buttons pressed at startup
-                } else if (!m_button_down_time[p][i]) {
-                    m_button_down_time[p][i] = m_frames;
-                    m_buttonsp[p] |= 1 << i;
-                } else if (i < BUTTON_REPEAT_COUNT) {
-                    if (delay != 255 && !(m_button_first_repeat[p] & (1 << i)) && m_frames - m_button_down_time[p][i] >= delay) {
-                        m_button_down_time[p][i] = m_frames;
-                        m_button_first_repeat[p] |= 1 << i;
-                        m_buttonsp[p] |= 1 << i;
-                    } else if ((m_button_first_repeat[p] & (1 << i)) && m_frames - m_button_down_time[p][i] >= interval) {
-                        m_button_down_time[p][i] = m_frames;
-                        m_buttonsp[p] |= 1 << i;
-                    }
-                }
-            } else  {
-#ifdef SDL
-                // Catch a press-and-release within one frame via latch
-                if ((m_buttons_latch[p] & (1 << i)) && !m_button_down_time[p][i]) {
-                    m_buttonsp[p] |= 1 << i;
-                }
-#endif
-                if (m_button_down_time[p][i]) {
-                    m_button_down_time[p][i] = 0;
-                    m_button_first_repeat[p] &= ~(1 << i);
-                }
-            }
-        }
-#ifdef SDL
-        m_buttons_latch[p] = 0;
-#endif
-    }
-
-    if (!m_dialog_showing) {
-        if ((m_buttons[0] & BUTTON_MASK_ESCAPE) != 0)
-            p8_abort();
-
-        if ((m_buttonsp[0] & BUTTON_MASK_PAUSE) != 0) {
-            p8_show_pause_menu();
-        }
-    }
-}
-
 static void p8_post_flip(void)
 {
     p8_flush_cartdata();
     p8_update_input();
+    p8_check_for_pause();
     m_frames++;
 }
 
@@ -1116,7 +805,7 @@ void p8_flip()
     p8_post_flip();
 }
 
-static void p8_main_loop()
+static int p8_main_loop()
 {
     int time_debt = 0;
     unsigned updates_since_last_flip = 0;
@@ -1125,7 +814,9 @@ static void p8_main_loop()
     {
         const int target_frame_time = 1000 / m_fps;
 
-        lua_update();
+        int ret = lua_update();
+        if (ret != 0)
+            return ret;
         updates_since_last_flip++;
 
         unsigned elapsed = p8_elapsed_time();
@@ -1133,7 +824,9 @@ static void p8_main_loop()
         time_debt += elapsed;
 
         if (time_debt < target_frame_time || updates_since_last_flip >= m_fps) {
-            lua_draw();
+            ret = lua_draw();
+            if (ret != 0)
+                return ret;
             time_debt += p8_elapsed_time() - elapsed;
 
             p8_flip();
@@ -1165,47 +858,18 @@ unsigned p8_elapsed_time(void)
     return elapsed_time;
 }
 
-void p8_pump_events(void)
+void p8_check_for_pause(void)
 {
-#ifdef SDL
-    SDL_PumpEvents();
-
-    // SDL_QUIT must be consumed and acted on immediately.
-    SDL_Event event;
-    while (SDL_PeepEvents(&event, 1, SDL_GETEVENT, SDL_QUITMASK) > 0)
-        p8_abort();
-
-    // Consume all pending keydown events.  Handle pause/escape immediately,
-    // and re-queue everything else so p8_update_input processes it normally.
-    SDL_Event keyevents[64];
-    int n = SDL_PeepEvents(keyevents, 64, SDL_GETEVENT, SDL_KEYDOWNMASK);
-    for (int i = 0; i < n; i++) {
-        SDLKey sym = keyevents[i].key.keysym.sym;
-        bool is_pause = (sym == SDLK_RETURN || sym == SDLK_p);
-        bool is_escape = (sym == INPUT_ESCAPE);
-        if (is_pause || is_escape) {
-            if (sym == SDLK_RETURN) {
-                m_buttons[0] |= BUTTON_MASK_PAUSE | BUTTON_MASK_RETURN;
-                m_button_down_time[0][BUTTON_PAUSE] = UINT_MAX;
-                m_button_down_time[0][BUTTON_RETURN] = UINT_MAX;
-            } else if (sym == SDLK_p) {
-                m_buttons[0] |= BUTTON_MASK_PAUSE;
-                m_button_down_time[0][BUTTON_PAUSE] = UINT_MAX;
-            } else if (sym == INPUT_ESCAPE) {
-                m_buttons[0] |= BUTTON_MASK_ESCAPE;
-                m_button_down_time[0][BUTTON_ESCAPE] = UINT_MAX;
-            }
-            if (!m_dialog_showing) {
-                if (is_pause)
-                    p8_show_pause_menu();
-                else if (is_escape)
-                    p8_abort();
-            }
-        } else {
-            SDL_PushEvent(&keyevents[i]);
+    if (!m_dialog_showing) {
+        if (cart_running || lua_running) {
+            if ((m_buttonsp[0] & BUTTON_MASK_ESCAPE) != 0)
+                p8_abort();
+        }
+        if (cart_running) {
+            if ((m_buttonsp[0] & BUTTON_MASK_PAUSE) != 0)
+                p8_show_pause_menu();
         }
     }
-#endif
 }
 
 void p8_seed_rng_state(uint32_t seed)
@@ -1241,6 +905,8 @@ void p8_seed_rng_state(uint32_t seed)
 
 void p8_reset(void)
 {
+    uint8_t cursor_x = m_memory[MEMORY_CURSOR];
+    uint8_t cursor_y = m_memory[MEMORY_CURSOR + 1];
     memset(m_memory + MEMORY_DRAWSTATE, 0, MEMORY_DRAWSTATE_SIZE);
     memset(m_memory + MEMORY_HARDWARESTATE, 0, MEMORY_HARDWARESTATE_SIZE);
     m_memory[MEMORY_SCREEN_PHYS] = 0x60;
@@ -1252,71 +918,137 @@ void p8_reset(void)
     clip_set(0, 0, P8_WIDTH, P8_HEIGHT);
     // time(NULL) is a plain integer; shift left 16 to make it a fix32 integer.
     p8_seed_rng_state((uint32_t)time(NULL) << 16);
+    m_memory[MEMORY_CURSOR] = cursor_x;
+    m_memory[MEMORY_CURSOR + 1] = cursor_y;
+}
+
+static void p8_common_reset_cart()
+{
+    assert(!cart_running);
+    p8_close_cartdata();
+    lua_shutdown_api();
+    lua_load_api();
+    p8_reset();
+    m_frames = 0;
+    p8_reset_input();
+    p8_update_input();
+}
+
+void p8_new_cart(void)
+{
+    assert(!cart_running);
+    m_current_cart_file_name[0] = '\0';
+    memset(m_cart_memory, 0, CART_MEMORY_SIZE);
+    memset(m_memory, 0, CART_MEMORY_SIZE);
+    p8_common_reset_cart();
+}
+
+void p8_reset_cart(void)
+{
+    assert(!cart_running);
+    memcpy(m_memory, m_cart_memory, CART_MEMORY_SIZE);
+    p8_common_reset_cart();
 }
 
 void __attribute__ ((noreturn)) p8_abort()
 {
+    assert(cart_running);
     longjmp(jmpbuf_restart, 1);
 }
 
 void __attribute__ ((noreturn)) p8_restart()
 {
+    assert(cart_running);
     restart = true;
     p8_abort();
 }
 
-char *p8_resolve_relative_path(const char *filename, bool for_cstore)
+void p8_quit()
 {
-    if (filename[0] == '/' || filename[1] == ':')
-        return strdup(filename);
-
-    if (!current_cart_dir)
-        return strdup(filename);
-
-    for (int pass=1;pass<=(for_cstore?1:2);pass++) {
-        const char *cart_dir = (pass == 1) ? DEFAULT_CARTS_PATH : current_cart_dir;
-        size_t len = strlen(cart_dir) + strlen(filename) + 2;
-        char *resolved_path = malloc(len);
-        if (resolved_path) {
-            snprintf(resolved_path, len, "%s/%s", cart_dir, filename);
-            if (pass == (for_cstore ? 1 : 2) || access(resolved_path, F_OK) == 0)
-                return resolved_path;
-            free(resolved_path);
-        }
-    }
-
-    return NULL;
+    quit_requested = true;
+    if (cart_running || lua_running)
+        p8_abort();
 }
 
-void __attribute__ ((noreturn)) p8_load_new(const char *filename, const char *param)
+bool p8_is_cart_running(void)
 {
-    assert(m_load_available);
+    return cart_running;
+}
 
-    if (load_filename) {
-#ifdef OS_FREERTOS
-        rh_free(load_filename);
-#else
-        free(load_filename);
-#endif
-    }
-    if (load_param) {
-#ifdef OS_FREERTOS
-        rh_free(load_param);
-#else
-        free(load_param);
-#endif
+bool p8_is_quit_requested(void)
+{
+    return quit_requested;
+}
+
+int p8_make_full_path(char *ret, int ret_size, const char *dir_path, const char *file_name)
+{
+    if (!ret || !dir_path || !file_name) {
+        errno = EINVAL;
+        return -1;
     }
 
-    load_filename = strdup(filename);
-    load_param = param ? strdup(param) : NULL;
-    load_requested = true;
+    size_t dir_len = strlen(dir_path);
+    size_t file_len = strlen(file_name);
+    if (dir_len > PATH_MAX || file_len > PATH_MAX || dir_len + 1 + file_len > PATH_MAX)
+        return -1;
 
-    longjmp(jmpbuf_load, 1);
+    if (strcmp(file_name, "..") == 0) {
+        strcpy(ret, dir_path);
+        char *slash = strrchr(ret, '/');
+        if (!slash)
+            slash = strrchr(ret, '\\');
+        if (slash) {
+            if (slash[1] == '\0' && ret[1] == ':' && slash==ret+2) {
+                // If going up a directory from the root of a drive,
+                // go up to the list of drives rather than the current
+                // directory of the drive.
+                // i.e. "C:\" -> "" rather than "C:\" -> "C:"
+                ret[0] = '\0';
+            } else if (ret[1] == ':' && slash==ret+2) {
+                // If going up to the root of the drive don't erase
+                // the trailing slash.
+                slash[1] = '\0';
+            } else {
+                slash[0] = '\0';
+            }
+        }
+    } else {
+        strcpy(ret, dir_path);
+        if (dir_len > 0 &&
+            ret[dir_len - 1] != '/' &&
+            ret[dir_len - 1] != '\\')
+            strcat(ret, "/");
+        strcat(ret, file_name);
+    }
+    return 0;
+}
+
+int p8_resolve_relative_path(char *dest_filename, const char *src_filename, size_t dest_size, bool for_cstore)
+{
+    if (src_filename[0] == '/' || src_filename[1] == ':')
+        return strtcpy(dest_filename, src_filename, dest_size);
+
+    if (!m_current_cart_dir[0])
+        return strtcpy(dest_filename, src_filename, dest_size);
+
+    for (int pass=1;pass<=(for_cstore?1:2);pass++) {
+        const char *cart_dir = (pass == 1) ? DEFAULT_CARTS_PATH : m_current_cart_dir;
+        int ret = snprintf(dest_filename, dest_size, "%s/%s", cart_dir, src_filename);
+        if (pass == (for_cstore ? 1 : 2) || access(dest_filename, F_OK) == 0)
+            return (ret > 0 && (size_t)ret < dest_size) ? ret : -1;
+    }
+
+    return -1;
 }
 
 void p8_set_skip_main_loop_if_no_callbacks(bool skip)
 {
     skip_main_loop_if_no_callbacks = skip;
+}
+
+bool p8_get_skip_main_loop_if_no_callbacks(void)
+{
+    return skip_main_loop_if_no_callbacks;
 }
 
 bool p8_open_cartdata(const char *id)
@@ -1421,3 +1153,16 @@ void p8_show_version_dialog(void)
     p8_dialog_cleanup(&dialog);
 }
 
+void p8_show_lua_error_dialog(void)
+{
+    const char *err_type;
+    char err_msg[256];
+    err_msg[0] = '\0';
+    lua_get_error(&err_type, err_msg, sizeof(err_msg), NULL, NULL);
+
+    const char *lines[] = {
+        err_type ? err_type : "",
+        err_msg
+    };
+    p8_show_error_dialog(lines, 2, P8_ERROR_ERROR);
+}

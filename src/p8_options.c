@@ -13,8 +13,10 @@
 #define CONTROLS_CARD_HEIGHT 38
 
 /* Draw the keyboard reference card for the controls dialog */
-static void draw_controls_card(int x, int y, int width, int height)
+static void draw_controls_card(const p8_dialog_t *dialog, void *user_data, int x, int y, int width, int height)
 {
+    (void)dialog;
+    (void)user_data;
     (void)height;
 
     int col_w = width / 2;
@@ -62,7 +64,7 @@ static void draw_controls_card(int x, int y, int width, int height)
 void p8_show_controls_dialog(void)
 {
     p8_dialog_control_t controls[] = {
-        DIALOG_CUSTOM_CONTROL(110, CONTROLS_CARD_HEIGHT, draw_controls_card),
+        DIALOG_CUSTOM_CONTROL(110, CONTROLS_CARD_HEIGHT, draw_controls_card, NULL),
         DIALOG_SPACING(),
         DIALOG_BUTTONBAR_OK_ONLY()
     };

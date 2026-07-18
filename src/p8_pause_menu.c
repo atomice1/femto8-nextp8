@@ -6,10 +6,12 @@
 #include <setjmp.h>
 #include <stdlib.h>
 #include <string.h>
+#include "strtcpy.h"
 
 #include "p8_pause_menu.h"
 #include "p8_emu.h"
 #include "p8_dialog.h"
+#include "p8_input.h"
 #include "p8_overlay_helper.h"
 #include "p8_options.h"
 #include "p8_audio.h"
@@ -31,8 +33,7 @@ void p8_menuitem_set(int index, const char *label, int lua_callback_ref)
     if (item->lua_callback_ref != LUA_NOREF && L)
         luaL_unref(L, LUA_REGISTRYINDEX, item->lua_callback_ref);
     item->active = true;
-    strncpy(item->label, label ? label : "", sizeof(item->label) - 1);
-    item->label[sizeof(item->label) - 1] = '\0';
+    strtcpy(item->label, label ? label : "", sizeof(item->label));
     item->lua_callback_ref = lua_callback_ref;
 }
 
@@ -42,8 +43,7 @@ void p8_menuitem_set_label(int index, const char *label)
         return;
     p8_custom_menuitem_t *item = &m_custom_menuitems[index - 1];
     item->active = true;
-    strncpy(item->label, label ? label : "", sizeof(item->label) - 1);
-    item->label[sizeof(item->label) - 1] = '\0';
+    strtcpy(item->label, label ? label : "", sizeof(item->label));
 }
 
 void p8_menuitem_clear(int index)
@@ -100,8 +100,6 @@ void p8_show_pause_menu(void)
         return;
     }
 
-    m_dialog_showing = true;
-
     /* Pause audio during pause menu unless 0x5f2f == 2 */
     bool should_pause_audio = m_memory[MEMORY_AUDIO_PAUSE] != 2;
     if (should_pause_audio)
@@ -132,10 +130,9 @@ void p8_show_pause_menu(void)
 
     // Run dialog loop, allowing menuitem callbacks to keep the menu open
     p8_dialog_set_showing(&pause_dialog, true);
-    m_keypress = 0;
 
     int action_id = -1;
-    for (;;) {
+    while (!p8_is_quit_requested()) {
         p8_dialog_draw(&pause_dialog);
         p8_flip();
         p8_dialog_action_t result = p8_dialog_update(&pause_dialog);
@@ -177,8 +174,7 @@ void p8_show_pause_menu(void)
 
     p8_dialog_set_showing(&pause_dialog, false);
     p8_dialog_cleanup(&pause_dialog);
-
-    m_dialog_showing = false;
+    p8_flip(); // Ensure dialog hides immediately even if next flip is some time away
 
     if (should_pause_audio)
         audio_resume();
