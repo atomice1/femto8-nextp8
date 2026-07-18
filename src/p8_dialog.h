@@ -86,8 +86,6 @@ typedef struct {
 } p8_dialog_control_t;
 
 /* Dialog Structure */
-typedef struct p8_dialog p8_dialog_t;
-
 struct p8_dialog {
     const char *title;                  // Dialog title (optional, can be NULL)
     p8_dialog_control_t *controls;      // Array of controls

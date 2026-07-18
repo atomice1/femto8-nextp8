@@ -503,6 +503,7 @@ void p8_init_input(void)
     *(volatile uint8_t *)_JOYSTICK0_LATCHED = 0xff;
     *(volatile uint8_t *)_JOYSTICK1_LATCHED = 0xff;
     *(volatile uint8_t *)_MOUSE_BUTTONS_LATCHED = 0xff;
+    *(volatile uint8_t *)_KEYBOARD_EVENT_QUEUE_LO = 0x00;
 #endif
 
     p8_reset_input();

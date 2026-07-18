@@ -2746,7 +2746,6 @@ int lua_exec_repl(const char *input)
     return m_status;
 }
 
-
 void lua_get_error(const char **err_type, char *err, int err_size, const char **filename, int *lineno)
 {
     if (!L) {
