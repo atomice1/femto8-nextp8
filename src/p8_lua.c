@@ -45,6 +45,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "p8_lua_helper.h"
+#include "p8_main.h"
 #include "p8_print_helper.h"
 #include "pico_font.h"
 #include "p8_parser.h"
@@ -2268,6 +2269,15 @@ int lua_reboot(lua_State *L)
     return 0;
 }
 
+// browse()
+// Switch to the file browser screen.
+int lua_browse(lua_State *L)
+{
+    (void)L;
+    p8_set_active_screen(P8_SCREEN_BROWSE);
+    return 0;
+}
+
 // cd([directory])
 // Change the current cartridge directory.
 int cd(lua_State *L)
@@ -2377,6 +2387,10 @@ void lua_register_functions(lua_State *L)
     lua_register(L, "btn", btn);
     lua_register(L, "btnp", btnp);
     lua_register(L, "_update_buttons", _update_buttons);
+    // ****************************************************************
+    // *** Screen control ***
+    // ****************************************************************
+    lua_register(L, "browse", lua_browse);
     // ****************************************************************
     // *** Sound ***
     // ****************************************************************
