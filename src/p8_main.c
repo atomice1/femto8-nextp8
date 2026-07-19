@@ -92,7 +92,7 @@ void p8_main(void)
         if (screen->handle_buttons) 
             buttons_handled = screen->handle_buttons(button_mask, buttonp_mask);
 
-        /* Escape switches screens: BROWSE -> BROWSE */
+        /* Escape switches screens: BROWSE -> EDIT -> REPL -> EDIT -> REPL -> ... (forever) */
         if (!buttons_handled && (buttonp_mask & BUTTON_MASK_ESCAPE)) {
             p8_screen_index_t next_screen;
             switch (current_screen) {
@@ -103,7 +103,8 @@ void p8_main(void)
                     next_screen = P8_SCREEN_REPL;
                     break;
                 case P8_SCREEN_REPL:
-                    next_screen = P8_SCREEN_BROWSE;
+                    /* After reaching REPL, keep toggling between EDIT and REPL */
+                    next_screen = P8_SCREEN_EDIT;
                     break;
                 default:
                     next_screen = P8_SCREEN_BROWSE;
