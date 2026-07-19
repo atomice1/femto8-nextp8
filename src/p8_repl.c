@@ -405,13 +405,43 @@ static void repl_handle_keypress(int scancode, int keypress, int keymod)
     }
 }
 
+/* Banner display state */
+static bool repl_banner_shown = false;
+
+static void repl_show(void)
+{
+    if (!repl_banner_shown) {
+        repl_banner_shown = true;
+        overlay_clear();
+        
+        /* Print welcome banner with colored text
+         * "welcome to nextp8" where nextp8 has specific colors (hex values):
+         * n=8, e=A, x=B, t=C, p=7, 8=7
+         * Other characters use light-grey (6)
+         * Using P8SCII: \f sets foreground color (C escape \f = byte 0x0c)
+         */
+        const char *banner =
+            "welcome to \f8n\fAe\fBx\fCt\f7p8\n\n"
+            "\f6type \f7browse\f6 to return to the\n"
+            "browser\n\n"
+            "press \f7break/esc\f6 to return to\n"
+            "the editor\n";
+        int x, y;
+        cursor_get(&x, &y);
+        draw_text(banner, strlen(banner), x, y, 6, 0, false, &x, &y, NULL);
+        cursor_set(x, y, -1);
+    }
+}
+
 static void repl_init(void)
 {
     lua_load_api();
+    repl_banner_shown = false;
 }
 
 p8_screen_t p8_screen_repl = {
     .init = repl_init,
+    .show = repl_show,
     .draw = repl_draw,
     .update = repl_update,
     .handle_keypress = repl_handle_keypress,
