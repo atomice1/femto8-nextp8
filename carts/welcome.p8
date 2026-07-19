@@ -9,8 +9,10 @@ end
 function _draw()
  cls()
  print("welcome to", 44, 20)
- print("copy your carts to", 28, 110)
- print("/machines/nextp8/carts", 20, 116)
+ print("copy your carts to", 28, 92)
+ print("/machines/nextp8/carts", 20, 98)
+ print("press \f7break/esc\f6", 34, 110)
+ print("to edit this cart", 30, 116)
  local x=64
  local y=64
  local tx=0
