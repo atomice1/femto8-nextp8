@@ -47,6 +47,9 @@ static void editor_screen_hide();
 static p8_tab_t active_tab = P8_TAB_CODE;
 static bool cart_modified = false;
 
+/* Screen memory saving/restoring */
+static uint8_t saved_main_screen[MEMORY_SCREEN_SIZE];
+
 /* --- Tab dispatch table ----------------------------------------------------- */
 
 static p8_editor_tab_t * const tab_subeditors[P8_TAB_COUNT] = {
@@ -290,9 +293,15 @@ static void editor_screen_shutdown(void)
 
 static void editor_screen_show(void)
 {
+    /* Save current screen memory before showing editor */
+    memcpy(saved_main_screen, m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8), MEMORY_SCREEN_SIZE);
+
     p8_dialog_set_showing(&editor_dialog, true);
     if (tab_subeditors[active_tab]->show)
         tab_subeditors[active_tab]->show();
+
+    /* Clear main screen memory */
+    memset(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8), 0, MEMORY_SCREEN_SIZE);
 }
 
 static void editor_screen_hide(void)
@@ -304,6 +313,9 @@ static void editor_screen_hide(void)
         if (tab_subeditors[i]->sync)
             tab_subeditors[i]->sync();
     }
+
+    /* Restore saved screen memory */
+    memcpy(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8), saved_main_screen, MEMORY_SCREEN_SIZE);
 }
 
 static void editor_screen_draw(int x, int y, int w, int h)

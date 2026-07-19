@@ -79,6 +79,9 @@ static int capacity = 0;
 static int selected_index = 0;
 static char last_browse_cart_dir[PATH_MAX];
 
+/* Screen memory saving/restoring */
+static uint8_t saved_main_screen[MEMORY_SCREEN_SIZE];
+
 static void clear_dir_contents(void) {
     filename_mem_ptr = filename_mem;
     nitems = 0;
@@ -458,6 +461,9 @@ static void browse_init(void)
 
 static void browse_show(void)
 {
+    /* Save current screen memory before showing browse */
+    memcpy(saved_main_screen, m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8), MEMORY_SCREEN_SIZE);
+
     /* Relist directory if current_cart_dir changed since last show/hide, or first time */
     bool changed = strcmp(m_current_cart_dir, last_browse_cart_dir) != 0;
     if (changed) {
@@ -490,8 +496,10 @@ static void browse_hide(void)
     /* Record current directory so browse_show can detect external changes (e.g. cd()) */
     strtcpy(last_browse_cart_dir, m_current_cart_dir, sizeof(last_browse_cart_dir));
 
+    /* Restore saved screen memory */
+    memcpy(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8), saved_main_screen, MEMORY_SCREEN_SIZE);
+
     reset_color();
-    memset(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8), 0, MEMORY_SCREEN_SIZE);
 }
 
 static void browse_update(void)
