@@ -123,7 +123,8 @@ int main(int argc, char *argv[])
     }
 #endif
 #endif
-    p8_init();
+    if (p8_init() != 0)
+        return EXIT_FAILURE;
 
     if (file_name == NULL) {
         do {
