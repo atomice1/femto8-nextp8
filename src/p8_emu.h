@@ -289,6 +289,7 @@ extern char m_param_string[256];
 extern bool m_load_available;
 
 void __attribute__ ((noreturn)) p8_abort();
+void p8_check_for_next_frame(void);
 void p8_check_for_pause(void);
 void p8_clear_reboot_requested(void);
 void p8_clear_quit_requested(void);
