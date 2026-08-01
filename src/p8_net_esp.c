@@ -79,6 +79,7 @@ int net_lookup_domain(const char *domain_name, char *ip_address, size_t ip_addre
         }
 
         if (strcmp(response, "ERROR") == 0 || strcmp(response, "FAIL") == 0) {
+            fprintf(stderr, "net_lookup_domain: failed to resolve domain '%s'\n", domain_name);
             errno = EINVAL;
             return -1;
         }

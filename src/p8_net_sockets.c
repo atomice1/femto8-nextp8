@@ -60,6 +60,7 @@ int net_lookup_domain(const char *domain_name, char *ip_address, size_t ip_addre
 
     status = getaddrinfo(domain_name, NULL, &hints, &res);
     if (status != 0) {
+        fprintf(stderr, "net_lookup_domain: getaddrinfo failed for '%s': %s\n", domain_name, gai_strerror(status));
         errno = EINVAL;
         return -1;
     }
@@ -100,6 +101,7 @@ int net_start_tcp(const char *remote_ip, unsigned remote_port)
     if (inet_pton(AF_INET, remote_ip, &server_addr.sin_addr) <= 0) {
         close(sockfd);
         sockfd = -1;
+        fprintf(stderr, "net_start_tcp: invalid IP address '%s'\n", remote_ip);
         errno = EINVAL;
         return -1;
     }

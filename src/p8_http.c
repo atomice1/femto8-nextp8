@@ -47,6 +47,7 @@ static int parse_url(const char *url, bool *use_ssl, char *host, size_t host_len
         *port = 443;
         p += 8;
     } else {
+        fprintf(stderr, "parse_url: unsupported protocol in URL '%s'\n", url);
         errno = EINVAL;
         return -1;
     }
@@ -59,11 +60,20 @@ static int parse_url(const char *url, bool *use_ssl, char *host, size_t host_len
 
     size_t host_size = host_end - host_start;
     if (host_size == 0 || host_size >= host_len) {
+        fprintf(stderr, "parse_url: invalid host in URL '%s'\n", url);
         errno = EINVAL;
         return -1;
     }
 
-    strtcpy(host, host_start, host_len);
+    /* Null-terminate host at host_end */
+    size_t host_copy_len = host_end - host_start;
+    if (host_copy_len >= host_len) {
+        fprintf(stderr, "parse_url: invalid host in URL '%s'\n", url);
+        errno = EINVAL;
+        return -1;
+    }
+    memcpy(host, host_start, host_copy_len);
+    host[host_copy_len] = '\0';
     p = host_end;
 
     /* Extract port if present */
@@ -75,6 +85,7 @@ static int parse_url(const char *url, bool *use_ssl, char *host, size_t host_len
             p++;
         }
         if (*port == 0 || *port > 65535) {
+            fprintf(stderr, "parse_url: invalid port in URL '%s'\n", url);
             errno = EINVAL;
             return -1;
         }
@@ -84,11 +95,13 @@ static int parse_url(const char *url, bool *use_ssl, char *host, size_t host_len
     if (*p == '\0' || *p == '/') {
         const char *path_start = *p ? p : "/";
         if (strlen(path_start) >= path_len) {
+            fprintf(stderr, "parse_url: path too long in URL '%s'\n", url);
             errno = EINVAL;
             return -1;
         }
         strcpy(path, path_start);
     } else {
+        fprintf(stderr, "parse_url: invalid path in URL '%s'\n", url);
         errno = EINVAL;
         return -1;
     }
@@ -186,6 +199,7 @@ int http_start_get(const char *url)
     }
 
     /* Resolve hostname */
+    fprintf(stderr, "Resolving domain '%s'...\n", host);
     if (net_lookup_domain(host, ip, sizeof(ip)) < 0) {
         return -1;
     }
@@ -242,6 +256,7 @@ ssize_t http_recv(void *data, unsigned max_length)
 
         /* Parse HTTP version and status code */
         if (sscanf(line, "HTTP/%*d.%*d %d", &http_status_code) != 1) {
+            fprintf(stderr, "http_recv: failed to parse HTTP status line '%s'\n", line);
             errno = EINVAL;
             return -1;
         }

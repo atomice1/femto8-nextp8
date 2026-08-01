@@ -23,11 +23,13 @@ int bbs_start_get_cart(int cat, int play_src, const char *lid)
 
     /* Validate parameters */
     if (cat < 0 || cat > 7) {
+        fprintf(stderr, "bbs_start_get_cart: invalid category %d\n", cat);
         errno = EINVAL;
         return -1;
     }
 
     if (!lid || strlen(lid) == 0) {
+        fprintf(stderr, "bbs_start_get_cart: invalid lid\n");
         errno = EINVAL;
         return -1;
     }

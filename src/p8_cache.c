@@ -55,7 +55,7 @@ static int build_cache_filename(const char *cart_id, char *buffer, size_t buffer
 
 int cache_download(const char *cart_id, char *filename_out, unsigned max_filename_length)
 {
-    char temp_filename[256];
+    char temp_filename[PATH_MAX+1];
     FILE *fp = NULL;
     unsigned char buffer[CACHE_BUFFER_SIZE];
     ssize_t bytes_read;
@@ -64,6 +64,7 @@ int cache_download(const char *cart_id, char *filename_out, unsigned max_filenam
     assert(sizeof(temp_filename) >= max_filename_length);
 
     if (!cart_id || strlen(cart_id) == 0) {
+        printf("cache_download: invalid cart_id\n");
         errno = EINVAL;
         return -1;
     }
