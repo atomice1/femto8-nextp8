@@ -81,6 +81,7 @@ int cache_download(const char *cart_id, char *filename_out, unsigned max_filenam
 
     /* Check if already cached */
     if (access(filename_out, R_OK) == 0 && strcmp(CACHE_PATH, DEFAULT_CARTS_PATH) != 0) {
+        printf("Using cached cart %s\n", filename_out);
         return 0;
     }
 
@@ -128,6 +129,8 @@ int cache_download(const char *cart_id, char *filename_out, unsigned max_filenam
         unlink(temp_filename);
         return -1;
     }
+
+    printf("Downloaded cart to %s\n", filename_out);
 
     return 0;
 }

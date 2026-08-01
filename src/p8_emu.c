@@ -1325,7 +1325,6 @@ int p8_download_bbs_cart(const char *cart_id, char *cached_filename, size_t cach
     } else {
         /* Successfully downloaded - set BBS cart ID */
         strtcpy(m_bbs_cart_id, cart_id, sizeof(m_bbs_cart_id));
-        printf("Downloaded cart to %s\n", cached_filename);
         return 0;
     }
 }
