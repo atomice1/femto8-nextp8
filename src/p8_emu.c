@@ -93,7 +93,9 @@ static bool in_main_loop = false;
 
 char m_current_cart_dir[PATH_MAX];
 char m_current_cart_file_name[PATH_MAX];
+char m_real_current_cart_file_name[PATH_MAX];
 char m_breadcrumb[256];
+char m_breadcrumb_cart_file_name[PATH_MAX];
 char m_bbs_cart_id[256];
 char m_param_string[256];
 char m_clipboard[1024];
@@ -265,6 +267,8 @@ int p8_init()
     memset(m_cart_memory, 0, CART_MEMORY_SIZE);
     memset(m_overlay_memory, (OVERLAY_TRANSPARENT_COLOR << 4) | OVERLAY_TRANSPARENT_COLOR, MEMORY_SCREEN_SIZE);
     m_lua_script[0] = '\0';
+    m_breadcrumb_cart_file_name[0] = '\0';
+    m_breadcrumb[0] = '\0';
 
 #ifdef ENABLE_AUDIO
     audio_init();
@@ -336,9 +340,11 @@ int p8_load(const char *file_name, const char *param, const char *bbs_cart_id, c
     strtcpy(m_param_string, param ? param : "", sizeof(m_param_string));
     strtcpy(m_bbs_cart_id, bbs_cart_id ? bbs_cart_id : "", sizeof(m_bbs_cart_id));
     strtcpy(m_breadcrumb, breadcrumb ? breadcrumb : "", sizeof(m_breadcrumb));
+    strtcpy(m_breadcrumb_cart_file_name, m_real_current_cart_file_name, sizeof(m_breadcrumb_cart_file_name));
 
     p8_editor_invalidate();
 
+    strtcpy(m_real_current_cart_file_name, file_name, sizeof(m_real_current_cart_file_name));
     if (bbs_cart_id) {
         m_current_cart_file_name[0] = '\0';
     } else {
@@ -355,7 +361,7 @@ int p8_load(const char *file_name, const char *param, const char *bbs_cart_id, c
         }
     }
 
-    if (cart_running)
+    if (!cart_running)
         p8_reset_cart();
 
     p8_show_io_icon(false);
@@ -387,7 +393,6 @@ int p8_run(void)
         // should not be reachable
         abort();
     }
-    assert(!cart_running);
 
     if (setjmp(jmpbuf_restart)) {
         cart_running = false;
@@ -395,6 +400,7 @@ int p8_run(void)
             return 0;
     }
     restart = false;
+    assert(!lua_running && !cart_running);
 
     p8_reset_cart();
 
@@ -1069,8 +1075,10 @@ void p8_reset(void)
 static void p8_common_reset_cart()
 {
     p8_close_cartdata();
-    lua_shutdown_api();
-    lua_load_api();
+    if (!lua_running) {
+        lua_shutdown_api();
+        lua_load_api();
+    }
     p8_reset();
     m_frames = 0;
     p8_reset_input();
@@ -1081,6 +1089,7 @@ void p8_new_cart(void)
 {
     assert(!cart_running);
     m_current_cart_file_name[0] = '\0';
+    m_real_current_cart_file_name[0] = '\0';
     memset(m_cart_memory, 0, CART_MEMORY_SIZE);
     memset(m_memory, 0, CART_MEMORY_SIZE);
     m_lua_script[0] = '\0';
