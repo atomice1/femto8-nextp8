@@ -220,11 +220,100 @@ function test_table_constructor()
     end)
 end
 
+function test_pack()
+    test_case("pack_basic_args", function()
+        local x, y, dx, dy = 1, 2, 3, 4
+        local tbl = pack(x, y, dx, dy)
+        check_eq(type(tbl), "table")
+        check_eq(tbl[1], x)
+        check_eq(tbl[2], y)
+        check_eq(tbl[3], dx)
+        check_eq(tbl[4], dy)
+        check_eq(tbl.n, 4)
+        check_eq(#tbl, 4)
+    end)
+
+    test_case("pack_two_args", function()
+        local x, y = 10, 20
+        local tbl = pack(x, y)
+        check_eq(tbl[1], x)
+        check_eq(tbl[2], y)
+        check_eq(tbl.n, 2)
+        check_eq(#tbl, 2)
+    end)
+
+    test_case("pack_with_nil_args", function()
+        local x, y = 5, 10
+        local tbl = pack(x, y, nil, nil)
+        check_eq(tbl[1], x)
+        check_eq(tbl[2], y)
+        check_eq(tbl[3], nil)
+        check_eq(tbl[4], nil)
+        check_eq(tbl.n, 4)
+        -- #tbl counts array length, stops at first nil from end
+        check_eq(#tbl, 2)
+    end)
+
+    test_case("pack_single_arg", function()
+        local tbl = pack(42)
+        check_eq(tbl[1], 42)
+        check_eq(tbl.n, 1)
+        check_eq(#tbl, 1)
+    end)
+
+    test_case("pack_no_args", function()
+        local tbl = pack()
+        check_eq(tbl.n, 0)
+        check_eq(#tbl, 0)
+    end)
+
+    test_case("pack_nil_only", function()
+        local tbl = pack(nil)
+        check_eq(tbl[1], nil)
+        check_eq(tbl.n, 1)
+        -- #tbl returns 0 when first element is nil
+        check_eq(#tbl, 0)
+    end)
+
+    test_case("pack_multiple_nil_in_middle", function()
+        local tbl = pack(1, nil, 2, nil, 3)
+        check_eq(tbl[1], 1)
+        check_eq(tbl[2], nil)
+        check_eq(tbl[3], 2)
+        check_eq(tbl[4], nil)
+        check_eq(tbl[5], 3)
+        check_eq(tbl.n, 5)
+        -- Pico-8 # operator: when array is full, returns full size
+        check_eq(#tbl, 5)
+    end)
+
+    test_case("pack_strings_and_numbers", function()
+        local tbl = pack("hello", 42, "world", 100)
+        check_eq(tbl[1], "hello")
+        check_eq(tbl[2], 42)
+        check_eq(tbl[3], "world")
+        check_eq(tbl[4], 100)
+        check_eq(tbl.n, 4)
+        check_eq(#tbl, 4)
+    end)
+
+    test_case("pack_tables_as_args", function()
+        local t1 = {1, 2}
+        local t2 = {3, 4}
+        local tbl = pack(t1, t2)
+        check_eq(tbl[1], t1)
+        check_eq(tbl[2], t2)
+        check_eq(tbl.n, 2)
+        check_eq(#tbl, 2)
+    end)
+end
+
 function _init()
     test_suite("count", test_count)
     test_suite("deli", test_deli)
     test_suite("all_and_del", test_all_and_del)
     test_suite("split", test_split)
     test_suite("table_constructor", test_table_constructor)
+    test_suite("pack", test_pack)
     summary()
 end
