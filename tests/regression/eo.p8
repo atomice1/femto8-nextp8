@@ -7,7 +7,7 @@ __lua__
 function test_eo()
     it=0
     test_case("eo1", function()
-        function eo1(e)local t,o,l,n,d,f,u,i=1,0,0,1,1,8,8,{}for e=1,f do local n={}for e=1,u do n[e]=0end i[e]=n end t=3while t<#e do printh("eo1: t="..t)it+=1l=10o=10i[n][d]=l n+=1if(n>f)n=1d+=1
+        function eo1(e)local t,o,l,n,d,f,u,i=1,0,0,1,1,8,8,{}for e=1,f do local n={}for e=1,u do n[e]=0end i[e]=n end t=3printh("e=" .. e)while t<#e do printh("eo1: t="..t)it+=1l=10o=10i[n][d]=l n+=1if(n>f)n=1d+=1
         while(o>0)i[n][d]=l o-=1n+=1if(n>f)n=1d+=1
         t+=2end return i,f,u end
         eo1("))(0Q((6c(d((,b(9)d((+Y/87")
@@ -21,7 +21,7 @@ function test_eo()
             for e = 1, f do
                 local n = {}
                 for e = 1, u do
-                n[e] = 0
+                    n[e] = 0
                 end
                 i[e] = n
             end
@@ -35,17 +35,17 @@ function test_eo()
                 i[n][d] = l
                 n += 1
                 if n > f then
-                n = 1
-                d += 1
-                end
-                while o > 0 do
-                i[n][d] = l
-                o -= 1
-                n += 1
-                if n > f then
                     n = 1
                     d += 1
                 end
+                while o > 0 do
+                    i[n][d] = l
+                    o -= 1
+                    n += 1
+                    if n > f then
+                        n = 1
+                        d += 1
+                    end
                 end
                 t += 2
             end

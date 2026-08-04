@@ -101,9 +101,13 @@ function check_nil(a)
     end
 end
 
-function check_eq(a, b)
+function check_eq(a, b, ctx)
     if not eq(a, b) then
-        fail(tostr1(a) .. " != " .. tostr1(b))
+        if ctx then
+            fail(ctx .. ": " .. tostr1(a) .. " != " .. tostr1(b))
+        else
+            fail(tostr1(a) .. " != " .. tostr1(b))
+        end
     end
 end
 
