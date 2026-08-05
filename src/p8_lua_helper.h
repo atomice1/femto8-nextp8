@@ -577,6 +577,8 @@ static inline void draw_scaled_sprite(int sx, int sy, int sw, int sh, int dx, in
                     {
                         int src_x = sx + (flip_x ? (sw - 1 - (x * sw) / dw) : (x * sw) / dw);
                         int src_y = sy + (flip_y ? (sh - 1 - (y * sh) / dh) : (y * sh) / dh);
+                        if (src_x < 0 || src_x >= P8_WIDTH || src_y < 0 || src_y >= P8_HEIGHT)
+                            continue;
                         int sprite_offset = base_sprite_offset + (src_x >> 1) + src_y * 64;
                         uint8_t index = IS_EVEN(src_x) ? m_memory[sprite_offset] & 0xF : m_memory[sprite_offset] >> 4;
                         uint8_t color = color_get(PALTYPE_DRAW, index);
@@ -740,7 +742,7 @@ static inline int gfx_addr_remap(int location)
 
 static inline uint8_t gfx_addr_get(int x, int y, uint8_t *memory, int location, int size)
 {
-    if (x < 0 || y < 0 || x > P8_WIDTH || y > P8_HEIGHT)
+    if (x < 0 || y < 0 || x >= P8_WIDTH || y >= P8_HEIGHT)
         return 0;
     int offset = location + (x >> 1) + y * 64;
 
@@ -749,7 +751,7 @@ static inline uint8_t gfx_addr_get(int x, int y, uint8_t *memory, int location, 
 
 static inline uint8_t gfx_get(int x, int y, int location, int size)
 {
-    if (x < 0 || y < 0 || x > P8_WIDTH || y > P8_HEIGHT)
+    if (x < 0 || y < 0 || x >= P8_WIDTH || y >= P8_HEIGHT)
         return 0;
     location = gfx_addr_remap(location);
     return gfx_addr_get(x, y, m_memory, location, size);
@@ -757,7 +759,7 @@ static inline uint8_t gfx_get(int x, int y, int location, int size)
 
 static inline void gfx_set(int x, int y, int location, int size, int col)
 {
-    if (x < 0 || y < 0 || x > P8_WIDTH || y > P8_HEIGHT)
+    if (x < 0 || y < 0 || x >= P8_WIDTH || y >= P8_HEIGHT)
         return;
 
     int offset = gfx_addr_remap(location) + (x >> 1) + y * 64;
