@@ -73,11 +73,11 @@ static void repl_history_push(const char *line)
 
 static void repl_print(const char *line, int colour, bool add_newline)
 {
-    int x, y, right;
+    int x, y;
     cursor_get(&x, &y);
     uint8_t old_flags = m_memory[MEMORY_MISCFLAGS];
     m_memory[MEMORY_MISCFLAGS] = 0x80 | (add_newline ? 0 : 0x4);
-    draw_text(line, strlen(line), x, y, colour, 0, false, &x, &y, &right);
+    draw_text(line, strlen(line), x, y, colour, 0, false, &x, &y, NULL, NULL);
     m_memory[MEMORY_MISCFLAGS] = old_flags;
     cursor_set(x, y, -1);
 }
@@ -428,7 +428,7 @@ static void repl_show(void)
             "the editor\n";
         int x, y;
         cursor_get(&x, &y);
-        draw_text(banner, strlen(banner), x, y, 6, 0, false, &x, &y, NULL);
+        draw_text(banner, strlen(banner), x, y, 6, 0, false, &x, &y, NULL, NULL);
         cursor_set(x, y, -1);
     }
 }
