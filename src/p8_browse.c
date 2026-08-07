@@ -578,7 +578,7 @@ static void browse_update(void)
                 if (show_bbs_download_dialog(cart_id_buffer, sizeof(cart_id_buffer)) == DIALOG_RESULT_ACCEPTED) {
                     const char *cart_id = (cart_id_buffer[0] == '#') ? (cart_id_buffer + 1) : cart_id_buffer;
                     char cart_path[PATH_MAX];
-                    if (p8_download_bbs_cart(cart_id, cart_path, sizeof(cart_path)) == 0) {
+                    if (p8_download_bbs_cart(cart_id, m_current_cart_dir, cart_path, sizeof(cart_path), true) == 0) {
                         /* Hide browse screen before running cart */
                         browse_hide();
                         if (p8_load(cart_path, NULL, cart_id, NULL) == 0) {

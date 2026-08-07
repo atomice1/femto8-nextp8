@@ -21,11 +21,11 @@
 #define CACHE_BUFFER_SIZE 8192
 
 /* Ensure cache directory exists */
-static int ensure_cache_dir(void)
+static int ensure_dir(const char *path)
 {
     struct stat st;
 
-    if (stat(CACHE_PATH, &st) == 0) {
+    if (stat(path, &st) == 0) {
         if (S_ISDIR(st.st_mode)) {
             return 0;
         } else {
@@ -34,18 +34,18 @@ static int ensure_cache_dir(void)
         }
     }
 
-    if (MKDIR(CACHE_PATH) < 0) {
-        fprintf(stderr, "Failed to create cache directory '%s': %s\n", CACHE_PATH, strerror(errno));
+    if (MKDIR(path) < 0) {
+        fprintf(stderr, "Failed to create directory '%s': %s\n", path, strerror(errno));
         return -1;
     }
 
     return 0;
 }
 
-/* Build cache filename for cart ID */
-static int build_cache_filename(const char *cart_id, char *buffer, size_t buffer_size)
+/* Build cache filename for cart ID in specified directory */
+static int build_cache_filename(const char *cart_id, const char *dir, char *buffer, size_t buffer_size)
 {
-    int len = snprintf(buffer, buffer_size, "%s/%s.p8", CACHE_PATH, cart_id);
+    int len = snprintf(buffer, buffer_size, "%s/%s.p8", dir, cart_id);
     if (len >= buffer_size) {
         errno = ENAMETOOLONG;
         return -1;
@@ -54,6 +54,11 @@ static int build_cache_filename(const char *cart_id, char *buffer, size_t buffer
 }
 
 int cache_download(const char *cart_id, char *filename_out, unsigned max_filename_length)
+{
+    return cache_download_to_dir(cart_id, CACHE_PATH, filename_out, max_filename_length, false);
+}
+
+int cache_download_to_dir(const char *cart_id, const char *download_dir, char *filename_out, unsigned max_filename_length, bool force_download)
 {
     char temp_filename[PATH_MAX+1];
     FILE *fp = NULL;
@@ -69,18 +74,17 @@ int cache_download(const char *cart_id, char *filename_out, unsigned max_filenam
         return -1;
     }
 
-    /* Ensure cache directory exists */
-    if (ensure_cache_dir() < 0) {
+    /* Ensure download directory exists */
+    if (ensure_dir(download_dir) < 0)
         return -1;
-    }
 
     /* Build cache filename directly in output buffer */
-    if (build_cache_filename(cart_id, filename_out, max_filename_length) < 0) {
+    if (build_cache_filename(cart_id, download_dir, filename_out, max_filename_length) < 0) {
         return -1;
     }
 
     /* Check if already cached */
-    if (access(filename_out, R_OK) == 0 && strcmp(CACHE_PATH, DEFAULT_CARTS_PATH) != 0) {
+    if (!force_download && access(filename_out, R_OK) == 0) {
         printf("Using cached cart %s\n", filename_out);
         return 0;
     }

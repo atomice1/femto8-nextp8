@@ -1713,7 +1713,7 @@ int _load(lua_State *L)
     if (filename[0] == '#') {
 #ifdef ENABLE_BBS_DOWNLOAD
         bbs_cart_id = filename + 1;  /* Skip the '#' */
-        if (p8_download_bbs_cart(bbs_cart_id, resolved_path, sizeof(resolved_path)) < 0) {
+        if (p8_download_bbs_cart(bbs_cart_id, CACHE_PATH, resolved_path, sizeof(resolved_path), false) < 0) {
             m_load_result = -2;
             fprintf(stderr, "load: could not fetch cart\n");
             if (p8_is_cart_running()) {

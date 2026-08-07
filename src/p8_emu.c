@@ -1314,13 +1314,13 @@ void p8_show_error_dialog(const char **lines, int line_count, p8_error_severity_
 }
 
 #ifdef ENABLE_BBS_DOWNLOAD
-int p8_download_bbs_cart(const char *cart_id, char *cached_filename, size_t cached_filename_size)
+int p8_download_bbs_cart(const char *cart_id, const char *download_dir, char *cached_filename, size_t cached_filename_size, bool force_download)
 {
     /* Download cart from BBS */
     p8_show_io_icon(true);
     printf("Downloading cart %s from BBS...\n", cart_id);
     cached_filename[0] = '\0';
-    int ret = cache_download(cart_id, cached_filename, cached_filename_size);
+    int ret = cache_download_to_dir(cart_id, download_dir, cached_filename, cached_filename_size, force_download);
     p8_show_io_icon(false);
     if (ret < 0) {
         printf("Failed to download cart %s from BBS, error %d\n", cart_id, errno);

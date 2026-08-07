@@ -300,7 +300,7 @@ p8_clock_t p8_clock_delta(p8_clock_t start, p8_clock_t end);
 void p8_close_cartdata(void);
 void p8_delayed_flush_cartdata(void);
 #ifdef ENABLE_BBS_DOWNLOAD
-int p8_download_bbs_cart(const char *cart_id, char *cached_filename, size_t cached_filename_size);
+int p8_download_bbs_cart(const char *cart_id, const char *download_dir, char *cached_filename, size_t cached_filename_size, bool force_download);
 #endif
 unsigned p8_elapsed_time(void);
 int p8_exec(const char *input, const char **err_type, char *err, int err_size, const char **filename, int *lineno);
