@@ -333,20 +333,22 @@ static int is_pico8_builtin (TString *name) {
 static void singlevar (LexState *ls, expdesc *var) {
   TString *varname = str_checkname(ls);
   FuncState *fs = ls->fs;
-  if (is_pico8_builtin(varname)) {
-    /* Variable found locally, but it's a PICO-8 builtin so use VGLOBAL
-       (this handles the case where _ENV is a local parameter) */
-    expdesc key;
-    codestring(ls, &key, varname);
-    var->k = VGLOBAL;
-    var->f = var->t = NO_JUMP;
-    var->u.glb.idx = luaK_exp2RK(fs, &key);
-  } else if (singlevaraux(fs, varname, var, 1) == VVOID) {  /* global name? */
-    expdesc key;
-    singlevaraux(fs, ls->envn, var, 1);  /* get environment variable */
-    lua_assert(var->k == VLOCAL || var->k == VUPVAL);
-    codestring(ls, &key, varname);  /* key is variable name */
-    luaK_indexed(fs, var, &key);  /* env[varname] */
+  if (singlevaraux(fs, varname, var, 1) == VVOID) {  /* global name? */
+    if (is_pico8_builtin(varname)) {
+      /* Variable found locally, but it's a PICO-8 builtin so use VGLOBAL
+        (this handles the case where _ENV is a local parameter) */
+      expdesc key;
+      codestring(ls, &key, varname);
+      var->k = VGLOBAL;
+      var->f = var->t = NO_JUMP;
+      var->u.glb.idx = luaK_exp2RK(fs, &key);
+    } else {
+      expdesc key;
+      singlevaraux(fs, ls->envn, var, 1);  /* get environment variable */
+      lua_assert(var->k == VLOCAL || var->k == VUPVAL);
+      codestring(ls, &key, varname);  /* key is variable name */
+      luaK_indexed(fs, var, &key);  /* env[varname] */
+    }
   }
 }
 
