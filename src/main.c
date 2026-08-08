@@ -67,66 +67,11 @@ int main(int argc, char *argv[])
     }
 
 #ifdef NEXTP8
-    uint32_t hw_timestamp = *(uint32_t *)_BUILD_TIMESTAMP_HI;
     uint32_t hw_version = *(uint32_t *)_HW_VERSION_HI;
     if (_EXTRACT_API(hw_version) != HW_API_VERSION)
         _fatal_error("Incompatible hardware version");
-#if DEV_BUILD
-    if (_loader_data->reset_type != _RESET_TYPE_APP_RESTART &&
-        !skip_main_loop) {
-        uint32_t loader_version = _loader_data->loader_version;
-        uint32_t loader_timestamp = _loader_data->loader_timestamp;
-        _show_message(
-            "This is a development build of\n"
-            "nextp8. Not all carts may work.\n"
-            "\n"
-            "nextp8 comes with NO WARRANTY.\n"
-            "\n"
-            "NEXTP8 %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
-            "FEMTO8 %s\n"
-            "HW     %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
-            "BSP    %u.%u.%u %u%02u%02u %02u:%02u:%02u\n"
-            "LOADER %u.%u.%u %u%02u%02u %02u:%02u:%02u\n",
-            _EXTRACT_MAJOR(nextp8_version),
-            _EXTRACT_MINOR(nextp8_version),
-            _EXTRACT_PATCH(nextp8_version),
-            _EXTRACT_YEAR(nextp8_timestamp),
-            _EXTRACT_MONTH(nextp8_timestamp),
-            _EXTRACT_DAY(nextp8_timestamp),
-            _EXTRACT_HOUR(nextp8_timestamp),
-            _EXTRACT_MINUTE(nextp8_timestamp),
-            _EXTRACT_SECOND(nextp8_timestamp),
-            femto8_version,
-            _EXTRACT_MAJOR(hw_version),
-            _EXTRACT_MINOR(hw_version),
-            _EXTRACT_PATCH(hw_version),
-            _EXTRACT_YEAR(hw_timestamp),
-            _EXTRACT_MONTH(hw_timestamp),
-            _EXTRACT_DAY(hw_timestamp),
-            _EXTRACT_HOUR(hw_timestamp),
-            _EXTRACT_MINUTE(hw_timestamp),
-            _EXTRACT_SECOND(hw_timestamp),
-            _EXTRACT_MAJOR(_bsp_version),
-            _EXTRACT_MINOR(_bsp_version),
-            _EXTRACT_PATCH(_bsp_version),
-            _EXTRACT_YEAR(_bsp_timestamp),
-            _EXTRACT_MONTH(_bsp_timestamp),
-            _EXTRACT_DAY(_bsp_timestamp),
-            _EXTRACT_HOUR(_bsp_timestamp),
-            _EXTRACT_MINUTE(_bsp_timestamp),
-            _EXTRACT_SECOND(_bsp_timestamp),
-            _EXTRACT_MAJOR(loader_version),
-            _EXTRACT_MINOR(loader_version),
-            _EXTRACT_PATCH(loader_version),
-            _EXTRACT_YEAR(loader_timestamp),
-            _EXTRACT_MONTH(loader_timestamp),
-            _EXTRACT_DAY(loader_timestamp),
-            _EXTRACT_HOUR(loader_timestamp),
-            _EXTRACT_MINUTE(loader_timestamp),
-            _EXTRACT_SECOND(loader_timestamp));
-    }
 #endif
-#endif
+
     if (p8_init() != 0)
         return EXIT_FAILURE;
 
