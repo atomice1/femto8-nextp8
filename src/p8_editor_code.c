@@ -1659,6 +1659,8 @@ static void code_sync(void)
 
 void p8_editor_code_set_line(int line)
 {
+    if (lines == NULL || line_count == 0)
+        return;
     if (line < 1) line = 1;
     if (line > line_count) line = line_count;
     if (cursor_line != line) {
