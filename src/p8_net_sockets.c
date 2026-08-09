@@ -183,6 +183,7 @@ int net_start_ssl(const char *remote_ip, unsigned remote_port, const char *hostn
 
     /* Set hostname for SNI (Server Name Indication) */
     if (SSL_set_tlsext_host_name(ssl, hostname) != 1) {
+        fprintf(stderr, "net_start_ssl: failed to set SNI hostname '%s'\n", hostname);
         /* Continue anyway, SNI is optional in theory */
     }
 
