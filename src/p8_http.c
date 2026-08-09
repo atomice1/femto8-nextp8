@@ -317,7 +317,13 @@ ssize_t http_recv(void *data, unsigned max_length)
             }
 
             /* Parse hex chunk size */
-            current_chunk_remaining = strtol(line, NULL, 16);
+            long chunk_size = strtol(line, NULL, 16);
+            if (chunk_size < 0) {
+                fprintf(stderr, "http_recv: invalid negative chunk size in line '%s'\n", line);
+                errno = EINVAL;
+                return -1;
+            }
+            current_chunk_remaining = (size_t)chunk_size;
 
             if (current_chunk_remaining == 0) {
                 /* Last chunk */
