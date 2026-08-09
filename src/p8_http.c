@@ -378,8 +378,12 @@ ssize_t http_recv(void *data, unsigned max_length)
     } else {
         /* Normal content-length based transfer */
         size_t to_read = max_length;
-        if (content_length > 0 && bytes_received + to_read > content_length) {
-            to_read = content_length - bytes_received;
+        if (content_length > 0) {
+            if (bytes_received >= content_length) {
+                to_read = 0;  /* Already received all content */
+            } else if (to_read > content_length - bytes_received) {
+                to_read = content_length - bytes_received;
+            }
         }
 
         if (to_read == 0) {
