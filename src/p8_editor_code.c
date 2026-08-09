@@ -1043,7 +1043,7 @@ static void do_undo(void)
     }
     if (reverse_edit(&redo_stack[redo_depth], &undo_stack[undo_depth - 1])) redo_depth++;
     if (!undo_edit(&undo_stack[undo_depth - 1])) pop_redo();
-    free_edit(&undo_stack[undo_depth]);
+    pop_undo();
 }
 
 static void do_redo(void)
