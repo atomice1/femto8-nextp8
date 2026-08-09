@@ -252,13 +252,16 @@ static void editor_autosave(void)
             if (tab_subeditors[i]->sync)
                 tab_subeditors[i]->sync();
         }
-        write_cart_p8(AUTOSAVE_FILE_NAME, m_lua_script, m_cart_memory);
-        FILE *fh = fopen(AUTOSAVE_METADATA_FILE_NAME, "wt");
-        if (fh) {
-            fprintf(fh, "%s\n", m_current_cart_file_name);
-            fprintf(fh, "%s\n", m_current_cart_dir);
-            fprintf(fh, "%s\n", m_bbs_cart_id);
-            fclose(fh);
+        int ret = write_cart_p8(AUTOSAVE_FILE_NAME, m_lua_script, m_cart_memory);
+        if (ret == 0) {
+            FILE *fh = fopen(AUTOSAVE_METADATA_FILE_NAME, "wt");
+            if (fh) {
+                fprintf(fh, "%s\n", m_current_cart_file_name);
+                fprintf(fh, "%s\n", m_current_cart_dir);
+                fprintf(fh, "%s\n", m_bbs_cart_id);
+                fclose(fh);
+            }
+            cart_modified = false;
         }
     }
 }
