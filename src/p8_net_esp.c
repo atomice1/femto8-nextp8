@@ -266,10 +266,8 @@ ssize_t net_recv(void *data, unsigned max_length)
                     assert(overflow_pos == 0);
                     return received;
                 }
-            } else if (ch == 'C') {
-                closed_pos = 1;
             } else {
-                closed_pos = 0;
+                closed_pos = (ch == 'C') ? 1 : 0;
             }
         }
 
