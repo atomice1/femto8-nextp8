@@ -200,14 +200,20 @@ static void map_handle_keypress(int scancode, int keypress, int keymod)
         if (scancode == SCANCODE_V) {
             if (map_copy_w > 0 && map_copy_h > 0) {
                 p8_editor_undo_push(map_undo_ctx);
-                for (int row = 0; row < map_copy_h; row++) {
-                    int dy = map_cursor_y + row;
-                    if (dy >= MAP_ROWS) break;
-                    for (int col = 0; col < map_copy_w; col++) {
-                        int dx = map_cursor_x + col;
-                        if (dx >= MAP_COLS) break;
-                        m_cart_memory[MEMORY_MAP + dy * MAP_COLS + dx] =
-                            map_copy_buf[row * map_copy_w + col];
+                /* Clamp paste area to valid map bounds */
+                int paste_rows = map_copy_h;
+                int paste_cols = map_copy_w;
+                if (map_cursor_y + paste_rows > MAP_ROWS)
+                    paste_rows = MAP_ROWS - map_cursor_y;
+                if (map_cursor_x + paste_cols > MAP_COLS)
+                    paste_cols = MAP_COLS - map_cursor_x;
+                /* Only paste if there's a valid area to paste */
+                if (paste_rows > 0 && paste_cols > 0) {
+                    for (int row = 0; row < paste_rows; row++) {
+                        for (int col = 0; col < paste_cols; col++) {
+                            m_cart_memory[MEMORY_MAP + (map_cursor_y + row) * MAP_COLS + (map_cursor_x + col)] =
+                                map_copy_buf[row * map_copy_w + col];
+                        }
                     }
                 }
             }
