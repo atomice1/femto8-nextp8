@@ -340,10 +340,12 @@ static void sprite_flood_fill(int start_x, int start_y, int fill_color)
     int sp = 0;
     uint8_t visited[8] = {0};  /* bit-per-pixel: visited[y] has bit x */
 
-    sx[sp] = (uint8_t)start_x;
-    sy[sp] = (uint8_t)start_y;
-    sp++;
-    visited[start_y] |= (uint8_t)(1u << start_x);
+    if (sp < 64) {
+        sx[sp] = (uint8_t)start_x;
+        sy[sp] = (uint8_t)start_y;
+        sp++;
+        visited[start_y] |= (uint8_t)(1u << start_x);
+    }
 
     while (sp > 0) {
         sp--;
