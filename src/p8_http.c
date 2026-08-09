@@ -94,12 +94,13 @@ static int parse_url(const char *url, bool *use_ssl, char *host, size_t host_len
     /* Extract path */
     if (*p == '\0' || *p == '/') {
         const char *path_start = *p ? p : "/";
-        if (strlen(path_start) >= path_len) {
+        size_t path_src_len = strlen(path_start);
+        if (path_src_len >= path_len) {
             fprintf(stderr, "parse_url: path too long in URL '%s'\n", url);
             errno = EINVAL;
             return -1;
         }
-        strcpy(path, path_start);
+        memcpy(path, path_start, path_src_len + 1); /* include null terminator */
     } else {
         fprintf(stderr, "parse_url: invalid path in URL '%s'\n", url);
         errno = EINVAL;
