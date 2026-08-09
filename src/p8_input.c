@@ -898,7 +898,7 @@ void p8_update_input()
         if (keymap_page) {
             if (press) {
                 // Key press event: fire immediately and arm repeat
-                char ch = keymap_page[scancode];
+                char ch = (scancode < 256) ? keymap_page[scancode] : '\0';
                 queue_keypress(scancode, ch, keymod);
                 if (!is_modifier(scancode)) {
                     repeat_sc = scancode;
