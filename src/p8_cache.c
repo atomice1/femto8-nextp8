@@ -127,7 +127,11 @@ int cache_download_to_dir(const char *cart_id, const char *download_dir, char *f
     bbs_close();
 
     /* Rename temp file to final name */
-    unlink(filename_out); // Remove existing file if it exists
+    if (unlink(filename_out) < 0 && errno != ENOENT) {
+        fprintf(stderr, "Failed to unlink '%s': %s\n", filename_out, strerror(errno));
+        unlink(temp_filename);
+        return -1;
+    }
     if (rename(temp_filename, filename_out) < 0) {
         fprintf(stderr, "Failed to rename '%s' to '%s': %s\n", temp_filename, filename_out, strerror(errno));
         unlink(temp_filename);
