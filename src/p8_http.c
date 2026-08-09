@@ -227,7 +227,7 @@ int http_start_get(const char *url)
                       "\r\n",
                       path, host);
 
-    if (len < 0 || (size_t)len >= sizeof(request)) {
+    if (len < 0 || len >= (int)sizeof(request)) {
         net_close();
         errno = EOVERFLOW;
         return -1;
