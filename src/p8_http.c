@@ -9,6 +9,7 @@
 #include "p8_net.h"
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -281,7 +282,14 @@ ssize_t http_recv(void *data, unsigned max_length)
 
             /* Check for Content-Length */
             if (strncasecmp(line, "Content-Length:", 15) == 0) {
-                content_length = atol(line + 15);
+                char *endptr;
+                unsigned long val = strtoul(line + 15, &endptr, 10);
+                if (*endptr != '\0' || val > SIZE_MAX) {
+                    fprintf(stderr, "http_recv: invalid Content-Length value\n");
+                    errno = EINVAL;
+                    return -1;
+                }
+                content_length = (size_t)val;
             }
 
             /* Check for Transfer-Encoding: chunked */
