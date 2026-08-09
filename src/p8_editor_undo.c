@@ -35,13 +35,14 @@ static void free_stack(uint8_t **stack, int *depth)
 static void push_to(uint8_t **stack, int *depth,
                     const uint8_t *mem, int size)
 {
+    uint8_t *snap = (uint8_t *)malloc((size_t)size);
+    if (!snap) return;
+
     if (*depth == P8_UNDO_LIMIT) {
         free(stack[0]);
         memmove(stack, stack + 1, (P8_UNDO_LIMIT - 1) * sizeof(uint8_t *));
         (*depth)--;
     }
-    uint8_t *snap = (uint8_t *)malloc((size_t)size);
-    if (!snap) return;
     memcpy(snap, mem, (size_t)size);
     stack[(*depth)++] = snap;
 }
