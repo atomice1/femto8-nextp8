@@ -70,11 +70,15 @@ static bool music_edit_mode = false; /* when true, up/down edit the selected cel
 
 static uint8_t music_byte(int pat, int b)
 {
+    if (pat < 0 || pat >= MUSIC_COUNT || b < 0 || b >= MUSIC_ENTRY_BYTES)
+        return 0;
     return m_cart_memory[MEMORY_MUSIC + pat * MUSIC_ENTRY_BYTES + b];
 }
 
 static void music_write(int pat, int byte_offset, uint8_t val)
 {
+    if (pat < 0 || pat >= MUSIC_COUNT || byte_offset < 0 || byte_offset >= MUSIC_ENTRY_BYTES)
+        return;
     m_cart_memory[MEMORY_MUSIC + pat * MUSIC_ENTRY_BYTES + byte_offset] = val;
 }
 

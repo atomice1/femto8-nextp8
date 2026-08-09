@@ -361,9 +361,11 @@ static void sprite_flood_fill(int start_x, int start_y, int fill_color)
             int c = (snx & 1) ? (b >> 4) : (b & 0xF);
             if (c != target) continue;
             visited[ny] |= (uint8_t)(1u << nx);
-            sx[sp] = (uint8_t)nx;
-            sy[sp] = (uint8_t)ny;
-            sp++;
+            if (sp < 64) {
+                sx[sp] = (uint8_t)nx;
+                sy[sp] = (uint8_t)ny;
+                sp++;
+            }
         }
     }
 }
