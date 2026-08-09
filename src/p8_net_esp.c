@@ -37,13 +37,15 @@ int net_lookup_domain(const char *domain_name, char *ip_address, size_t ip_addre
         return -1;
     }
 
+    if (ip_address_len == 0)
+        return 0;
+
+    ip_address[0] = '\0';
+
     /* Send DNS query: AT+CIPDOMAIN="domain" */
-    snprintf(cmd, sizeof(cmd), "AT+CIPDOMAIN=\"%s\"", domain_name);
+    snprintf(cmd, sizeof(cmd), "AT+CIPDOMAIN=\"%s\"\r\n", domain_name);
 
     if (_esp_write_string(cmd) < 0) {
-        return -1;
-    }
-    if (_esp_write_string("\r\n") < 0) {
         return -1;
     }
 
@@ -72,10 +74,10 @@ int net_lookup_domain(const char *domain_name, char *ip_address, size_t ip_addre
             }
 
             strcpy(ip_address, ip_start);
+        }
 
-            /* Wait for OK */
-            _esp_send_at_command("", "OK", AT_TIMEOUT_US);
-            return 0;
+        if (strcmp(response, "OK") == 0) {
+            break;
         }
 
         if (strcmp(response, "ERROR") == 0 || strcmp(response, "FAIL") == 0) {
@@ -84,6 +86,8 @@ int net_lookup_domain(const char *domain_name, char *ip_address, size_t ip_addre
             return -1;
         }
     }
+
+    return 0;
 }
 
 int net_start_tcp(const char *remote_ip, unsigned remote_port)
