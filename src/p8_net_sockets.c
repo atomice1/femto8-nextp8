@@ -65,10 +65,26 @@ int net_lookup_domain(const char *domain_name, char *ip_address, size_t ip_addre
         return -1;
     }
 
-    struct sockaddr_in *ipv4 = (struct sockaddr_in *)res->ai_addr;
-    const char *ip = inet_ntoa(ipv4->sin_addr);
+    struct sockaddr_in *ipv4 = NULL;
+    const char *ip = NULL;
 
-    if (strlen(ip) >= ip_address_len) {
+    for (struct addrinfo *rp = res; rp != NULL; rp = rp->ai_next) {
+        if (rp->ai_family == AF_INET) {
+            ipv4 = (struct sockaddr_in *)rp->ai_addr;
+            break;
+        }
+    }
+
+    if (!ipv4) {
+        fprintf(stderr, "net_lookup_domain: no IPv4 address found for '%s'\n", domain_name);
+        freeaddrinfo(res);
+        errno = EAFNOSUPPORT;
+        return -1;
+    }
+
+    ip = inet_ntoa(ipv4->sin_addr);
+
+    if (strlen(ip) + 1 > ip_address_len) {
         freeaddrinfo(res);
         errno = EOVERFLOW;
         return -1;
