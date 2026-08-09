@@ -933,6 +933,7 @@ static void sprite_handle_mouse_buttons(int mx, int my, int buttons, int buttons
                         sel_rect_y0 = pan_orig_sel_y0 + total_dy;
                         sel_rect_x1 = pan_orig_sel_x1 + total_dx;
                         sel_rect_y1 = pan_orig_sel_y1 + total_dy;
+                        /* Clamp to valid range and ensure x0<=x1, y0<=y1 */
                         if (sel_rect_x0 < 0) sel_rect_x0 = 0;
                         if (sel_rect_x0 > 7) sel_rect_x0 = 7;
                         if (sel_rect_x1 < 0) sel_rect_x1 = 0;
@@ -941,6 +942,16 @@ static void sprite_handle_mouse_buttons(int mx, int my, int buttons, int buttons
                         if (sel_rect_y0 > 7) sel_rect_y0 = 7;
                         if (sel_rect_y1 < 0) sel_rect_y1 = 0;
                         if (sel_rect_y1 > 7) sel_rect_y1 = 7;
+                        if (sel_rect_x0 > sel_rect_x1) {
+                            int t = sel_rect_x0;
+                            sel_rect_x0 = sel_rect_x1;
+                            sel_rect_x1 = t;
+                        }
+                        if (sel_rect_y0 > sel_rect_y1) {
+                            int t = sel_rect_y0;
+                            sel_rect_y0 = sel_rect_y1;
+                            sel_rect_y1 = t;
+                        }
                     } else {
                         sprite_shift_pixels(total_dx, total_dy);
                     }
