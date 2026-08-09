@@ -346,15 +346,29 @@ ssize_t http_recv(void *data, unsigned max_length)
         /* If chunk is complete, read trailing CRLF */
         if (current_chunk_remaining == 0) {
             char crlf[2];
+
+            /* Read first byte if available in buffer */
             if (read_buffer_pos < read_buffer_len) {
-                read_buffer_pos++;
+                crlf[0] = read_buffer[read_buffer_pos++];
             } else {
-                net_recv(crlf, 1);
+                ssize_t recv_len = net_recv(crlf, 1);
+                if (recv_len != 1)
+                    return -1;
             }
+
+            /* Read second byte if available in buffer */
             if (read_buffer_pos < read_buffer_len) {
-                read_buffer_pos++;
+                crlf[1] = read_buffer[read_buffer_pos++];
             } else {
-                net_recv(crlf, 1);
+                ssize_t recv_len = net_recv(crlf + 1, 1);
+                if (recv_len != 1)
+                    return -1;
+            }
+
+            if (crlf[0] != '\r' || crlf[1] != '\n') {
+                fprintf(stderr, "http_recv: expected CRLF after chunk, got '%c%c'\n", crlf[0], crlf[1]);
+                errno = EINVAL;
+                return -1;
             }
         }
 
