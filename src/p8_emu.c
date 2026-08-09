@@ -467,6 +467,9 @@ int p8_exec(const char *input, const char **err_type, char *err, int err_size, c
 
 int p8_shutdown()
 {
+    if (!m_initialized)
+        return 0;
+
 #ifdef ENABLE_AUDIO
     audio_close();
 #endif
