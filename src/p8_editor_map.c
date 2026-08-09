@@ -78,6 +78,10 @@ static void map_ensure_visible(void)
 /* Draw one 8×8 sprite from the sprite sheet at screen position (sx, sy) */
 static void draw_tile_sprite(int sx, int sy, int sprite_idx)
 {
+    /* Bounds check sprite_idx to prevent out-of-bounds sprite sheet access */
+    if (sprite_idx < 0 || sprite_idx >= 256)
+        sprite_idx = 0;
+
     /* Sprite (sprite_idx) top-left pixel in the sprite sheet */
     int sheet_px = (sprite_idx % 16) * 8;
     int sheet_py = (sprite_idx / 16) * 8;
