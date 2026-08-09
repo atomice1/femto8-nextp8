@@ -83,6 +83,12 @@ int cache_download_to_dir(const char *cart_id, const char *download_dir, char *f
         return -1;
     }
 
+    /* Ensure filename_out has room for .tmp suffix (4 bytes) */
+    if (strlen(filename_out) + 4 > PATH_MAX) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+
     /* Check if already cached */
     if (!force_download && access(filename_out, R_OK) == 0) {
         printf("Using cached cart %s\n", filename_out);
