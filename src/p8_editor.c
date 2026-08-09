@@ -371,7 +371,7 @@ static void editor_screen_handle_keypress(int scancode, int keypress, int keymod
     tab_subeditors[active_tab]->handle_keypress(scancode, keypress, keymod);
 }
 
-static void editor_screen_handle_mouse(int mx, int my, int buttons, int buttonsp, int keymod)
+static void editor_screen_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp, int keymod)
 {
     /* --- Tab-strip click (top bar, y < GLYPH_HEIGHT) --- */
     int editor_action = EDITOR_ACTION_NONE;
@@ -394,9 +394,17 @@ static void editor_screen_handle_mouse(int mx, int my, int buttons, int buttonsp
         return;
     }
 
-    /* --- Sub-editor mouse input --- */
-    if (tab_subeditors[active_tab]->handle_mouse)
-        tab_subeditors[active_tab]->handle_mouse(mx, my, buttons, buttonsp, keymod);
+    /* --- Sub-editor mouse button input --- */
+    if (tab_subeditors[active_tab]->handle_mouse_buttons)
+        tab_subeditors[active_tab]->handle_mouse_buttons(mx, my, buttons, buttonsp, keymod);
+}
+
+static void editor_screen_handle_mouse_wheel(int mx, int my, int wheel, int buttons, int keymod)
+{
+    (void)mx; (void)my; (void)wheel; (void)buttons; (void)keymod;
+    /* Tab strip doesn't handle wheel - sub-editors will */
+    if (tab_subeditors[active_tab]->handle_mouse_wheel)
+        tab_subeditors[active_tab]->handle_mouse_wheel(mx, my, wheel, buttons, keymod);
 }
 
 static bool editor_screen_handle_buttons(int button_mask, int buttonp_mask)
@@ -438,6 +446,7 @@ p8_screen_t p8_screen_edit = {
     .draw = editor_screen_draw,
     .update = editor_screen_update,
     .handle_keypress = editor_screen_handle_keypress,
-    .handle_mouse = editor_screen_handle_mouse,
+    .handle_mouse_buttons = editor_screen_handle_mouse_buttons,
+    .handle_mouse_wheel = editor_screen_handle_mouse_wheel,
     .handle_buttons = editor_screen_handle_buttons
 };

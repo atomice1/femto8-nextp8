@@ -1533,15 +1533,8 @@ static int col_from_logical_x(int line_idx, int logical_x)
     return len;
 }
 
-static void code_handle_mouse(int mx, int my, int buttons, int buttonsp, int keymod)
+static void code_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp, int keymod)
 {
-    /* Mousewheel scrolls vertically (3 lines per tick). */
-    if (m_mouse_wheel != 0) {
-        scroll_offset_y -= m_mouse_wheel * 3;
-        if (scroll_offset_y < 0) scroll_offset_y = 0;
-        if (scroll_offset_y >= line_count) scroll_offset_y = line_count - 1;
-    }
-
     int lmb_pressed = (buttonsp & 1);
     int lmb_held    = buttons & 1;
 
@@ -1575,8 +1568,17 @@ static void code_handle_mouse(int mx, int my, int buttons, int buttonsp, int key
         cursor_col  = col;
         update_selection();
     }
+}
 
-    return;
+static void code_handle_mouse_wheel(int mx, int my, int wheel, int buttons, int keymod)
+{
+    (void)mx; (void)my; (void)buttons; (void)keymod;
+    /* Mousewheel scrolls vertically (3 lines per tick). */
+    if (wheel != 0) {
+        scroll_offset_y -= wheel * 3;
+        if (scroll_offset_y < 0) scroll_offset_y = 0;
+        if (scroll_offset_y >= line_count) scroll_offset_y = line_count - 1;
+    }
 }
 
 static void code_show(void)
@@ -1686,5 +1688,6 @@ p8_editor_tab_t p8_subeditor_code = {
     .sync=code_sync,
     .invalidate=code_invalidate,
     .handle_keypress=code_handle_keypress,
-    .handle_mouse=code_handle_mouse
+    .handle_mouse_buttons=code_handle_mouse_buttons,
+    .handle_mouse_wheel=code_handle_mouse_wheel
 };

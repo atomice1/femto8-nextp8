@@ -124,9 +124,19 @@ void p8_main(void)
                 screen->handle_keypress(scancode, keypress, keymod);
         }
 
-        /* Handle mouse input */
-        if (screen->handle_mouse)
-            screen->handle_mouse(m_mouse_x, m_mouse_y, m_mouse_buttons, m_mouse_buttonsp, m_mouse_keymod);
+        /* Handle mouse input - split into move, buttons, and wheel */
+        /* Handle mouse movement */
+        if (screen->handle_mouse_move) {
+            screen->handle_mouse_move(m_mouse_x, m_mouse_y, m_mouse_xrel, m_mouse_yrel, m_mouse_buttons, m_mouse_keymod);
+        }
+        /* Handle mouse buttons (press/release) */
+        if (screen->handle_mouse_buttons) {
+            screen->handle_mouse_buttons(m_mouse_x, m_mouse_y, m_mouse_buttons, m_mouse_buttonsp, m_mouse_keymod);
+        }
+        /* Handle mouse wheel - accumulate and process */
+        if (screen->handle_mouse_wheel && m_mouse_wheel != 0) {
+            screen->handle_mouse_wheel(m_mouse_x, m_mouse_y, m_mouse_wheel, m_mouse_buttons, m_mouse_keymod);
+        }
     }
 
     /* Shutdown all screens */

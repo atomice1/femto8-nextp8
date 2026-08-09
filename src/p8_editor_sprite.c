@@ -800,23 +800,8 @@ static void sprite_replace_color(int from_color, int to_color)
 
 /* --- Mouse handler -------------------------------------------------------- */
 
-static void sprite_handle_mouse(int mx, int my, int buttons, int buttonsp, int keymod)
+static void sprite_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp, int keymod)
 {
-    /* Mousewheel scrolls the sprite sheet (both sheet mode and edit-mode mini sheet). */
-    if (m_mouse_wheel != 0 && !sprite_edit) {
-        sprite_scroll -= m_mouse_wheel;
-        if (sprite_scroll < 0) sprite_scroll = 0;
-        if (sprite_scroll > 16 - SHEET_VISIBLE_ROWS) sprite_scroll = 16 - SHEET_VISIBLE_ROWS;
-    }
-    if (m_mouse_wheel != 0 && sprite_edit) {
-        int cy2 = GLYPH_HEIGHT;
-        if (my >= cy2 + 64 && my < P8_HEIGHT - GLYPH_HEIGHT) {
-            sprite_mini_offset -= m_mouse_wheel;
-            if (sprite_mini_offset < -3) sprite_mini_offset = -3;
-            if (sprite_mini_offset >  3) sprite_mini_offset =  3;
-        }
-    }
-
     int lmb_pressed = (buttonsp & 1);
     int lmb_held    = buttons & 1;
     int rmb_pressed = (buttonsp & 2);
@@ -1098,12 +1083,32 @@ static void sprite_shutdown(void)
     sprite_undo_ctx = NULL;
 }
 
+static void sprite_handle_mouse_wheel(int mx, int my, int wheel, int buttons, int keymod)
+{
+    (void)buttons; (void)keymod;
+    /* Mousewheel scrolls the sprite sheet (both sheet mode and edit-mode mini sheet). */
+    if (wheel != 0 && !sprite_edit) {
+        sprite_scroll -= wheel;
+        if (sprite_scroll < 0) sprite_scroll = 0;
+        if (sprite_scroll > 16 - SHEET_VISIBLE_ROWS) sprite_scroll = 16 - SHEET_VISIBLE_ROWS;
+    }
+    if (wheel != 0 && sprite_edit) {
+        int cy2 = GLYPH_HEIGHT;
+        if (my >= cy2 + 64 && my < P8_HEIGHT - GLYPH_HEIGHT) {
+            sprite_mini_offset -= wheel;
+            if (sprite_mini_offset < -3) sprite_mini_offset = -3;
+            if (sprite_mini_offset >  3) sprite_mini_offset =  3;
+        }
+    }
+}
+
 p8_editor_tab_t p8_subeditor_sprite = {
     "spr",
     .init=sprite_init,
     .shutdown=sprite_shutdown,
     .draw=sprite_draw,
     .handle_keypress=sprite_handle_keypress,
-    .handle_mouse=sprite_handle_mouse,
+    .handle_mouse_buttons=sprite_handle_mouse_buttons,
+    .handle_mouse_wheel=sprite_handle_mouse_wheel,
     .handle_buttons=sprite_handle_buttons,
 };

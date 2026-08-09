@@ -310,15 +310,8 @@ static void music_handle_keypress(int scancode, int keypress, int keymod)
  * MOUSE HANDLER
  * ========================================================================= */
 
-static void music_handle_mouse(int mx, int my, int buttons, int buttonsp, int keymod)
+static void music_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp, int keymod)
 {
-    /* Mousewheel scrolls the pattern list. */
-    if (m_mouse_wheel != 0) {
-        music_scroll -= m_mouse_wheel;
-        if (music_scroll < 0) music_scroll = 0;
-        if (music_scroll > MUSIC_COUNT - MUSIC_ROWS) music_scroll = MUSIC_COUNT - MUSIC_ROWS;
-    }
-
     int lmb_pressed = (buttonsp & 1);
 
     /* Content area: x=0, y=GLYPH_HEIGHT, w=P8_WIDTH, h=P8_HEIGHT-GLYPH_HEIGHT */
@@ -386,6 +379,17 @@ static void music_handle_mouse(int mx, int my, int buttons, int buttonsp, int ke
     }
 }
 
+static void music_handle_mouse_wheel(int mx, int my, int wheel, int buttons, int keymod)
+{
+    (void)mx; (void)my; (void)buttons; (void)keymod;
+    /* Mousewheel scrolls the pattern list. */
+    if (wheel != 0) {
+        music_scroll -= wheel;
+        if (music_scroll < 0) music_scroll = 0;
+        if (music_scroll > MUSIC_COUNT - MUSIC_ROWS) music_scroll = MUSIC_COUNT - MUSIC_ROWS;
+    }
+}
+
 static bool music_handle_buttons(int button_mask, int buttonp_mask)
 {
     (void)button_mask;
@@ -426,6 +430,7 @@ p8_editor_tab_t p8_subeditor_music = {
     .shutdown=music_shutdown,
     .draw=music_draw,
     .handle_keypress=music_handle_keypress,
-    .handle_mouse=music_handle_mouse,
+    .handle_mouse_buttons=music_handle_mouse_buttons,
+    .handle_mouse_wheel=music_handle_mouse_wheel,
     .handle_buttons=music_handle_buttons,
 };

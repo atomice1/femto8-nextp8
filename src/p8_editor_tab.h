@@ -89,15 +89,34 @@ typedef struct {
     void (*handle_keypress)(int scancode, int keypress, int keymod);
 
     /**
-     * Handle mouse input for this sub-editor.  Called every frame after
-     * p8_flip() with updated mouse state.
+     * Handle mouse movement. Called every frame with mouse position and relative movement.
+     * mx, my        current mouse position in screen (overlay) coordinates
+     * mx_rel, my_rel  relative movement since last frame
+     * buttons       current button state: bit0=LMB, bit1=RMB, bit2=MMB
+     * keymod        current key modifiers (KMOD_* bitmask)
+     * May be NULL if this sub-editor does not handle mouse movement.
+     */
+    void (*handle_mouse_move)(int mx, int my, int mx_rel, int my_rel, int buttons, int keymod);
+
+    /**
+     * Handle mouse button presses/releases.
      * mx, my        current mouse position in screen (overlay) coordinates
      * buttons       current button state: bit0=LMB, bit1=RMB, bit2=MMB
      * buttonsp      buttons pressed this frame: bit0=LMB, bit1=RMB, bit2=MMB
      * keymod        current key modifiers (KMOD_* bitmask)
-     * May be NULL if this sub-editor does not use mouse input.
+     * May be NULL if this sub-editor does not handle mouse buttons.
      */
-    void (*handle_mouse)(int mx, int my, int buttons, int buttonsp, int keymod);
+    void (*handle_mouse_buttons)(int mx, int my, int buttons, int buttonsp, int keymod);
+
+    /**
+     * Handle mouse wheel movement.
+     * mx, my        current mouse position in screen (overlay) coordinates
+     * wheel         wheel delta (positive = up/right, negative = down/left)
+     * buttons       current button state: bit0=LMB, bit1=RMB, bit2=MMB
+     * keymod        current key modifiers (KMOD_* bitmask)
+     * May be NULL if this sub-editor does not handle mouse wheel.
+     */
+    void (*handle_mouse_wheel)(int mx, int my, int wheel, int buttons, int keymod);
 } p8_editor_tab_t;
 
 #endif /* P8_EDITOR_TAB_H */

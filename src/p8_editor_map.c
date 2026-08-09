@@ -266,23 +266,9 @@ static void map_handle_keypress(int scancode, int keypress, int keymod)
 
 /* --- Mouse handler -------------------------------------------------------- */
 
-static void map_handle_mouse(int mx, int my, int buttons, int buttonsp, int keymod)
+static void map_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp, int keymod)
 {
     int strip_y = GLYPH_HEIGHT + (P8_HEIGHT - GLYPH_HEIGHT) - GLYPH_HEIGHT - 16;
-    /* Mousewheel over tile strip scrolls the strip rows; elsewhere scrolls the map. */
-    if (m_mouse_wheel != 0) {
-        if (my >= strip_y && my < strip_y + 16) {
-            /* Scroll strip independently */
-            map_strip_scroll -= m_mouse_wheel;
-            if (map_strip_scroll < 0)  map_strip_scroll = 0;
-            if (map_strip_scroll > 14) map_strip_scroll = 14;
-        } else {
-            map_scroll_y -= m_mouse_wheel;
-            if (map_scroll_y < 0) map_scroll_y = 0;
-            if (map_scroll_y > MAP_ROWS - MAP_VIEW_ROWS) map_scroll_y = MAP_ROWS - MAP_VIEW_ROWS;
-        }
-    }
-
     int lmb_held    = buttons & 1;
     int lmb_pressed = (buttonsp & 1);
 
@@ -386,6 +372,25 @@ static void map_handle_mouse(int mx, int my, int buttons, int buttonsp, int keym
     }
 }
 
+static void map_handle_mouse_wheel(int mx, int my, int wheel, int buttons, int keymod)
+{
+    (void)buttons; (void)keymod;
+    int strip_y = GLYPH_HEIGHT + (P8_HEIGHT - GLYPH_HEIGHT) - GLYPH_HEIGHT - 16;
+    /* Mousewheel over tile strip scrolls the strip rows; elsewhere scrolls the map. */
+    if (wheel != 0) {
+        if (my >= strip_y && my < strip_y + 16) {
+            /* Scroll strip independently */
+            map_strip_scroll -= wheel;
+            if (map_strip_scroll < 0)  map_strip_scroll = 0;
+            if (map_strip_scroll > 14) map_strip_scroll = 14;
+        } else {
+            map_scroll_y -= wheel;
+            if (map_scroll_y < 0) map_scroll_y = 0;
+            if (map_scroll_y > MAP_ROWS - MAP_VIEW_ROWS) map_scroll_y = MAP_ROWS - MAP_VIEW_ROWS;
+        }
+    }
+}
+
 static bool map_handle_buttons(int button_mask, int buttonp_mask)
 {
     /* ESC: clear selection */
@@ -428,6 +433,7 @@ p8_editor_tab_t p8_subeditor_map = {
     .shutdown=map_shutdown,
     .draw=map_draw,
     .handle_keypress=map_handle_keypress,
-    .handle_mouse=map_handle_mouse,
+    .handle_mouse_buttons=map_handle_mouse_buttons,
+    .handle_mouse_wheel=map_handle_mouse_wheel,
     .handle_buttons=map_handle_buttons
 };

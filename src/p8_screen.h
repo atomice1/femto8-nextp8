@@ -49,9 +49,19 @@ typedef struct {
     void (*handle_keypress)(int scancode, int keypress, int keymod);
 
     /**
-     * Handle mouse input.
+     * Handle mouse movement.
      */
-    void (*handle_mouse)(int mx, int my, int buttons, int buttonsp, int keymod);
+    void (*handle_mouse_move)(int mx, int my, int mx_rel, int my_rel, int buttons, int keymod);
+
+    /**
+     * Handle mouse button presses/releases.
+     */
+    void (*handle_mouse_buttons)(int mx, int my, int buttons, int buttonsp, int keymod);
+
+    /**
+     * Handle mouse wheel movement.
+     */
+    void (*handle_mouse_wheel)(int mx, int my, int wheel, int buttons, int keymod);
 } p8_screen_t;
 
 #endif /* P8_SCREEN_H */

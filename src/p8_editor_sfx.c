@@ -1337,22 +1337,9 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
 
 /* --- Mouse handler -------------------------------------------------------- */
 
-static void sfx_handle_mouse(int mx, int my, int buttons, int buttonsp, int keymod)
+static void sfx_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp, int keymod)
 {
     sfx_undo_pushed_this_key = false;
-    /* Mousewheel: scroll list or tracker depending on current view. */
-    if (m_mouse_wheel != 0) {
-        if (sfx_detail < 0) {
-            sfx_list_scroll -= m_mouse_wheel;
-            if (sfx_list_scroll < 0) sfx_list_scroll = 0;
-            if (sfx_list_scroll > SFX_COUNT - LIST_ROWS) sfx_list_scroll = SFX_COUNT - LIST_ROWS;
-        } else if (sfx_mode == 1) {  /* tracker mode */
-            sfx_note_scroll -= m_mouse_wheel;
-            if (sfx_note_scroll < 0) sfx_note_scroll = 0;
-            if (sfx_note_scroll > SFX_NOTES - TRACKER_ROWS) sfx_note_scroll = SFX_NOTES - TRACKER_ROWS;
-        }
-    }
-
     int lmb_pressed = (buttonsp & 1);
     int lmb_held    = buttons & 1;
     int rmb_pressed = (buttonsp & 2);
@@ -1686,6 +1673,23 @@ static bool sfx_handle_buttons(int button_mask, int buttonsp_mask)
     return false;
 }
 
+static void sfx_handle_mouse_wheel(int mx, int my, int wheel, int buttons, int keymod)
+{
+    (void)mx; (void)my; (void)buttons; (void)keymod;
+    /* Mousewheel: scroll list or tracker depending on current view. */
+    if (wheel != 0) {
+        if (sfx_detail < 0) {
+            sfx_list_scroll -= wheel;
+            if (sfx_list_scroll < 0) sfx_list_scroll = 0;
+            if (sfx_list_scroll > SFX_COUNT - LIST_ROWS) sfx_list_scroll = SFX_COUNT - LIST_ROWS;
+        } else if (sfx_mode == 1) {  /* tracker mode */
+            sfx_note_scroll -= wheel;
+            if (sfx_note_scroll < 0) sfx_note_scroll = 0;
+            if (sfx_note_scroll > SFX_NOTES - TRACKER_ROWS) sfx_note_scroll = SFX_NOTES - TRACKER_ROWS;
+        }
+    }
+}
+
 static void sfx_init(void)
 {
     assert(sfx_undo_ctx == NULL);
@@ -1724,6 +1728,7 @@ p8_editor_tab_t p8_subeditor_sfx = {
     .shutdown=sfx_shutdown,
     .draw=sfx_draw,
     .handle_keypress=sfx_handle_keypress,
-    .handle_mouse=sfx_handle_mouse,
+    .handle_mouse_buttons=sfx_handle_mouse_buttons,
+    .handle_mouse_wheel=sfx_handle_mouse_wheel,
     .handle_buttons=sfx_handle_buttons
 };
