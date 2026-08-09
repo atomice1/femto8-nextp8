@@ -399,8 +399,8 @@ int p8_run(void)
         cart_running = false;
         if (!restart)
             return 0;
+        restart = false;
     }
-    restart = false;
     assert(!lua_running && !cart_running);
 
     p8_reset_cart();
@@ -448,13 +448,13 @@ int p8_exec(const char *input, const char **err_type, char *err, int err_size, c
         lua_running = false;
         if (!restart)
             return 0;
+        restart = false;
         int ret = p8_run();
         if (ret != 0)
             lua_get_error(err_type, err, err_size, filename, lineno);
 
         return ret;
     }
-    restart = false;
 
     lua_running = true;
     int ret = lua_exec_repl(input);
