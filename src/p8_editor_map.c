@@ -188,8 +188,32 @@ static void map_handle_keypress(int scancode, int keypress, int keymod)
                 int sx1 = map_sel_x0 < map_sel_x1 ? map_sel_x1 : map_sel_x0;
                 int sy0 = map_sel_y0 < map_sel_y1 ? map_sel_y0 : map_sel_y1;
                 int sy1 = map_sel_y0 < map_sel_y1 ? map_sel_y1 : map_sel_y0;
+
+                /* Clamp selection to valid map bounds */
+                sx0 = sx0 < 0 ? 0 : (sx0 >= MAP_COLS ? MAP_COLS - 1 : sx0);
+                sx1 = sx1 < 0 ? 0 : (sx1 >= MAP_COLS ? MAP_COLS - 1 : sx1);
+                sy0 = sy0 < 0 ? 0 : (sy0 >= MAP_ROWS ? MAP_ROWS - 1 : sy0);
+                sy1 = sy1 < 0 ? 0 : (sy1 >= MAP_ROWS ? MAP_ROWS - 1 : sy1);
+
+                /* Calculate dimensions */
                 map_copy_w = sx1 - sx0 + 1;
                 map_copy_h = sy1 - sy0 + 1;
+
+                /* Validate dimensions */
+                if (map_copy_w < 1 || map_copy_w > MAP_COLS ||
+                    map_copy_h < 1 || map_copy_h > MAP_ROWS) {
+                    map_copy_w = 0;
+                    map_copy_h = 0;
+                    return;
+                }
+
+                /* Verify buffer fits */
+                if (map_copy_w * map_copy_h > sizeof(map_copy_buf)) {
+                    map_copy_w = 0;
+                    map_copy_h = 0;
+                    return;
+                }
+
                 for (int row = 0; row < map_copy_h; row++)
                     for (int col = 0; col < map_copy_w; col++)
                         map_copy_buf[row * map_copy_w + col] =
