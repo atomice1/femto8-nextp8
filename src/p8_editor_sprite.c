@@ -785,6 +785,8 @@ static void sprite_handle_keypress(int scancode, int keypress, int keymod)
 static void sprite_replace_color(int from_color, int to_color)
 {
     if (from_color == to_color) return;
+    /* Validate sel_sprite is in valid range (0-255) */
+    if (sel_sprite < 0 || sel_sprite >= 256) return;
     int bx = (sel_sprite % 16) * 8;  /* pixel x start of sprite in sheet */
     int by = (sel_sprite / 16) * 8;  /* pixel y start */
     for (int py = 0; py < 8; py++) {
