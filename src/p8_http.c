@@ -354,27 +354,21 @@ ssize_t http_recv(void *data, unsigned max_length)
         /* If chunk is complete, read trailing CRLF */
         if (current_chunk_remaining == 0) {
             char crlf[2];
-
-            /* Read first byte if available in buffer */
-            if (read_buffer_pos < read_buffer_len) {
-                crlf[0] = read_buffer[read_buffer_pos++];
-            } else {
-                ssize_t recv_len = net_recv(crlf, 1);
-                if (recv_len != 1)
-                    return -1;
+            size_t bytes_in_buf = read_buffer_len - read_buffer_pos;
+            if (bytes_in_buf > 0) {
+                /* Copy what's in buffer */
+                memcpy(crlf, read_buffer + read_buffer_pos, bytes_in_buf);
+                read_buffer_pos = read_buffer_len;
             }
-
-            /* Read second byte if available in buffer */
-            if (read_buffer_pos < read_buffer_len) {
-                crlf[1] = read_buffer[read_buffer_pos++];
-            } else {
-                ssize_t recv_len = net_recv(crlf + 1, 1);
-                if (recv_len != 1)
+            /* Read remaining bytes from network */
+            if (bytes_in_buf < 2) {
+                ssize_t recv_len = net_recv(crlf + bytes_in_buf, 2 - bytes_in_buf);
+                if (recv_len != (ssize_t)(2 - bytes_in_buf)) {
                     return -1;
+                }
             }
-
             if (crlf[0] != '\r' || crlf[1] != '\n') {
-                fprintf(stderr, "http_recv: expected CRLF after chunk, got '%c%c'\n", crlf[0], crlf[1]);
+                fprintf(stderr, "http_recv: expected CRLF after chunk, got 0x%x 0x%x'\n", crlf[0], crlf[1]);
                 errno = EINVAL;
                 return -1;
             }
