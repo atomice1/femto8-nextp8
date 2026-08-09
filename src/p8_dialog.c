@@ -797,7 +797,10 @@ void p8_dialog_set_showing(p8_dialog_t *dialog, bool showing)
     (void)dialog;
     if (!showing) {
         if (m_dialog_nest_count > 0) {
+            /* Verify the dialog is at the top of the stack */
             assert(m_dialog_stack[m_dialog_nest_count - 1] == dialog);
+            if (m_dialog_stack[m_dialog_nest_count - 1] != dialog)
+                return;  /* Stack is corrupted */
             m_dialog_nest_count--;
             m_dialog_stack[m_dialog_nest_count] = NULL;
         }
@@ -806,6 +809,8 @@ void p8_dialog_set_showing(p8_dialog_t *dialog, bool showing)
         p8_dialog_draw_stack();
     } else if (showing) {
         assert(m_dialog_nest_count < MAX_DIALOG_NESTING);
+        if (m_dialog_nest_count >= MAX_DIALOG_NESTING)
+            return;  /* Dialog nesting limit exceeded */
         m_dialog_stack[m_dialog_nest_count] = dialog;
         m_dialog_nest_count++;
     }
