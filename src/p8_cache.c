@@ -74,6 +74,18 @@ int cache_download_to_dir(const char *cart_id, const char *download_dir, char *f
         return -1;
     }
 
+    /* Validate cart_id format - only alphanumeric, underscore, and hyphen allowed */
+    for (const char *p = cart_id; *p; p++) {
+        if (!(*p >= '0' && *p <= '9') &&
+            !(*p >= 'A' && *p <= 'Z') &&
+            !(*p >= 'a' && *p <= 'z') &&
+            !(*p == '_') && !(*p == '-')) {
+            printf("cache_download: invalid cart_id format\n");
+            errno = EINVAL;
+            return -1;
+        }
+    }
+
     /* Ensure download directory exists */
     if (ensure_dir(download_dir) < 0)
         return -1;
