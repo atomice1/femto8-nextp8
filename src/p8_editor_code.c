@@ -911,6 +911,7 @@ static bool undo_edit(const edit_t *edit)
             success = insert_text_multi_line_no_undo(cursor_line, cursor_col, "\n", 1);
         else
             success = insert_text_single_line_no_undo(cursor_line, cursor_col, (char *)&edit->ch, 1);
+        break;
     case EDIT_TYPE_SIMPLE_DELETE_FORWARD:
         assert(select_start_line == -1);
         success = insert_text_single_line_no_undo(cursor_line, cursor_col, (char *)&edit->ch, 1);
