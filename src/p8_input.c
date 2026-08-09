@@ -869,7 +869,6 @@ void p8_update_input()
     static unsigned repeat_mod = 0;
     static uint64_t repeat_down_time = 0;
     static bool repeat_first = false;
-    static unsigned keymod = 0;
     uint32_t key_event;
     while ((key_event = *(volatile uint32_t *)_KEYBOARD_EVENT_QUEUE_HI) != 0) {
         bool press = (key_event & 0x80000000) != 0;
@@ -878,6 +877,7 @@ void p8_update_input()
                           ((key_event >> 12) & 0xc3f0);
         bool membrane_mode = (key_event & 0x40000000);
         char *keymap_page;
+        m_mouse_keymod = keymod;
         if (membrane_mode) {
             unsigned page_index;
             if (keymod & (KMOD_SHIFT | KMOD_CTRL))
@@ -947,7 +947,6 @@ void p8_update_input()
     if (mouse_y4 >= P8_HEIGHT * 4) mouse_y4 = P8_HEIGHT * 4 - 1;
     m_mouse_x = mouse_x4 / 4;
     m_mouse_y = mouse_y4 / 4;
-    m_mouse_keymod = keymod;
 
     mouse_x_accum_prev = mouse_x_accum;
     mouse_y_accum_prev = mouse_y_accum;
