@@ -81,7 +81,7 @@ static int parse_url(const char *url, bool *use_ssl, char *host, size_t host_len
     if (*p == ':') {
         p++;
         *port = 0;
-        while (isdigit(*p)) {
+        while (isdigit(*p) && *port < 65536) {
             *port = *port * 10 + (*p - '0');
             p++;
         }
@@ -317,13 +317,7 @@ ssize_t http_recv(void *data, unsigned max_length)
             }
 
             /* Parse hex chunk size */
-            long chunk_size = strtol(line, NULL, 16);
-            if (chunk_size < 0) {
-                fprintf(stderr, "http_recv: invalid negative chunk size in line '%s'\n", line);
-                errno = EINVAL;
-                return -1;
-            }
-            current_chunk_remaining = (size_t)chunk_size;
+            current_chunk_remaining = strtol(line, NULL, 16);
 
             if (current_chunk_remaining == 0) {
                 /* Last chunk */
