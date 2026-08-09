@@ -2,6 +2,7 @@
  * Copyright (C) 2026 Chris January
  */
 
+#include <assert.h>
 #include "p8_browse.h"
 #include "p8_editor.h"
 #include "p8_emu.h"
@@ -26,6 +27,8 @@ static bool screen_switch_requested = false;
 
 void p8_set_active_screen(p8_screen_index_t screen)
 {
+    assert(screen < NUM_SCREENS);
+    if (screen >= NUM_SCREENS) return;
     pending_screen = screen;
     screen_switch_requested = true;
 }
