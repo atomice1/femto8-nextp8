@@ -1739,8 +1739,31 @@ static void sfx_init(void)
 
 static void sfx_shutdown(void)
 {
-    p8_editor_undo_destroy(sfx_undo_ctx);
-    sfx_undo_ctx = NULL;
+    if (sfx_undo_ctx) {
+        p8_editor_undo_destroy(sfx_undo_ctx);
+        sfx_undo_ctx = NULL;
+    }
+    /* Reset all static state */
+    sfx_cursor = 0;
+    sfx_list_scroll = 0;
+    sfx_detail = -1;
+    sfx_mode = 0;
+    sfx_note_cursor = 0;
+    sfx_note_scroll = 0;
+    sfx_field_cursor = 0;
+    sfx_wave_cursor = 0;
+    sfx_eff_cursor = 0;
+    sfx_vol_cursor = 5;
+    sfx_hdr_editing = false;
+    sfx_hdr_col = 0;
+    sfx_hdr_drag_field = -1;
+    sfx_sel_start = -1;
+    sfx_sel_end = -1;
+    sfx_all_fields = false;
+    sfx_clipboard_len = 0;
+    sfx_custom = 0;
+    sfx_drag_loop = -1;
+    memset(sfx_clipboard, 0, sizeof(sfx_clipboard));
 }
 
 p8_editor_tab_t p8_subeditor_sfx = {
