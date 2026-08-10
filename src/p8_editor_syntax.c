@@ -116,6 +116,14 @@ void p8_syn_highlight_line(const char *line, int len,
 {
     int i = 0;
 
+    /* Validate required parameters */
+    if (!line || !colors || !ctx)
+        return;
+
+    /* Negative or zero length requires no work */
+    if (len <= 0)
+        return;
+
     while (i < len) {
 
         /* ---------------------------------------------------------------
