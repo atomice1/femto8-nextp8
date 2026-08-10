@@ -136,9 +136,9 @@ static int compare_dir_entry(const void *p1, const void *p2)
 }
 static void list_dir() {
     selected_index = 0;
+    clear_dir_contents();
 #ifdef NEXTP8
     if (m_current_cart_dir[0] == '\0') {
-        clear_dir_contents();
         // Show drives
         static const char *volume_names[2] = {"0:/", "1:/"};
         for (int i=0;i<2;++i)
@@ -150,8 +150,8 @@ static void list_dir() {
     DIR *dir = opendir(m_current_cart_dir);
     if (dir == NULL) {
         fprintf(stderr, "%s: %s\n", m_current_cart_dir, strerror(errno));
+        append_dir_entry("..", true);
     } else {
-        clear_dir_contents();
         char full_path[PATH_MAX];
         for (;;) {
             struct dirent *dirent;
