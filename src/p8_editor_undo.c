@@ -51,6 +51,13 @@ static void push_to(uint8_t **stack, int *depth,
 
 p8_editor_undo_ctx_t *p8_editor_undo_create(int mem_addr, int mem_size)
 {
+    /* Validate parameters */
+    if (mem_addr < 0 || mem_size < 0) return NULL;
+
+    /* Check for buffer overflow */
+    if (mem_addr > 0x8000 || mem_size > 0x8000) return NULL;
+    if ((unsigned)mem_addr + (unsigned)mem_size > 0x8000) return NULL;
+
     p8_editor_undo_ctx_t *ctx =
         (p8_editor_undo_ctx_t *)calloc(1, sizeof(*ctx));
     if (!ctx) return NULL;
