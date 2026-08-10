@@ -231,8 +231,7 @@ bool p8_preview_load(const char *path, p8_preview_info_t *info_out)
 
     if (ok) {
         p8_preview_info_t *entry = cache_insert(path);
-        if (entry)
-            *entry = info;
+        *entry = info;
         *info_out = info;
     }
 
