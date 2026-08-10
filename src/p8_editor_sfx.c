@@ -170,6 +170,7 @@ static void sfx_note_write(int sfx_idx, int note_idx, uint16_t val)
 static void sfx_update_current_note(int pitch, int waveform, int volume, int effect, int custom)
 {
     if (sfx_detail < 0 || sfx_note_cursor < 0 || sfx_note_cursor >= SFX_NOTES) return;
+
     int nd = sfx_note(sfx_detail, sfx_note_cursor);
     if (nd == 0) {
         if (pitch == -1) pitch = 0;
@@ -184,6 +185,19 @@ static void sfx_update_current_note(int pitch, int waveform, int volume, int eff
         if (effect == -1) effect = NOTE_EFF(nd);
         if (custom == -1) custom = NOTE_CUSTOM(nd);
     }
+
+    /* Clamp to valid ranges to prevent silent truncation of invalid inputs */
+    if (pitch < 0) pitch = 0;
+    if (pitch > 63) pitch = 63;
+    if (waveform < 0) waveform = 0;
+    if (waveform > 7) waveform = 7;
+    if (volume < 0) volume = 0;
+    if (volume > 7) volume = 7;
+    if (effect < 0) effect = 0;
+    if (effect > 7) effect = 7;
+    if (custom < 0) custom = 0;
+    if (custom > 1) custom = 1;
+
     uint16_t new_nd = (uint16_t)((pitch & 0x3F) | (waveform << 6) | (volume << 9) | (effect << 12) | (custom << 15));
     sfx_note_write(sfx_detail, sfx_note_cursor, new_nd);
 }
