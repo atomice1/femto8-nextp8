@@ -125,7 +125,9 @@ static bool load_p8_text_preview(uint8_t *buffer, long size,
             while (*line != '\n' && *line != '\0' && x < 128) {
                 const char *pos = strchr(hex_chars, *line);
                 if (pos) {
-                    info->label[row * 128 + x] = (uint8_t)(pos - hex_chars);
+                    int offset = row * 128 + x;
+                    if (offset < PREVIEW_LABEL_SIZE)
+                        info->label[offset] = (uint8_t)(pos - hex_chars);
                     x++;
                 }
                 line++;
