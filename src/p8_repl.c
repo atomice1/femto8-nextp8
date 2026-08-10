@@ -62,7 +62,6 @@ static void repl_history_push(const char *line)
         repl_history_count--;
     }
     strtcpy(repl_history[repl_history_count], line, REPL_LINE_MAX);
-    repl_history[repl_history_count][REPL_LINE_MAX - 1] = '\0';
     repl_history_count++;
     repl_history_cursor = repl_history_count; /* reset cursor to end of history */
 }
@@ -111,6 +110,9 @@ static void repl_draw(int x, int y, int w, int h)
  *   followed by optional whitespace and then no open parantheses). */
 static bool is_command(const char *input, size_t input_len)
 {
+    assert(input != NULL);
+    if (input_len == 0)
+        return false;
     if (!((input[0] >= 'a' && input[0] <= 'z') ||
          (input[0] >= 'A' && input[0] <= 'Z') ||
           input[0] == '_'))
@@ -212,8 +214,7 @@ void repl_handle_ls(const char *arg)
     /* Leave room for the input line and the 'press any key' prompt at the bottom.
      * Calculate how many text lines fit on the main screen area and reserve two
      * rows (top and bottom) to avoid overlap. */
-    int lines_per_page = (P8_HEIGHT / GLYPH_HEIGHT) - 2;
-    if (lines_per_page < 4) lines_per_page = 4;
+    int lines_per_page = P8_HEIGHT / GLYPH_HEIGHT - 2;
 
     struct dirent *de;
     int printed = 0;
@@ -289,8 +290,11 @@ static void convert_command_to_function_call(char *input, int *input_len)
             } else {
                 input[i] = ',';
             }
-            if (i == *input_len)
+            if (i == *input_len) {
+                if (*input_len >= REPL_INPUT_MAX - 1)
+                    return;  /* Buffer full, can't append more */
                 (*input_len)++;
+            }
             for (i=i+1;i<*input_len;i++) {
                 if (input[i] != ' ' && input[i] != '\t')
                     break;
@@ -301,12 +305,17 @@ static void convert_command_to_function_call(char *input, int *input_len)
     /* i now points to the start of the argument(s), or equals *input_len if no args */
     if (quote_args && i < *input_len) {
         /* Insert '"' before argument, append '"' then ')' */
+        int needed = 3;  /* " + " + " + ) */
+        if (*input_len + needed > REPL_INPUT_MAX)
+            return;  /* Buffer would overflow */
         memmove(input + i + 1, input + i, *input_len - i);
         input[i] = '"';
         (*input_len)++;
         input[(*input_len)++] = '"';
         input[(*input_len)++] = ')';
     } else {
+        if (*input_len >= REPL_INPUT_MAX - 1)
+            return;  /* Buffer full, can't append more */
         input[(*input_len)++] = ')';
     }
     input[*input_len] = '\0';
@@ -405,11 +414,14 @@ static void repl_handle_keypress(int scancode, int keypress, int keymod)
     }
 }
 
-/* Banner display state */
+/* Banner display state
+ * The banner is shown only once per REPL session (not per screen show) to avoid
+ * overwhelming the user with repeated welcome messages when switching between screens. */
 static bool repl_banner_shown = false;
 
 static void repl_show(void)
 {
+    /* Banner is shown only once per REPL session */
     if (!repl_banner_shown) {
         repl_banner_shown = true;
         overlay_clear();
