@@ -72,10 +72,14 @@ static void extract_title_author(const char *lua_script,
         const char *end = strchr(start, '\n');
         if (end) {
             size_t len = end - start;
-            if (len >= title_size)
-                len = title_size - 1;
-            memcpy(title, start, len);
-            title[len] = '\0';
+            if (title_size > 0) {
+                if (len >= title_size)
+                    len = title_size - 1;
+                memcpy(title, start, len);
+                title[len] = '\0';
+            } else {
+                len = 0;
+            }
             while (len > 0 && (title[len-1] == ' ' || title[len-1] == '\r'))
                 title[--len] = '\0';
 
@@ -89,10 +93,14 @@ static void extract_title_author(const char *lua_script,
                 if (!author_end)
                     author_end = author_start + strlen(author_start);
                 size_t alen = author_end - author_start;
-                if (alen >= author_size)
-                    alen = author_size - 1;
-                memcpy(author, author_start, alen);
-                author[alen] = '\0';
+                if (author_size > 0) {
+                    if (alen >= author_size)
+                        alen = author_size - 1;
+                    memcpy(author, author_start, alen);
+                    author[alen] = '\0';
+                } else {
+                    alen = 0;
+                }
                 while (alen > 0 && (author[alen-1] == ' ' || author[alen-1] == '\r'))
                     author[--alen] = '\0';
             }
