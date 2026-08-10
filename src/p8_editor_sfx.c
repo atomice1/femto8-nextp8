@@ -996,6 +996,9 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
                 hi = sfx_sel_start < sfx_sel_end ? sfx_sel_end   : sfx_sel_start;
             }
             sfx_clipboard_len = hi - lo + 1;
+            /* Clamp to clipboard array size */
+            if (sfx_clipboard_len > SFX_NOTES) sfx_clipboard_len = SFX_NOTES;
+            if (sfx_clipboard_len < 0) sfx_clipboard_len = 0;
             for (int i = 0; i < sfx_clipboard_len; i++)
                 sfx_clipboard[i] = sfx_note(sfx_detail, lo + i);
             return;
