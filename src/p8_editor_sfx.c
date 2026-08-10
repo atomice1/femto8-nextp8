@@ -782,8 +782,10 @@ static void draw_pcm_mode(int x, int y, int w, int h)
     if (area_h < 4) area_h = 4;
 
     /* Sample width: fit 64 samples across available width, at least 1px each */
-    int sample_w = w / 64; if (sample_w < 1) sample_w = 1;
+    int sample_w = w / 64;
+    if (sample_w < 1) sample_w = 1;
     int total_w = sample_w * 64;
+    if (total_w > P8_WIDTH) total_w = P8_WIDTH;  /* Clamp to available width */
     int left = x + (w - total_w) / 2; /* horizontally centered */
 
     /* Vertical centering: full area used, center line halfway through area */
@@ -1395,8 +1397,10 @@ static void sfx_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp, 
                 int area_y1 = cy + h - GLYPH_HEIGHT - 1;
                 int area_h = area_y1 - area_y0 + 1;
                 if (area_h < 4) area_h = 4;
-                int sample_w = P8_WIDTH / 64; if (sample_w < 1) sample_w = 1;
+                int sample_w = P8_WIDTH / 64;
+                if (sample_w < 1) sample_w = 1;
                 int total_w = sample_w * 64;
+                if (total_w > P8_WIDTH) total_w = P8_WIDTH;  /* Clamp to available width */
                 int left = (P8_WIDTH - total_w) / 2;
                 /* only handle mouse when inside the centered PCM area */
                 if (mx >= left && mx < left + total_w && my >= area_y0 && my < area_y0 + area_h) {
