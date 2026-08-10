@@ -5,5 +5,5 @@ __lua__
 #include test_fwk.lua
 
 printh("load: START")
-load("test_load1.p8")
+load("../test_load1.p8")
 printh("load: FAIL")

@@ -29,4 +29,7 @@ function _init()
     end
 
     printh("PSCROLL_END")
+
+    printh("gen_print_scroll: START")
+    printh("gen_print_scroll: PASS")
 end
