@@ -1,9 +1,11 @@
 # Linux-specific additional targets
 # png_to_p8 - a tool to convert .p8.png files to .p8 files
 # parse_tree - a tool to display the parse tree of Pico-8 Lua scripts
+# dialog_test - a tool for testing dialogs
 
 PNG_TO_P8_TARGET := $(BUILD_DIR)/png_to_p8
 PARSE_TREE_TARGET := $(BUILD_DIR)/parse_tree
+DIALOG_TEST_TARGET := $(BUILD_DIR)/dialog_test
 
 # png_to_p8 tool objects (parser with decompression support)
 PNG_TO_P8_OBJECTS := $(BUILD_DIR)/p8_parser.o \
@@ -13,7 +15,7 @@ PNG_TO_P8_OBJECTS := $(BUILD_DIR)/p8_parser.o \
                      $(BUILD_DIR)/lodepng/lodepng.o \
                      $(BUILD_DIR)/png_to_p8.o
 
-all: $(PNG_TO_P8_TARGET) $(PARSE_TREE_TARGET)
+all: $(PNG_TO_P8_TARGET) $(PARSE_TREE_TARGET) $(DIALOG_TEST_TARGET)
 
 # png_to_p8 target
 $(PNG_TO_P8_TARGET): $(PNG_TO_P8_OBJECTS)
@@ -23,7 +25,7 @@ $(BUILD_DIR)/png_to_p8.o: tools/png_to_p8.c
 	$(CC) $(CFLAGS) -c $< -o $@
 	$(CC) -MM $(CFLAGS) -MT $@ -MF $(BUILD_DIR)/png_to_p8.d $<
 
-clean: clean-png-to-p8 clean-parse-tree
+clean: clean-png-to-p8 clean-parse-tree clean-dialog-test
 
 clean-png-to-p8:
 	rm -f $(BUILD_DIR)/png_to_p8.o $(BUILD_DIR)/png_to_p8.d
@@ -80,4 +82,20 @@ clean-parse-tree:
 	rm -f $(BUILD_DIR)/parse_tree.o $(BUILD_DIR)/parse_tree.d
 	rm -f $(PARSE_TREE_TARGET)
 
-.PHONY: clean-png-to-p8 clean-parse-tree
+# dialog_test target (interactive test with SDL)
+# Build p8_dialog.o with dialog_test.o and strtcpy.o
+DIALOG_TEST_OBJECTS := $(BUILD_DIR)/dialog_test.o \
+                       $(filter-out $(BUILD_DIR)/main.o,$(OBJECTS))
+
+$(DIALOG_TEST_TARGET): $(DIALOG_TEST_OBJECTS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(DIALOG_TEST_OBJECTS) -o $@ $(LIBS)
+
+$(BUILD_DIR)/dialog_test.o: tools/dialog_test.c
+	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) -MM $(CFLAGS) -MT $@ -MF $(BUILD_DIR)/dialog_test.d $<
+
+clean-dialog-test:
+	rm -f $(BUILD_DIR)/dialog_test.o $(BUILD_DIR)/dialog_test.d
+	rm -f $(DIALOG_TEST_TARGET)
+
+.PHONY: clean-png-to-p8 clean-parse-tree clean-dialog-test
