@@ -391,7 +391,7 @@ static int show_menu(void)
         DIALOG_MENUITEM("bbs download", 2),
 #endif
 #ifdef NEXTP8
-        DIALOG_MENUITEM("wi-fi config", 3)
+        DIALOG_MENUITEM("wi-fi config", 3),
 #endif
         DIALOG_MENUITEM("show version", 4),
         DIALOG_MENUITEM("controls", 5),
