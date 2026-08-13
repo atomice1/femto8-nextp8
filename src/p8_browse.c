@@ -386,15 +386,16 @@ static p8_dialog_result_t show_bbs_download_dialog(char *cart_id_buffer, size_t 
 static int show_menu(void)
 {
     p8_dialog_control_t controls[] = {
+        DIALOG_MENUITEM("edit cart", 1),
 #ifdef ENABLE_BBS_DOWNLOAD
-        DIALOG_MENUITEM("bbs download", 1),
+        DIALOG_MENUITEM("bbs download", 2),
 #endif
 #ifdef NEXTP8
-        DIALOG_MENUITEM("wi-fi config", 2),
+        DIALOG_MENUITEM("wi-fi config", 3)
 #endif
-        DIALOG_MENUITEM("show version", 3),
-        DIALOG_MENUITEM("controls", 4),
-        DIALOG_MENUITEM("back", 5)
+        DIALOG_MENUITEM("show version", 4),
+        DIALOG_MENUITEM("controls", 5),
+        DIALOG_MENUITEM("back", 6)
     };
 
     p8_dialog_t dialog;
@@ -569,12 +570,28 @@ static void browse_update(void)
         }
     }
 
-    if (result.type == DIALOG_RESULT_NONE && action2_pressed) {
+    // Button 2 (X) shows the menu on the browse screen
+    // Note: In quick mode, button 2 normally cancels the dialog,
+    // but we want to use it to show the menu instead
+    if ((result.type == DIALOG_RESULT_NONE || result.type == DIALOG_RESULT_CANCELLED) && action2_pressed) {
         char cart_id_buffer[64] = {'\0'};
         int action_id = show_menu();
         switch (action_id) {
+            case 1: {
+                /* "Edit cart": switch to editor with selected file */
+                struct dir_entry *dir_entry = &dir_contents[selected_index];
+                char full_path[PATH_MAX];
+                if (p8_make_full_path(full_path, sizeof(full_path), m_current_cart_dir, dir_entry->file_name) < 0) {
+                    fputs("Path too long\n", stderr);
+                    break;
+                }
+                /* Load cart for editing, then switch to editor */
+                p8_load(full_path, NULL, NULL, NULL);
+                p8_set_active_screen(P8_SCREEN_EDIT);
+                break;
+            }
 #ifdef ENABLE_BBS_DOWNLOAD
-            case 1:
+            case 2:
                 if (show_bbs_download_dialog(cart_id_buffer, sizeof(cart_id_buffer)) == DIALOG_RESULT_ACCEPTED) {
                     const char *cart_id = (cart_id_buffer[0] == '#') ? (cart_id_buffer + 1) : cart_id_buffer;
                     char cart_path[PATH_MAX];
@@ -598,19 +615,6 @@ static void browse_update(void)
                 }
                 break;
 #endif
-            case 2: {
-                /* "Edit file": switch to editor with selected file */
-                struct dir_entry *dir_entry = &dir_contents[selected_index];
-                char full_path[PATH_MAX];
-                if (p8_make_full_path(full_path, sizeof(full_path), m_current_cart_dir, dir_entry->file_name) < 0) {
-                    fputs("Path too long\n", stderr);
-                    break;
-                }
-                /* Load cart for editing, then switch to editor */
-                p8_load(full_path, NULL, NULL, NULL);
-                p8_set_active_screen(P8_SCREEN_EDIT);
-                break;
-            }
 #ifdef NEXTP8
             case 3:
                 wifi_show_config_dialog();
