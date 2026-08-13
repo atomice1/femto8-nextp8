@@ -131,6 +131,7 @@ typedef struct {
 #define DIALOG_TEXT_HIGHLIGHT     1   // Dark blue (text on highlighted background)
 #define DIALOG_BG_INVERTED        7   // White (inverted background)
 #define DIALOG_TEXT_INVERTED      1   // Dark blue (inverted text)
+#define DIALOG_TEXT_DISABLED      5   // Dark grey (disabled text)
 
 /* Global Dialog State */
 extern bool m_dialog_showing;

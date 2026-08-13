@@ -397,6 +397,12 @@ static int show_menu(void)
         DIALOG_MENUITEM("controls", 5),
         DIALOG_MENUITEM("back", 6)
     };
+    bool valid_cart = false;
+    if (selected_index >= 0 && selected_index < nitems) {
+        struct dir_entry *dir_entry = &dir_contents[selected_index];
+        valid_cart = !dir_entry->is_dir;
+    }
+    controls[0].enabled = valid_cart;
 
     p8_dialog_t dialog;
     p8_dialog_init(&dialog, NULL, controls, sizeof(controls) / sizeof(controls[0]), 0);

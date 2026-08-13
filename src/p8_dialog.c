@@ -190,7 +190,7 @@ void p8_dialog_init(p8_dialog_t *dialog,
     // Find first selectable control
     dialog->focused_control = -1;
     for (int i = 0; i < count; i++) {
-        if (controls[i].selectable) {
+        if (controls[i].selectable && controls[i].enabled) {
             dialog->focused_control = i;
             break;
         }
@@ -212,7 +212,7 @@ static void draw_control(const p8_dialog_t *dialog, int control_idx, int x, int 
     const p8_dialog_control_t *control = &dialog->controls[control_idx];
 
     int bg_color = control->inverted ? DIALOG_BG_INVERTED : DIALOG_BG_NORMAL;
-    int fg_color = control->inverted ? DIALOG_TEXT_INVERTED : DIALOG_TEXT_NORMAL;
+    int fg_color = control->inverted ? DIALOG_TEXT_INVERTED : (control->enabled ? DIALOG_TEXT_NORMAL : DIALOG_TEXT_DISABLED);
 
     if (focused && !control->inverted) {
         bg_color = DIALOG_BG_HIGHLIGHT;
@@ -528,7 +528,7 @@ static bool move_to_next_control(p8_dialog_t *dialog, bool quick_mode)
 {
     int next = dialog->focused_control + 1;
     while (next < dialog->control_count &&
-        (!dialog->controls[next].selectable ||
+        (!dialog->controls[next].selectable || !dialog->controls[next].enabled ||
             (quick_mode && dialog->controls[next].type == DIALOG_BUTTONBAR))) {
         next++;
     }
@@ -546,7 +546,7 @@ static bool move_to_prev_control(p8_dialog_t *dialog, bool quick_mode)
 {
     int prev = dialog->focused_control - 1;
     while (prev >= 0 &&
-        (!dialog->controls[prev].selectable ||
+        (!dialog->controls[prev].selectable || !dialog->controls[prev].enabled ||
             (quick_mode && dialog->controls[prev].type == DIALOG_BUTTONBAR))) {
         prev--;
     }
@@ -695,14 +695,15 @@ p8_dialog_action_t p8_dialog_update(p8_dialog_t *dialog)
                 switch (control->type) {
                     case DIALOG_BUTTON:
                     case DIALOG_MENUITEM:
-                        result.type = DIALOG_RESULT_BUTTON;
-                        result.action_id = control->data.button.action_id;
+                        if (control->enabled) {
+                            result.type = DIALOG_RESULT_BUTTON;
+                            result.action_id = control->data.button.action_id;
+                        }
                         break;
 
                     case DIALOG_CHECKBOX:
-                        if (control->data.checkbox.value) {
+                        if (control->enabled)
                             *control->data.checkbox.value = !*control->data.checkbox.value;
-                        }
                         break;
 
                     case DIALOG_LISTBOX:
@@ -836,7 +837,7 @@ p8_dialog_action_t p8_dialog_update(p8_dialog_t *dialog)
     if (buttons & (BUTTON_MASK_LEFT | BUTTON_MASK_RIGHT)) {
         if (dialog->focused_control >= 0) {
             p8_dialog_control_t *ctrl = &dialog->controls[dialog->focused_control];
-            if (ctrl->type == DIALOG_MENUITEM) {
+            if (ctrl->type == DIALOG_MENUITEM && ctrl->enabled) {
                 result.type = DIALOG_RESULT_BUTTON;
                 result.action_id = ctrl->data.button.action_id;
                 result.button_mask = buttons & (BUTTON_MASK_LEFT | BUTTON_MASK_RIGHT);
