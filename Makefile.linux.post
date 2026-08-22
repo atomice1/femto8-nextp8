@@ -25,9 +25,9 @@ $(BUILD_DIR)/png_to_p8.o: tools/png_to_p8.c
 	$(CC) $(CFLAGS) -c $< -o $@
 	$(CC) -MM $(CFLAGS) -MT $@ -MF $(BUILD_DIR)/png_to_p8.d $<
 
-clean: clean-png-to-p8 clean-parse-tree clean-dialog-test
+clean:: clean-png-to-p8 clean-parse-tree clean-dialog-test
 
-clean-png-to-p8:
+clean-png-to-p8::
 	rm -f $(BUILD_DIR)/png_to_p8.o $(BUILD_DIR)/png_to_p8.d
 	rm -f $(PNG_TO_P8_TARGET)
 
@@ -78,7 +78,7 @@ $(BUILD_DIR)/parse_tree.o: tools/parse_tree.c
 	$(CC) $(CFLAGS) -c $< -o $@
 	$(CC) -MM $(CFLAGS) -MT $@ -MF $(BUILD_DIR)/parse_tree.d $<
 
-clean-parse-tree:
+clean-parse-tree::
 	rm -f $(BUILD_DIR)/parse_tree.o $(BUILD_DIR)/parse_tree.d
 	rm -f $(PARSE_TREE_TARGET)
 
@@ -94,8 +94,12 @@ $(BUILD_DIR)/dialog_test.o: tools/dialog_test.c
 	$(CC) $(CFLAGS) -c $< -o $@
 	$(CC) -MM $(CFLAGS) -MT $@ -MF $(BUILD_DIR)/dialog_test.d $<
 
-clean-dialog-test:
+clean-dialog-test::
 	rm -f $(BUILD_DIR)/dialog_test.o $(BUILD_DIR)/dialog_test.d
 	rm -f $(DIALOG_TEST_TARGET)
 
 .PHONY: clean-png-to-p8 clean-parse-tree clean-dialog-test
+
+ifeq ($(USE_NEXTP8_AUDIO),1)
+  include Makefile.linux.nextp8_audio.post
+endif

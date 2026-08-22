@@ -33,6 +33,8 @@ DEFINES += -DLODEPNG_NO_COMPILE_ENCODER -DLODEPNG_NO_COMPILE_DISK -DLODEPNG_NO_C
 CFLAGS   += -Wall $(DEFINES) $(fpic) $(INCFLAGS) $(SDL_CFLAGS) -g -O3 -Wall -Werror
 CXXFLAGS += $(CFLAGS) -fno-threadsafe-statics
 
+LINKER ?= $(CC)
+
 # Source directories
 SRC_DIRS := src src/lua src/data src/lodepng src/lexaloffle src/wifi
 
@@ -46,14 +48,15 @@ SOURCES_CXX := $(wildcard $(addsuffix /*.cpp, $(SRC_DIRS)))
 
 # Generate object file paths
 OBJECTS_C := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SOURCES_C))
-OBJECTX_CXX := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SOURCES_CXX))
+OBJECTS_CXX := $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(SOURCES_CXX))
 OBJECTS_LUA := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SOURCES_LUA))
+
 OBJECTS := $(OBJECTS_C) $(OBJECTS_CXX) $(OBJECTS_LUA)
 
 all: $(TARGET)
 
 $(TARGET): $(OBJECTS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJECTS) -o $@ $(LIBS)
+	$(LINKER) $(CFLAGS) $(LDFLAGS) $(OBJECTS) -o $@ $(LIBS)
 
 $(OBJECTS_C): $(BUILD_DIR)/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -67,7 +70,7 @@ $(OBJECTS_LUA): $(BUILD_DIR)/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 	$(CC) -MM $(CFLAGS) -MT $@ -MF $(BUILD_DIR)/$*.d $<
 
-clean:
+clean::
 	rm -f $(OBJECTS) $(OBJECTS:.o=.d) $(TARGET)
 
 .PHONY: clean

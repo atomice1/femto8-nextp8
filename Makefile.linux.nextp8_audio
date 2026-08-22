@@ -1,0 +1,35 @@
+# USE_NEXTP8_AUDIO=1 configuration
+# This file is included by Makefile.linux when USE_NEXTP8_AUDIO=1
+
+VERILATOR_ROOT := /usr/share/verilator
+
+# Use g++ for linking when USE_NEXTP8_AUDIO=1 (C++ code)
+LINKER := g++
+
+# Set DEFAULT_NEXTP8_CORE based on which directory exists
+ifneq ($(wildcard nextp8-core),)
+  DEFAULT_NEXTP8_CORE := nextp8-core
+else ifneq ($(wildcard ../nextp8-core),)
+  DEFAULT_NEXTP8_CORE := ../nextp8-core
+else
+  $(error nextp8-core directory not found)
+endif
+
+# Add verilated source and objects (these will be added to Makefile's OBJECTS)
+SOURCES_CXX += src/p8_audio_verilated.cpp
+DEFINES += -DUSE_NEXTP8_AUDIO
+
+# Verilator setup (matching sQLux verilator command)
+VERILATOR ?= verilator
+VERILATOR_FLAGS = --sv --no-timing -Wno-WIDTH -Wno-IMPLICITSTATIC -Wno-CASEINCOMPLETE
+
+NEXTP8_CORE ?= $(DEFAULT_NEXTP8_CORE)
+
+VERILATED_DIR := build-verilated
+
+# Add to CFLAGS/CXXFLAGS for verilated code
+CFLAGS += -I$(VERILATED_DIR)
+CXXFLAGS += -I$(VERILATED_DIR)
+
+# Add LIBS for verilated code
+LIBS += -lpthread -lstdc++ -L$(VERILATED_DIR) -lVp8audio -lverilated

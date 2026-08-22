@@ -10,7 +10,7 @@
 #ifndef P8_AUDIO_H
 #define P8_AUDIO_H
 
-#ifdef NEXTP8
+#if defined(NEXTP8) || defined(USE_NEXTP8_AUDIO)
 #define SAMPLE_RATE 22050
 #else
 #define SAMPLE_RATE 44100

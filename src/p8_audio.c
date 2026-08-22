@@ -28,6 +28,45 @@
 #include "nextp8.h"
 #endif
 
+#ifdef USE_NEXTP8_AUDIO
+#include "p8_audio_verilated.h"
+/* MMIO wrapper macros for verilated audio - address is byte offset, value is 16-bit */
+#define MMIO_WRITE(byte_addr, value) p8audio_verilated_mmio_write((byte_addr), (value))
+#define MMIO_READ(byte_addr) p8audio_verilated_mmio_read((byte_addr))
+
+#define _P8AUDIO_BASE          0x0
+#define _P8AUDIO_VERSION       (_P8AUDIO_BASE + 0x0)
+#define _P8AUDIO_CTRL          (_P8AUDIO_BASE + 0x2)
+#define _P8AUDIO_SFX_BASE_HI   (_P8AUDIO_BASE + 0x4)
+#define _P8AUDIO_SFX_BASE_LO   (_P8AUDIO_BASE + 0x6)
+#define _P8AUDIO_MUSIC_BASE_HI (_P8AUDIO_BASE + 0x8)
+#define _P8AUDIO_MUSIC_BASE_LO (_P8AUDIO_BASE + 0xa)
+#define _P8AUDIO_HWFX40        (_P8AUDIO_BASE + 0xd)
+#define _P8AUDIO_HWFX41        (_P8AUDIO_BASE + 0xf)
+#define _P8AUDIO_HWFX42        (_P8AUDIO_BASE + 0x11)
+#define _P8AUDIO_HWFX43        (_P8AUDIO_BASE + 0x13)
+#define _P8AUDIO_SFX_CMD       (_P8AUDIO_BASE + 0x18)
+#define _P8AUDIO_SFX_LEN       (_P8AUDIO_BASE + 0x1a)
+#define _P8AUDIO_MUSIC_CMD     (_P8AUDIO_BASE + 0x1c)
+#define _P8AUDIO_MUSIC_FADE    (_P8AUDIO_BASE + 0x1e)
+#define _P8AUDIO_STAT46        (_P8AUDIO_BASE + 0x20)
+#define _P8AUDIO_STAT47        (_P8AUDIO_BASE + 0x22)
+#define _P8AUDIO_STAT48        (_P8AUDIO_BASE + 0x24)
+#define _P8AUDIO_STAT49        (_P8AUDIO_BASE + 0x26)
+#define _P8AUDIO_STAT50        (_P8AUDIO_BASE + 0x28)
+#define _P8AUDIO_STAT51        (_P8AUDIO_BASE + 0x2a)
+#define _P8AUDIO_STAT52        (_P8AUDIO_BASE + 0x2c)
+#define _P8AUDIO_STAT53        (_P8AUDIO_BASE + 0x2e)
+#define _P8AUDIO_STAT54        (_P8AUDIO_BASE + 0x30)
+#define _P8AUDIO_STAT55        (_P8AUDIO_BASE + 0x32)
+#define _P8AUDIO_STAT56        (_P8AUDIO_BASE + 0x34)
+#define _P8AUDIO_STAT57        (_P8AUDIO_BASE + 0x36)
+#else
+/* Direct MMIO access for native femto8 audio - addr is a pointer */
+#define MMIO_WRITE(addr, value) (*(volatile uint16_t*)(addr) = (value))
+#define MMIO_READ(addr) (*(volatile uint16_t*)(addr))
+#endif
+
 #define EFFECT_MASK 0x7000
 #define VOLUME_MASK 0x0E00
 #define WAVEFORM_MASK 0x01C0
@@ -179,19 +218,27 @@ void audio_callback(void *userdata, uint8_t *cbuffer, int length)
 
 void audio_init()
 {
-#ifdef NEXTP8
-    *(uint16_t *)_P8AUDIO_SFX_BASE_HI = ((uint32_t)m_memory + MEMORY_SFX) >> 16;
-    *(uint16_t *)_P8AUDIO_SFX_BASE_LO = ((uint32_t)m_memory + MEMORY_SFX) & 0xFFFF;
-    *(uint16_t *)_P8AUDIO_MUSIC_BASE_HI = ((uint32_t)m_memory + MEMORY_MUSIC) >> 16;
-    *(uint16_t *)_P8AUDIO_MUSIC_BASE_LO = ((uint32_t)m_memory + MEMORY_MUSIC) & 0xFFFF;
-    *(uint16_t *)_P8AUDIO_CTRL = 1; // enable audio subsystem
+#ifdef USE_NEXTP8_AUDIO
+    p8audio_verilated_init();
+    MMIO_WRITE(_P8AUDIO_SFX_BASE_HI, MEMORY_SFX >> 16);
+    MMIO_WRITE(_P8AUDIO_SFX_BASE_LO, MEMORY_SFX & 0xFFFF);
+    MMIO_WRITE(_P8AUDIO_MUSIC_BASE_HI, MEMORY_MUSIC >> 16);
+    MMIO_WRITE(_P8AUDIO_MUSIC_BASE_LO, MEMORY_MUSIC & 0xFFFF);
+    MMIO_WRITE(_P8AUDIO_CTRL, 1); // enable audio subsystem
+#elif defined(NEXTP8)
+    MMIO_WRITE(_P8AUDIO_SFX_BASE_HI, ((uint32_t)m_memory + MEMORY_SFX) >> 16);
+    MMIO_WRITE(_P8AUDIO_SFX_BASE_LO, ((uint32_t)m_memory + MEMORY_SFX) & 0xFFFF);
+    MMIO_WRITE(_P8AUDIO_MUSIC_BASE_HI, ((uint32_t)m_memory + MEMORY_MUSIC) >> 16);
+    MMIO_WRITE(_P8AUDIO_MUSIC_BASE_LO, ((uint32_t)m_memory + MEMORY_MUSIC) & 0xFFFF);
+    MMIO_WRITE(_P8AUDIO_CTRL, 1); // enable audio subsystem
 
     // 5512.5 Hz
-    *(volatile uint16_t *)_DA_PERIOD = _DA_CLKS_PER_SECOND * 2 / 11025;
-    *(volatile uint16_t *)_DA_CONTROL = (1 << 0) | (1 << 8);
+    MMIO_WRITE(_DA_PERIOD, _DA_CLKS_PER_SECOND * 2 / 11025);
+    MMIO_WRITE(_DA_CONTROL, (1 << 0) | (1 << 8));
 #else
     _queue_init(&m_sound_queue);
-
+#endif
+#if !defined(NEXTP8)
     m_audio_spec.freq = SAMPLE_RATE;
     m_audio_spec.format = AUDIO_S16SYS;
     m_audio_spec.channels = 1;
@@ -204,6 +251,9 @@ void audio_init()
     if (ret != 0)
     {
         printf("Error on SDL_OpenAudio()\n");
+#ifdef USE_NEXTP8_AUDIO
+        exit(1);
+#endif
     }
 
     SDL_PauseAudio(0);
@@ -212,9 +262,11 @@ void audio_init()
 
 void audio_resume()
 {
+#if defined(NEXTP8) || defined(USE_NEXTP8_AUDIO)
+    MMIO_WRITE(_P8AUDIO_CTRL, 1);
+#endif
 #ifdef NEXTP8
-    *(volatile uint16_t *)_P8AUDIO_CTRL = 1;
-    *(volatile uint16_t *)_DA_CONTROL = (1 << 0) | (1 << 8);
+    MMIO_WRITE(_DA_CONTROL, (1 << 0) | (1 << 8));
 #else
     SDL_PauseAudio(0);
 #endif
@@ -222,9 +274,11 @@ void audio_resume()
 
 void audio_pause()
 {
+#if defined(NEXTP8) || defined(USE_NEXTP8_AUDIO)
+    MMIO_WRITE(_P8AUDIO_CTRL, 0);
+#endif
 #ifdef NEXTP8
-    *(volatile uint16_t *)_P8AUDIO_CTRL = 0;
-    *(volatile uint16_t *)_DA_CONTROL = 0;
+    MMIO_WRITE(_DA_CONTROL, 0);
 #else
     SDL_PauseAudio(1);
 #endif
@@ -232,24 +286,29 @@ void audio_pause()
 
 void audio_close()
 {
+#if defined(NEXTP8) || defined(USE_NEXTP8_AUDIO)
+    MMIO_WRITE(_P8AUDIO_CTRL, 0);
+#endif
 #ifdef NEXTP8
-    *(uint16_t *)_P8AUDIO_CTRL = 0;
-    *(uint16_t *)_DA_CONTROL = 0;
+    MMIO_WRITE(_DA_CONTROL, 0);
 #else
     SDL_CloseAudio();
+#endif
+#ifdef USE_NEXTP8_AUDIO
+    p8audio_verilated_close();
 #endif
 }
 
 void audio_sound(int32_t index, int32_t channel, uint32_t start, uint32_t length)
 {
-#ifdef NEXTP8
-    *(volatile uint8_t *)_P8AUDIO_HWFX40 = *(uint8_t *)(m_memory + 0x5f40);
-    *(volatile uint8_t *)_P8AUDIO_HWFX41 = *(uint8_t *)(m_memory + 0x5f41);
-    *(volatile uint8_t *)_P8AUDIO_HWFX42 = *(uint8_t *)(m_memory + 0x5f42);
-    *(volatile uint8_t *)_P8AUDIO_HWFX43 = *(uint8_t *)(m_memory + 0x5f43);
-    *(volatile uint16_t *)_P8AUDIO_SFX_LEN = length & 0x3f;
+#if defined(NEXTP8) || defined(USE_NEXTP8_AUDIO)
+    MMIO_WRITE(_P8AUDIO_HWFX40, *(uint8_t *)(m_memory + 0x5f40));
+    MMIO_WRITE(_P8AUDIO_HWFX41, *(uint8_t *)(m_memory + 0x5f41));
+    MMIO_WRITE(_P8AUDIO_HWFX42, *(uint8_t *)(m_memory + 0x5f42));
+    MMIO_WRITE(_P8AUDIO_HWFX43, *(uint8_t *)(m_memory + 0x5f43));
+    MMIO_WRITE(_P8AUDIO_SFX_LEN, length & 0x3f);
     /* Bit 15 is the trigger bit; without it the RTL ignores the write. */
-    *(volatile uint16_t *)_P8AUDIO_SFX_CMD = 0x8000 | (index & 0x3f) | ((channel & 0x7) << 12) | ((start & 0x3f) << 6);
+    MMIO_WRITE(_P8AUDIO_SFX_CMD, 0x8000 | (index & 0x3f) | ((channel & 0x7) << 12) | ((start & 0x3f) << 6));
 #else
     soundcommand_t sound_command;
     sound_command.sound_mode = SOUNDMODE_SOUND;
@@ -312,13 +371,13 @@ void audio_sound(int32_t index, int32_t channel, uint32_t start, uint32_t length
 
 void audio_music(int32_t index, int32_t fadems, int32_t mask)
 {
-#ifdef NEXTP8
-    *(volatile uint8_t *)_P8AUDIO_HWFX40 = *(uint8_t *)(m_memory + 0x5f40);
-    *(volatile uint8_t *)_P8AUDIO_HWFX41 = *(uint8_t *)(m_memory + 0x5f41);
-    *(volatile uint8_t *)_P8AUDIO_HWFX42 = *(uint8_t *)(m_memory + 0x5f42);
-    *(volatile uint8_t *)_P8AUDIO_HWFX43 = *(uint8_t *)(m_memory + 0x5f43);
-    *(volatile uint16_t *)_P8AUDIO_MUSIC_FADE = (fadems * 2205 / 1000) & 0xffff;
-    *(volatile uint16_t *)_P8AUDIO_MUSIC_CMD = ((index & 0x3f) << 7) | ((mask & 0xf) << 3);
+#if defined(NEXTP8) || defined(USE_NEXTP8_AUDIO)
+    MMIO_WRITE(_P8AUDIO_HWFX40, *(uint8_t *)(m_memory + 0x5f40));
+    MMIO_WRITE(_P8AUDIO_HWFX41, *(uint8_t *)(m_memory + 0x5f41));
+    MMIO_WRITE(_P8AUDIO_HWFX42, *(uint8_t *)(m_memory + 0x5f42));
+    MMIO_WRITE(_P8AUDIO_HWFX43, *(uint8_t *)(m_memory + 0x5f43));
+    MMIO_WRITE(_P8AUDIO_MUSIC_FADE, (fadems * 2205 / 1000) & 0xffff);
+    MMIO_WRITE(_P8AUDIO_MUSIC_CMD, ((index & 0x3f) << 7) | ((mask & 0xf) << 3));
 #else
     soundcommand_t sound_command;
     sound_command.sound_mode = SOUNDMODE_MUSIC;
@@ -369,11 +428,11 @@ void audio_music(int32_t index, int32_t fadems, int32_t mask)
 
 int32_t audio_stat(int32_t index)
 {
-#ifdef NEXTP8
+#if defined(NEXTP8) || defined(USE_NEXTP8_AUDIO)
     if (index >= 46 && index <= 57)
-        return *(volatile int16_t *)(_P8AUDIO_STAT46 + (index - 46) * 2);
+        return MMIO_READ(_P8AUDIO_STAT46 + (index - 46) * 2);
     else if (index >= 16 && index <= 26)
-        return *(volatile int16_t *)(_P8AUDIO_STAT46 + (index - 16) * 2);
+        return MMIO_READ(_P8AUDIO_STAT46 + (index - 16) * 2);
 #else
     if (index >= 16 && index <= 19)
     {
@@ -438,7 +497,7 @@ int32_t audio_stat(int32_t index)
     return 0;
 }
 
-#ifndef NEXTP8
+#if !defined(NEXTP8) && !defined(USE_NEXTP8_AUDIO)
 void update_channel(soundstate_t *channel)
 {
     if (channel->sound_mode == SOUNDMODE_NONE)
@@ -626,10 +685,14 @@ void render_sound(int waveform, int pitch, int volume, int position, int offset,
         break;
     }
 }
+#endif
 
+#ifndef NEXTP8
 void render_sounds(int16_t *buffer, int total_samples)
 {
+#ifndef USE_NEXTP8_AUDIO
     update_sound_queue();
+#endif
 
     memset(buffer, 0, sizeof(int16_t) * total_samples);
 
@@ -637,6 +700,9 @@ void render_sounds(int16_t *buffer, int total_samples)
     if (m_memory[MEMORY_AUDIO_PAUSE] == 1)
         return;
 
+#ifdef USE_NEXTP8_AUDIO
+    audio_callback_verilated(buffer, total_samples);
+#else
     for (int i = 0; i < CHANNEL_COUNT; i++)
     {
         soundstate_t *channel = &m_channels[i];
@@ -726,6 +792,7 @@ void render_sounds(int16_t *buffer, int total_samples)
             }
         }
     }
+#endif
 
     const bool dampen_enabled = (m_memory[MEMORY_MISCFLAGS] & 0x20) == 0;
 
@@ -774,12 +841,12 @@ void audio_pcm_write(unsigned address, unsigned length)
 
 #ifdef NEXTP8
     int16_t *da_memory = (int16_t *)_DA_MEMORY_BASE;
-    
+
     for (uint32_t i = 0; i < length; i++)
     {
         uint8_t sample8 = m_memory[address + i];
         int16_t sample16 = (int16_t)((sample8 - 128) * 256);
-        
+
         da_memory[m_pcm_write_pos] = sample16;
         m_pcm_write_pos = (m_pcm_write_pos + 1) % PCM_BUFFER_SIZE;
     }
@@ -801,14 +868,14 @@ int16_t audio_pcm_buffered()
 {
 #ifdef ENABLE_AUDIO
 #ifdef NEXTP8
-    uint16_t da_address = *(volatile uint16_t *)_DA_CONTROL;
-    
+    uint16_t da_address = MMIO_READ(_DA_CONTROL);
+
     int buffered;
     if (m_pcm_write_pos >= da_address)
         buffered = m_pcm_write_pos - da_address;
     else
         buffered = PCM_BUFFER_SIZE - da_address + m_pcm_write_pos;
-    
+
     return buffered;
 #else
     return m_pcm_buffered;
