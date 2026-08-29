@@ -78,17 +78,17 @@ extern "C" void p8audio_verilated_mmio_write(uint8_t byte_addr, uint16_t data)
 }
 
 /* Pop one entry.  Returns false if empty.  Call from audio thread only. */
-static bool queue_pop(mmio_cmd_t *out)
+static bool queue_pop(mmio_cmd_t *out, bool lock_queue)
 {
-    pthread_mutex_lock(&s_queue_mutex);
+    if (lock_queue) pthread_mutex_lock(&s_queue_mutex);
     if (s_queue_count == 0) {
-        pthread_mutex_unlock(&s_queue_mutex);
+        if (lock_queue) pthread_mutex_unlock(&s_queue_mutex);
         return false;
     }
     *out = s_queue_buf[s_queue_head];
     s_queue_head = (s_queue_head + 1) % QUEUE_CAPACITY;
     s_queue_count--;
-    pthread_mutex_unlock(&s_queue_mutex);
+    if (lock_queue) pthread_mutex_unlock(&s_queue_mutex);
     return true;
 }
 
@@ -170,10 +170,10 @@ static void service_dma(void)
  * Flush queued MMIO writes into the model via mclk transactions.
  * Called from the audio thread before each sample batch.
  *==============================================================*/
-static void flush_mmio_queue(void)
+static void flush_mmio_queue(bool lock_queue)
 {
     mmio_cmd_t cmd;
-    while (queue_pop(&cmd)) {
+    while (queue_pop(&cmd, lock_queue)) {
         /* The 7-bit 'address' port is the byte-address shifted right by 1
          * (word address).  nUDS and nLDS are both active (0) for 16-bit
          * writes. */
@@ -271,7 +271,7 @@ static int16_t advance_one_sample(void)
  *==============================================================*/
 extern "C" void audio_callback_verilated(int16_t *buf, int samples)
 {
-    flush_mmio_queue();
+    flush_mmio_queue(true);
 
     for (int i = 0; i < samples; i++) {
         int16_t s_pcm = advance_one_sample();
@@ -362,6 +362,12 @@ extern "C" uint16_t p8audio_verilated_mmio_read(uint8_t byte_offset)
 {
     if (byte_offset < 0x20 || byte_offset > 0x36 || (byte_offset & 1u))
         return 0;
+    pthread_mutex_lock(&s_queue_mutex);
+    if (s_queue_count > 0) {
+        flush_mmio_queue(false);
+        update_stat_cache();
+    }
+    pthread_mutex_unlock(&s_queue_mutex);
     int idx = (byte_offset - 0x20) / 2;
     pthread_mutex_lock(&s_stat_mutex);
     uint16_t val = s_stat_cache[idx];
