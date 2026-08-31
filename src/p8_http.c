@@ -7,6 +7,7 @@
 #include "p8_emu.h"
 #include "p8_http.h"
 #include "p8_net.h"
+#include <assert.h>
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
@@ -344,6 +345,7 @@ ssize_t http_recv(void *data, unsigned max_length)
             }
             size_t available = read_buffer_len - read_buffer_pos;
             size_t to_copy = (available < (to_read - n)) ? available : (to_read - n);
+            assert(ptr + n + to_copy <= (unsigned char *)data + max_length);
             memcpy(ptr + n, read_buffer + read_buffer_pos, to_copy);
             read_buffer_pos += to_copy;
             n += to_copy;
@@ -356,9 +358,10 @@ ssize_t http_recv(void *data, unsigned max_length)
             char crlf[2];
             size_t bytes_in_buf = read_buffer_len - read_buffer_pos;
             if (bytes_in_buf > 0) {
-                /* Copy what's in buffer */
-                memcpy(crlf, read_buffer + read_buffer_pos, bytes_in_buf);
-                read_buffer_pos = read_buffer_len;
+                /* Copy what's in buffer (up to 2 bytes for CRLF) */
+                size_t to_copy = bytes_in_buf < 2 ? bytes_in_buf : 2;
+                memcpy(crlf, read_buffer + read_buffer_pos, to_copy);
+                read_buffer_pos += to_copy;
             }
             /* Read remaining bytes from network */
             if (bytes_in_buf < 2) {
@@ -397,6 +400,7 @@ ssize_t http_recv(void *data, unsigned max_length)
         if (read_buffer_pos < read_buffer_len) {
             size_t available = read_buffer_len - read_buffer_pos;
             size_t to_copy = (available < to_read) ? available : to_read;
+            assert(ptr + to_copy <= (unsigned char *)data + max_length);
             memcpy(ptr, read_buffer + read_buffer_pos, to_copy);
             read_buffer_pos += to_copy;
             n = to_copy;
