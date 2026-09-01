@@ -15,7 +15,11 @@
 #include "p8_parser.h"
 #include "strtcpy.h"
 
+#ifdef NEXTP8
+#define PREVIEW_CACHE_SIZE 1
+#else
 #define PREVIEW_CACHE_SIZE 64
+#endif
 
 typedef struct {
     char path[PATH_MAX];
