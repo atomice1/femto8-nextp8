@@ -354,7 +354,6 @@ static uint16_t player0_mask(volatile uint8_t *keyboard_matrix, uint8_t joy0)
     if (is_down(keyboard_matrix, KEY_Z) ||
         is_down(keyboard_matrix, KEY_N) ||
         is_down(keyboard_matrix, KEY_C) ||
-        is_down(keyboard_matrix, KEY_ENTER) ||
         (joy0 & JOY_BUTTON1))
         mask |= BUTTON_MASK_ACTION1;
     if (is_down(keyboard_matrix, KEY_X) ||
@@ -580,8 +579,6 @@ void p8_pump_events(void)
             m_buttonsp[0] |= BUTTON_MASK_PAUSE;
         m_buttons[0] |= BUTTON_MASK_PAUSE;
         m_button_down_time[0][BUTTON_PAUSE] = UINT_MAX;
-    } else {
-        m_buttons[0] &= ~BUTTON_MASK_PAUSE;
     }
     bool enter_down = is_down(keyboard_matrix, KEY_ENTER);
     if (enter_down) {
@@ -591,10 +588,12 @@ void p8_pump_events(void)
             m_buttonsp[0] |= BUTTON_MASK_RETURN;
         m_buttons[0] |= BUTTON_MASK_PAUSE | BUTTON_MASK_RETURN;
         m_button_down_time[0][BUTTON_PAUSE] = UINT_MAX;
-       m_button_down_time[0][BUTTON_RETURN] = UINT_MAX;
+        m_button_down_time[0][BUTTON_RETURN] = UINT_MAX;
     } else {
-        m_buttons[0] &= ~(BUTTON_MASK_PAUSE | BUTTON_MASK_RETURN);
+        m_buttons[0] &= ~BUTTON_MASK_RETURN;
     }
+    if (!p_down && !enter_down)
+        m_buttons[0] &= ~BUTTON_MASK_PAUSE;
 #endif
 }
 
