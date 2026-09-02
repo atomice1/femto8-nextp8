@@ -433,6 +433,12 @@ static p8_dialog_control_t preview_controls[5] = {
 };
 static p8_dialog_t preview_dialog;
 
+#ifdef NEXTP8
+#define PREVIEW_CACHE_SIZE 1
+#else
+#define PREVIEW_CACHE_SIZE 64
+#endif
+
 static void browse_init(void)
 {
     assert(dir_contents == NULL);
@@ -440,11 +446,17 @@ static void browse_init(void)
     assert(nitems == 0);
     assert(browse_controls[0].label == NULL);
 
+    if (!p8_preview_cache_init(PREVIEW_CACHE_SIZE)) {
+        fputs("Failed to initialize preview cache\n", stderr);
+        abort();
+    }
+
     filename_mem = (char *)malloc(INITIAL_FILENAME_MEM_SIZE);
     dir_contents = (struct dir_entry *)malloc(sizeof(struct dir_entry) * INITIAL_CAPACITY);
     if (!filename_mem || !dir_contents) {
         free(filename_mem);
         free(dir_contents);
+        p8_preview_cache_shutdown();
         fputs("Out of memory\n", stderr);
         abort();
     }
@@ -460,7 +472,7 @@ static void browse_init(void)
     }
     browse_controls[0].label = m_current_cart_dir;
     browse_controls[1].data.listbox.item_count = nitems;
-    
+
     p8_dialog_init(&browse_dialog, NULL, browse_controls, sizeof(browse_controls) / sizeof(browse_controls[0]), P8_WIDTH);
     browse_dialog.draw_border = false;
     browse_dialog.padding = 0;
@@ -692,6 +704,8 @@ static void browse_draw(int x, int y, int w, int h)
 
 void browse_shutdown(void)
 {
+    p8_preview_cache_shutdown();
+
     p8_dialog_cleanup(&browse_dialog);
 
     clear_dir_contents();

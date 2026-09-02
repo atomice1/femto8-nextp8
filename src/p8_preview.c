@@ -15,18 +15,13 @@
 #include "p8_parser.h"
 #include "strtcpy.h"
 
-#ifdef NEXTP8
-#define PREVIEW_CACHE_SIZE 1
-#else
-#define PREVIEW_CACHE_SIZE 64
-#endif
-
 typedef struct {
     char path[PATH_MAX];
     p8_preview_info_t info;
 } preview_cache_entry_t;
 
-static preview_cache_entry_t preview_cache[PREVIEW_CACHE_SIZE];
+static preview_cache_entry_t *preview_cache = NULL;
+static int preview_cache_size = 0;
 static int preview_cache_count = 0;
 
 static p8_preview_info_t *cache_lookup(const char *path)
@@ -41,20 +36,40 @@ static p8_preview_info_t *cache_lookup(const char *path)
 static p8_preview_info_t *cache_insert(const char *path)
 {
     preview_cache_entry_t *entry;
-    if (preview_cache_count < PREVIEW_CACHE_SIZE) {
+    if (preview_cache_count < preview_cache_size) {
         entry = &preview_cache[preview_cache_count++];
     } else {
         // Evict oldest entry
         memmove(&preview_cache[0], &preview_cache[1],
-                (PREVIEW_CACHE_SIZE - 1) * sizeof(preview_cache[0]));
-        entry = &preview_cache[PREVIEW_CACHE_SIZE - 1];
+                (preview_cache_size - 1) * sizeof(preview_cache[0]));
+        entry = &preview_cache[preview_cache_size - 1];
     }
     strtcpy(entry->path, path, sizeof(entry->path));
     return &entry->info;
 }
 
+bool p8_preview_cache_init(int cache_size)
+{
+    preview_cache_size = cache_size;
+    preview_cache_count = 0;
+    preview_cache = malloc(sizeof(preview_cache_entry_t) * cache_size);
+    if (!preview_cache) {
+        preview_cache_size = 0;
+        return false;
+    }
+    return true;
+}
+
 void p8_preview_cache_clear(void)
 {
+    preview_cache_count = 0;
+}
+
+void p8_preview_cache_shutdown(void)
+{
+    free(preview_cache);
+    preview_cache = NULL;
+    preview_cache_size = 0;
     preview_cache_count = 0;
 }
 

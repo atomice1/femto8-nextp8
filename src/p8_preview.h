@@ -31,8 +31,20 @@ typedef struct {
 bool p8_preview_load(const char *path, p8_preview_info_t *info_out);
 
 /**
+ * Initialize the preview cache with the specified size.
+ * Must be called before any other preview cache functions.
+ * Memory is freed when browse screen shuts down.
+ */
+bool p8_preview_cache_init(int cache_size);
+
+/**
  * Flush the entire preview cache (e.g. when changing directories).
  */
 void p8_preview_cache_clear(void);
+
+/**
+ * Shutdown the preview cache and free all memory.
+ */
+void p8_preview_cache_shutdown(void);
 
 #endif /* P8_PREVIEW_H */
