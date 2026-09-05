@@ -5,6 +5,10 @@
 */
 
 
+//#define DEBUG_ALLOC 1
+#ifdef DEBUG_ALLOC
+#include <malloc.h>
+#endif
 #include <stddef.h>
 
 #define lmem_c
@@ -81,6 +85,9 @@ void *luaM_realloc_ (lua_State *L, void *block, size_t osize, size_t nsize) {
   if (nsize > realosize && g->gcrunning)
     luaC_fullgc(L, 1);  /* force a GC whenever possible */
 #endif
+#ifdef DEBUG_ALLOC
+  printf("luaM_realloc_(%p, %zu, %zu) = ", block, osize, nsize);
+#endif
   newblock = (*g->frealloc)(g->ud, block, osize, nsize);
   if (newblock == NULL && nsize > 0) {
     api_check(L, nsize > realosize,
@@ -89,9 +96,23 @@ void *luaM_realloc_ (lua_State *L, void *block, size_t osize, size_t nsize) {
       luaC_fullgc(L, 1);  /* try to free some memory... */
       newblock = (*g->frealloc)(g->ud, block, osize, nsize);  /* try again */
     }
-    if (newblock == NULL)
+    if (newblock == NULL) {
+      puts("LUA_ERRMEM\n");
       luaD_throw(L, LUA_ERRMEM);
+    }
   }
+#ifdef DEBUG_ALLOC
+#ifdef __linux__
+  struct mallinfo2 info = mallinfo2();
+  void *sbrk(intptr_t increment);
+  printf("%p totalbytes=%ld GCdebt=%ld gettotalbytes=%ld uordblks=%zd sbrk=%zx\n", newblock, g->totalbytes, g->GCdebt, g->totalbytes - g->GCdebt, info.uordblks, (size_t)sbrk(0));
+#else
+  struct mallinfo info = mallinfo();
+  extern char *__heap;
+  extern char __end[] __attribute__ ((aligned (4)));
+  printf("%p totalbytes=%ld GCdebt=%ld gettotalbytes=%ld uordblks=%zd sbrk=%zd\n", newblock, g->totalbytes, g->GCdebt, g->totalbytes - g->GCdebt, info.uordblks, __heap - __end);
+#endif
+#endif
   lua_assert((nsize == 0) == (newblock == NULL));
   g->GCdebt = (g->GCdebt + nsize) - realosize;
   return newblock;
