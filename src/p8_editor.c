@@ -23,8 +23,8 @@ extern void draw_file_name(const char *str, int x, int y, int col);
 static void editor_screen_show();
 static void editor_screen_hide();
 
-#define AUTOSAVE_FILE_NAME DEFAULT_CARTS_PATH "/_autosav.p8"
-#define AUTOSAVE_METADATA_FILE_NAME DEFAULT_CARTS_PATH "/_autosav.txt"
+#define AUTOSAVE_FILE_NAME          "_autosav.p8"
+#define AUTOSAVE_METADATA_FILE_NAME "_autosav.txt"
 
 #define EDITOR_BG_NORMAL      DIALOG_BG_NORMAL
 #define EDITOR_TEXT_NORMAL    DIALOG_TEXT_NORMAL
@@ -49,6 +49,9 @@ static bool cart_modified = false;
 
 /* Screen memory saving/restoring */
 static uint8_t saved_main_screen[MEMORY_SCREEN_SIZE];
+
+static char autosave_file_path[PATH_MAX];
+static char autosave_metadata_file_path[PATH_MAX];
 
 /* --- Tab dispatch table ----------------------------------------------------- */
 
@@ -213,9 +216,10 @@ static void handle_action(p8_dialog_t *dialog, int action)
 
 static void editor_autoload(void)
 {
-    if (access(AUTOSAVE_FILE_NAME, F_OK) == 0) {
-        if (p8_load(AUTOSAVE_FILE_NAME, NULL, NULL, NULL) == 0) {
-            FILE *fh = fopen(AUTOSAVE_METADATA_FILE_NAME, "rt");
+    if (!autosave_file_path[0] || !autosave_metadata_file_path[0]) return;
+    if (access(autosave_file_path, F_OK) == 0) {
+        if (p8_load(autosave_file_path, NULL, NULL, NULL) == 0) {
+            FILE *fh = fopen(autosave_metadata_file_path, "rt");
             if (fh) {
                 if (fgets(m_current_cart_file_name, sizeof(m_current_cart_file_name), fh)) {
                     size_t len = strlen(m_current_cart_file_name);
@@ -239,22 +243,23 @@ static void editor_autoload(void)
                     tab_subeditors[i]->invalidate();
             }
             cart_modified = true;
-            remove(AUTOSAVE_FILE_NAME);
-            remove(AUTOSAVE_METADATA_FILE_NAME);
+            remove(autosave_file_path);
+            remove(autosave_metadata_file_path);
         }
     }
 }
 
 static void editor_autosave(void)
 {
+    if (!autosave_file_path[0] || !autosave_metadata_file_path[0]) return;
     if (cart_modified) {
         for (int i = 0; i < P8_TAB_COUNT; i++) {
             if (tab_subeditors[i]->sync)
                 tab_subeditors[i]->sync();
         }
-        int ret = write_cart_p8(AUTOSAVE_FILE_NAME, m_lua_script, m_cart_memory);
+        int ret = write_cart_p8(autosave_file_path, m_lua_script, m_cart_memory);
         if (ret == 0) {
-            FILE *fh = fopen(AUTOSAVE_METADATA_FILE_NAME, "wt");
+            FILE *fh = fopen(autosave_metadata_file_path, "wt");
             if (fh) {
                 fprintf(fh, "%s\n", m_current_cart_file_name);
                 fprintf(fh, "%s\n", m_current_cart_dir);
@@ -278,6 +283,8 @@ static void editor_screen_init(void)
         if (tab_subeditors[i]->init)
             tab_subeditors[i]->init();
     }
+    p8_make_full_path(autosave_file_path, sizeof(autosave_file_path), DEFAULT_CARTS_PATH, AUTOSAVE_FILE_NAME);
+    p8_make_full_path(autosave_metadata_file_path, sizeof(autosave_metadata_file_path), DEFAULT_CARTS_PATH, AUTOSAVE_FILE_NAME);
     editor_autoload();
     p8_dialog_init(&editor_dialog, NULL, editor_controls, sizeof(editor_controls) / sizeof(editor_controls[0]), P8_WIDTH);
     editor_dialog.draw_border = false;

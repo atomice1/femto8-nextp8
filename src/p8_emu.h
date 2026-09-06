@@ -36,9 +36,14 @@
 #define SCREEN_HEIGHT 128
 #define ENABLE_AUDIO
 #define ENABLE_BBS_DOWNLOAD
-#define DEFAULT_CARTS_PATH "0:/machines/nextp8/carts"
-#define CARTDATA_PATH "0:/machines/nextp8/cdata"
-#define CACHE_PATH DEFAULT_CARTS_PATH
+#define DEFAULT_CARTS_PATH  reloc_default_carts_path
+#define CARTDATA_PATH       reloc_cartdata_path
+#define CACHE_PATH          reloc_cache_path
+#define FALLBACK_CARTS_PATH reloc_fallback_carts_path
+extern char reloc_default_carts_path[32];
+extern char reloc_cartdata_path[32];
+extern char reloc_cache_path[32];
+extern char reloc_fallback_carts_path[32];
 #else
 #define SDL
 #define ENABLE_AUDIO
@@ -59,6 +64,10 @@
 
 #ifndef CACHE_PATH
 #define CACHE_PATH "cache"
+#endif
+
+#ifndef FALLBACK_CARTS_PATH
+#define FALLBACK_CARTS_PATH "."
 #endif
 
 // #define BOOL_NULL -1

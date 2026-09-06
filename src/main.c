@@ -28,6 +28,11 @@
 
 const uint32_t nextp8_version   = _MAKE_VERSION(API_VERSION, MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION);
 const uint32_t nextp8_timestamp = _TIMESTAMP;
+
+char reloc_default_carts_path[32];
+char reloc_cartdata_path[32];
+char reloc_cache_path[32];
+char reloc_fallback_carts_path[32];
 #endif
 
 #define VERSION "1.0.00"
@@ -72,6 +77,18 @@ int main(int argc, char *argv[])
     uint32_t hw_version = *(uint32_t *)_HW_VERSION_HI;
     if (_EXTRACT_API(hw_version) != HW_API_VERSION)
         _fatal_error("Incompatible hardware version");
+
+    char sdcard_drive = '0';
+    if (_loader_data->magic == LOADER_MAGIC && _loader_data->loaded_path[0])
+        sdcard_drive = _loader_data->loaded_path[0];
+    strcpy(reloc_default_carts_path, "0:/machines/nextp8/carts");
+    strcpy(reloc_cartdata_path, "0:/machines/nextp8/cdata");
+    strcpy(reloc_cache_path, "0:/machines/nextp8/cache");
+    strcpy(reloc_fallback_carts_path, "0:/");
+    reloc_default_carts_path[0] = sdcard_drive;
+    reloc_cartdata_path[0] = sdcard_drive;
+    reloc_cache_path[0] = sdcard_drive;
+    reloc_fallback_carts_path[0] = sdcard_drive;
 #endif
 
     if (p8_init() != 0)

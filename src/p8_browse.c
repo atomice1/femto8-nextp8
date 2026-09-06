@@ -38,12 +38,6 @@
 #include "p8_preview.h"
 #include "strtcpy.h"
 
-#ifdef NEXTP8
-#define FALLBACK_CARTS_PATH "0:/"
-#else
-#define FALLBACK_CARTS_PATH "."
-#endif
-
 #define PREVIEW_LABEL_DISPLAY_SIZE 64
 #define PREVIEW_DIALOG_CONTENT_WIDTH PREVIEW_LABEL_DISPLAY_SIZE
 #define PREVIEW_BORDER_SIZE 6
