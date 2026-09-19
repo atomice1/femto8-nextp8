@@ -397,8 +397,10 @@ int p8_run(void)
 
     if (setjmp(jmpbuf_restart)) {
         cart_running = false;
-        if (!restart)
+        if (!restart) {
+            p8_reset_cart();
             return 0;
+        }
         restart = false;
     }
     assert(!lua_running && !cart_running);
@@ -447,7 +449,12 @@ int p8_exec(const char *input, const char **err_type, char *err, int err_size, c
     if (setjmp(jmpbuf_restart)) {
         lua_running = false;
         if (!restart)
+        {
+#ifdef ENABLE_AUDIO
+            audio_stop();
+#endif
             return 0;
+        }
         restart = false;
         int ret = p8_run();
         if (ret != 0)
@@ -459,6 +466,9 @@ int p8_exec(const char *input, const char **err_type, char *err, int err_size, c
     lua_running = true;
     int ret = lua_exec_repl(input);
     lua_running = false;
+#ifdef ENABLE_AUDIO
+    audio_stop();
+#endif
     if (ret != 0)
         lua_get_error(err_type, err, err_size, filename, lineno);
 
@@ -1081,6 +1091,9 @@ void p8_reset(void)
 static void p8_common_reset_cart()
 {
     p8_close_cartdata();
+#ifdef ENABLE_AUDIO
+    audio_stop();
+#endif
     if (!lua_running) {
         lua_shutdown_api();
         lua_load_api();

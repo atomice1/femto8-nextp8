@@ -426,6 +426,12 @@ void audio_music(int32_t index, int32_t fadems, int32_t mask)
 #endif
 }
 
+void audio_stop()
+{
+    audio_music(-1, 0, 0);
+    audio_sound(-1, 0, 0, 0);
+}
+
 int32_t audio_stat(int32_t index)
 {
 #if defined(NEXTP8) || defined(USE_NEXTP8_AUDIO)

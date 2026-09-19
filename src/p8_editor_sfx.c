@@ -1739,6 +1739,9 @@ static void sfx_init(void)
 
 static void sfx_shutdown(void)
 {
+#ifdef ENABLE_AUDIO
+    audio_sound(-1, 0, 0, 0);  /* stop SFX */
+#endif
     if (sfx_undo_ctx) {
         p8_editor_undo_destroy(sfx_undo_ctx);
         sfx_undo_ctx = NULL;
@@ -1766,10 +1769,18 @@ static void sfx_shutdown(void)
     memset(sfx_clipboard, 0, sizeof(sfx_clipboard));
 }
 
+static void sfx_hide(void)
+{
+#ifdef ENABLE_AUDIO
+    audio_sound(-1, 0, 0, 0);  /* stop SFX */
+#endif
+}
+
 p8_editor_tab_t p8_subeditor_sfx = {
     "sfx",
     .init=sfx_init,
     .shutdown=sfx_shutdown,
+    .hide=sfx_hide,
     .draw=sfx_draw,
     .handle_keypress=sfx_handle_keypress,
     .handle_mouse_buttons=sfx_handle_mouse_buttons,

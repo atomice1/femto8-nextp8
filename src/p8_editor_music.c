@@ -424,14 +424,25 @@ static void music_init(void)
 
 static void music_shutdown(void)
 {
+#ifdef ENABLE_AUDIO
+    audio_music(-1, 0, 0);  /* stop music */
+#endif
     p8_editor_undo_destroy(music_undo_ctx);
     music_undo_ctx = NULL;
+}
+
+static void music_hide(void)
+{
+#ifdef ENABLE_AUDIO
+    audio_music(-1, 0, 0);  /* stop music */
+#endif
 }
 
 p8_editor_tab_t p8_subeditor_music = {
     "mus",
     .init=music_init,
     .shutdown=music_shutdown,
+    .hide=music_hide,
     .draw=music_draw,
     .handle_keypress=music_handle_keypress,
     .handle_mouse_buttons=music_handle_mouse_buttons,
