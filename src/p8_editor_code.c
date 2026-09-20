@@ -62,10 +62,16 @@ static int scroll_offset_x = 0;
 static int scroll_offset_y = 0;
 static int cursor_line = 0;
 static int cursor_col = 0;
+static int select_anchor_line = -1;
+static int select_anchor_col = -1;
 static int select_start_line = -1;
 static int select_start_col = -1;
 static int select_end_line = -1;
 static int select_end_col = -1;
+
+static void clear_selection(void);
+static bool has_selection(void);
+
 static bool puny_mode = false;
 static bool sync_required = false;
 static bool showing = false;
@@ -104,20 +110,20 @@ typedef struct edit_t {
     int old_cursor_col;
     int new_cursor_line;
     int new_cursor_col;
+    int old_select_start_line;
+    int old_select_end_line;
+    int old_select_start_col;
+    int old_select_end_col;
+    int new_select_start_line;
+    int new_select_end_line;
+    int new_select_start_col;
+    int new_select_end_col;
     union {
         char ch;
         struct {
             int start_line_incl;
             int new_end_line_excl;
             int old_end_line_excl;
-            int old_select_start_line;
-            int old_select_end_line;
-            int old_select_start_col;
-            int old_select_end_col;
-            int new_select_start_line;
-            int new_select_end_line;
-            int new_select_start_col;
-            int new_select_end_col;
             char **old_lines;
             int *old_line_lengths;
         };
@@ -129,11 +135,6 @@ static edit_t undo_stack[UNDO_LIMIT];
 static int   undo_depth = 0;
 static edit_t redo_stack[UNDO_LIMIT];
 static int   redo_depth = 0;
-
-/* --- Selection anchor (set when SHIFT is held during movement) -------------- */
-
-static int select_anchor_line = -1;
-static int select_anchor_col  = -1;
 
 /* Syntax highlighting colour cache.
  *
@@ -152,6 +153,31 @@ static int               *syn_color_cache_cap = NULL;
 static p8_syn_context_t  *syntax_contexts     = NULL;
 static int                syn_valid_lines     = 0;
 static int                syn_cache_alloc     = 0;
+
+#define assert_selection_valid() do {\
+    if (has_selection()) { \
+        assert(select_start_line >= 0); \
+        assert(select_start_line < line_count); \
+        assert(select_end_line >= 0); \
+        assert(select_end_line <= line_count); \
+        assert(select_start_col >= 0); \
+        assert(select_start_col <= line_lengths[select_start_line]); \
+        assert(select_end_col >= 0); \
+        assert(select_end_col <= line_lengths[select_end_line]); \
+    } \
+    if (select_anchor_line != -1) { \
+        assert(select_anchor_line >= 0); \
+        assert(select_anchor_line < line_count); \
+        assert(select_anchor_col >= 0); \
+        assert(select_anchor_col <= line_lengths[select_anchor_line]); \
+    } \
+} while (0)
+#define assert_cursor_valid() do {\
+    assert(cursor_line >= 0); \
+    assert(cursor_line < line_count); \
+    assert(cursor_col >= 0); \
+    assert(cursor_col <= line_lengths[cursor_line]); \
+} while (0)
 
 static void free_edit(edit_t *edit)
 {
@@ -388,14 +414,6 @@ static void add_lines_to_undo(int start_line_incl, int old_end_line_excl, int ne
         edit->start_line_incl = start_line_incl;
         edit->new_end_line_excl = new_end_line_excl;
         edit->old_end_line_excl = old_end_line_excl;
-        edit->old_select_start_line = select_start_line;
-        edit->old_select_end_line = select_end_line;
-        edit->old_select_start_col = select_start_col;
-        edit->old_select_end_col = select_end_col;
-        edit->new_select_start_line = -1;
-        edit->new_select_end_line = -1;
-        edit->new_select_start_col = -1;
-        edit->new_select_end_col = -1;
         assert(edit->old_lines == NULL);
         assert(edit->old_line_lengths == NULL);
         if (old_end_line_excl > start_line_incl) {
@@ -428,7 +446,8 @@ static void add_lines_to_undo(int start_line_incl, int old_end_line_excl, int ne
         // Copy the old snapshot into the new window, and then extend it by copying from lines.
 
         assert(edit->start_line_incl >= 0 && edit->start_line_incl <= line_count);
-        assert(edit->old_end_line_excl >= 0 && edit->old_end_line_excl <= line_count);
+        // The next invariant doesn't hold if replacing several selected lines with fewer replacement lines.
+        //assert(edit->old_end_line_excl >= 0 && edit->old_end_line_excl <= line_count);
         assert(edit->new_end_line_excl >= 0);
         int start0 = edit->start_line_incl;
         int old_end0 = edit->old_end_line_excl;
@@ -519,11 +538,15 @@ static bool insert_line(int index, const char *text, int len)
     invalidate_lines_from(index);
     add_lines_to_undo(index, index, index + 1);
     if (!insert_line_raw(index, text, len)) return false;
-    if (select_start_line >= index) select_start_line++;
-    if (select_end_line   >= index) select_end_line++;
-    if (cursor_line       >= index) cursor_line++;
-    assert(cursor_line < line_count);
-    assert(cursor_col <= line_lengths[cursor_line]);
+#define fixup(l) \
+    if (l >= index) l++;
+    fixup(cursor_line);
+    fixup(select_start_line);
+    fixup(select_end_line);
+    fixup(select_anchor_line);
+#undef fixup
+    
+    assert_cursor_valid();
     return true;
 }
 
@@ -632,14 +655,15 @@ static bool insert_text_single_line_no_undo(int line, int col, const char *text,
     if (lines == NULL) return false;
     invalidate_lines_from(line);
     if (!insert_text_single_line_raw(line, col, text, len)) return false;
-    if (select_start_line == line && select_start_col >= col)
-        select_start_col += len;
-    if (select_end_line == line && select_end_col >= col)
-        select_end_col += len;
-    if (cursor_line == line && cursor_col >= col)
-        cursor_col += len;
-    assert(cursor_line < line_count);
-    assert(cursor_col <= line_lengths[cursor_line]);
+#define fixup(l, c) \
+    if (l == line && c >= col) \
+        c += len;
+    fixup(cursor_line, cursor_col);
+    fixup(select_start_line, select_start_col);
+    fixup(select_end_line, select_end_col);
+    fixup(select_anchor_line, select_anchor_col);
+#undef fixup
+    assert_cursor_valid();
     return true;
 }
 
@@ -682,6 +706,7 @@ static bool insert_text_multi_line_no_undo(int start_line, int col, const char *
 {
     assert(start_line >= 0 && start_line < line_count);
     assert(col >= 0 && col <= line_lengths[start_line]);
+    assert(!has_selection());
     invalidate_lines_from(start_line);
     int old_line_count = line_count;
     int old_line_length = line_lengths[start_line];
@@ -699,19 +724,18 @@ static bool insert_text_multi_line_no_undo(int start_line, int col, const char *
         else
             cursor_col = line_lengths[start_line + line_count - old_line_count];
     }
-    assert(cursor_line < line_count);
-    assert(cursor_col <= line_lengths[cursor_line]);
+    assert_cursor_valid();
     return true;
 }
 
 static bool insert_text_multi_line(int start_line, int col, const char *text, int len)
 {
+    assert(!has_selection());
     add_lines_to_undo(start_line, start_line + 1, start_line + 1);
     int old_line_count = line_count;
     if (!insert_text_multi_line_no_undo(start_line, col, text, len)) return false;
     undo_stack[undo_depth-1].new_end_line_excl = start_line + 1 + (line_count - old_line_count);
-    assert(cursor_line < line_count);
-    assert(cursor_col <= line_lengths[cursor_line]);
+    assert_cursor_valid();
     return true;
 }
 
@@ -728,30 +752,19 @@ static void delete_text_single_line_no_undo(int line, int start_col, int end_col
 {
     invalidate_lines_from(line);
     delete_text_single_line_raw(line, start_col, end_col);
-    if (cursor_line == line && cursor_col > start_col) {
-        if (cursor_col < end_col)
-            cursor_col = start_col;
-        else
-            cursor_col -= (end_col - start_col);
-        assert(cursor_col >= 0);
-        assert(cursor_col <= line_lengths[cursor_line]);
+#define fixup(l, c) \
+    if (l == line && c > start_col) { \
+        if (c < end_col) \
+            c = start_col; \
+        else \
+            c -= (end_col - start_col); \
     }
-    if (select_start_line == line && select_start_col > start_col) {
-        if (select_start_col < end_col)
-            select_start_col = start_col;
-        else
-            select_start_col -= (end_col - start_col);
-        assert(select_start_col >= 0);
-        assert(select_start_col <= line_lengths[cursor_line]);
-    }
-    if (select_end_line == line && select_end_col > start_col) {
-        if (select_end_col < end_col)
-            select_end_col = start_col;
-        else
-            select_end_col -= (end_col - start_col);
-        assert(select_end_col >= 0);
-        assert(select_end_col <= line_lengths[cursor_line]);
-    }
+    fixup(cursor_line, cursor_col);
+    fixup(select_start_line, select_start_col);
+    fixup(select_end_line, select_end_col);
+    fixup(select_anchor_line, select_anchor_col);
+#undef fixup
+    assert_cursor_valid();
 }
 
 static void delete_text_single_line(int line, int start_col, int end_col)
@@ -780,6 +793,7 @@ static void delete_text_multi_line_raw(int start_line, int start_col, int end_li
 
 static void delete_text_multi_line_no_undo(int start_line, int start_col, int end_line, int end_col)
 {
+    assert(!has_selection());
     invalidate_lines_from(start_line);
     delete_text_multi_line_raw(start_line, start_col, end_line, end_col);
     if (cursor_line > end_line) {
@@ -795,42 +809,17 @@ static void delete_text_multi_line_no_undo(int start_line, int start_col, int en
     } else if (cursor_line >= start_line && cursor_line < end_line) {
         cursor_line = start_line;
         cursor_col = start_col;
+        assert(cursor_col <= line_lengths[cursor_line]);
     }
-    if (select_start_line > end_line) {
-        select_start_line -= (end_line - start_line);
-        assert(select_start_line >= 0);
-        assert(select_start_line < line_count);
-        assert(select_start_col <= line_lengths[select_end_line]);
-    } else if (select_start_line == end_line) {
-        select_start_line = start_line;
-        select_start_col = (select_start_col > end_col) ? (start_col + (select_start_col - end_col)) : start_col;
-        assert(select_start_col >= 0);
-        assert(select_start_col <= line_lengths[cursor_line]);
-    } else if (select_start_line >= start_line && select_start_line < end_line) {
-        select_start_line = start_line;
-        select_start_col = start_col;
-    }
-    if (select_end_line > end_line) {
-        select_end_line -= (end_line - start_line);
-        assert(select_end_line >= 0);
-        assert(select_end_line < line_count);
-        assert(select_end_col <= line_lengths[select_end_line]);
-    } else if (select_end_line == end_line) {
-        select_end_line = start_line;
-        select_end_col = (select_end_col > end_col) ? (start_col + (select_end_col - end_col)) : start_col;
-        assert(select_end_col >= 0);
-        assert(select_end_col <= line_lengths[cursor_line]);
-    } else if (select_end_line >= start_line && select_end_line < end_line) {
-        select_end_line = start_line;
-        select_end_col = start_col;
-    }
+    assert_cursor_valid();
+    assert_selection_valid();
 }
 
 static void delete_text_multi_line(int start_line, int start_col, int end_line, int end_col)
 {
     assert(start_line >= 0 && start_line < line_count);
     assert(end_line >= 0 && end_line < line_count);
-    add_lines_to_undo(start_line, end_line + 1, start_line + ((start_col > 0 || end_col < line_lengths[end_line]) ? 1 : 0));
+    add_lines_to_undo(start_line, end_line + 1, start_line + 1);
     delete_text_multi_line_no_undo(start_line, start_col, end_line, end_col);
 }
 
@@ -876,6 +865,11 @@ static void clear_selection(void)
     select_end_col     = -1;
 }
 
+static bool has_selection(void)
+{
+    return !(select_start_line == select_end_line && select_start_col == select_end_col);
+}
+
 static void update_selection(void)
 {
     if (select_anchor_line < cursor_line ||
@@ -890,24 +884,25 @@ static void update_selection(void)
         select_end_line   = select_anchor_line;
         select_end_col    = select_anchor_col;
     }
-    if (select_start_line == select_end_line && select_start_col == select_end_col)
-        clear_selection();
+    assert_selection_valid();
 }
 
 static char *get_selected_text(void)
 {
-    if (select_start_line == -1) return NULL;
+    if (!has_selection()) return NULL;
     return get_text(select_start_line, select_start_col, select_end_line, select_end_col);
 }
 
 static void delete_selected_text(void)
 {
-    if (select_start_line == -1) return;
-    assert(select_start_line >= 0 && select_start_line < line_count);
-    assert(select_end_line >= 0 && select_end_line < line_count);
-    assert(select_start_col >= 0 && select_start_col <= line_lengths[select_start_line]);
-    assert(select_end_col >= 0 && select_end_col <= line_lengths[select_end_line]);
-    delete_text_multi_line(select_start_line, select_start_col, select_end_line, select_end_col);
+    if (!has_selection()) return;
+    assert_selection_valid();
+    int start_line = select_start_line;
+    int start_col = select_start_col;
+    int end_line = select_end_line;
+    int end_col = select_end_col;
+    clear_selection();
+    delete_text_multi_line(start_line, start_col, end_line, end_col);
 }
 
 static bool insert_text_at_cursor(const char *text)
@@ -968,13 +963,15 @@ static bool undo_edit(const edit_t *edit)
         assert(edit->old_select_end_col <= line_lengths[edit->old_select_end_line]);
         select_start_line = MIN(edit->old_select_start_line, line_count - 1);
         select_end_line = MIN(edit->old_select_end_line, line_count - 1);
-        select_start_col = select_start_line != -1 ? MIN(edit->old_select_start_col, line_lengths[select_start_line]) : -1;
-        select_end_col = select_end_line != -1 ? MIN(edit->old_select_end_col, line_lengths[select_end_line]) : -1;
+        select_start_col = MIN(edit->old_select_start_col, line_lengths[select_start_line]);
+        select_end_col = MIN(edit->old_select_end_col, line_lengths[select_end_line]);
+        assert_selection_valid();
     }
     assert(edit->old_cursor_line < line_count);
     assert(edit->old_cursor_col <= line_lengths[edit->old_cursor_line]);
     cursor_line = MIN(edit->old_cursor_line, line_count - 1);
     cursor_col = MIN(edit->old_cursor_col, line_lengths[cursor_line]);
+    assert_cursor_valid();
     return success;
 }
 
@@ -991,6 +988,12 @@ static bool reverse_edit(edit_t *dest, const edit_t *src)
         break;
     case EDIT_TYPE_SIMPLE_DELETE_FORWARD:
         dest->type = EDIT_TYPE_SIMPLE_INSERT_CHAR_FORWARD;
+        break;
+    case EDIT_TYPE_SIMPLE_DELETE_NEWLINE:
+        dest->type = EDIT_TYPE_SIMPLE_INSERT_NEWLINE;
+        break;
+    case EDIT_TYPE_SIMPLE_DELETE_NEWLINE_FORWARD:
+        dest->type = EDIT_TYPE_SIMPLE_INSERT_NEWLINE_FORWARD;
         break;
     case EDIT_TYPE_SIMPLE_INSERT_CHAR:
         dest->type = EDIT_TYPE_SIMPLE_DELETE_BACKWARD;
@@ -1067,6 +1070,14 @@ static void push_undo(void)
     undo_stack[undo_depth].type = EDIT_TYPE_NONE;
     undo_stack[undo_depth].old_cursor_line = cursor_line;
     undo_stack[undo_depth].old_cursor_col = cursor_col;
+    undo_stack[undo_depth].old_select_start_line = select_start_line;
+    undo_stack[undo_depth].old_select_end_line = select_end_line;
+    undo_stack[undo_depth].old_select_start_col = select_start_col;
+    undo_stack[undo_depth].old_select_end_col = select_end_col;
+    undo_stack[undo_depth].new_select_start_line = -1;
+    undo_stack[undo_depth].new_select_end_line = -1;
+    undo_stack[undo_depth].new_select_start_col = -1;
+    undo_stack[undo_depth].new_select_end_col = -1;
     undo_stack[undo_depth].old_lines = NULL;
     undo_stack[undo_depth].old_line_lengths = NULL;
     undo_depth++;
@@ -1192,8 +1203,8 @@ static bool duplicate_line(void)
 
 static bool comment_uncomment(void)
 {
-    int sl = (select_start_line != -1) ? select_start_line : cursor_line;
-    int el = (select_end_line   != -1) ? select_end_line   : cursor_line;
+    int sl = has_selection() ? select_start_line : cursor_line;
+    int el = has_selection() ? select_end_line : cursor_line;
     bool all = true;
     for (int l = sl; l <= el; l++)
         if (line_lengths[l] < 2 || lines[l][0] != '-' || lines[l][1] != '-')
@@ -1212,8 +1223,8 @@ static bool comment_uncomment(void)
 
 static bool indent_lines(bool unindent)
 {
-    int sl = (select_start_line != -1) ? select_start_line : cursor_line;
-    int el = (select_end_line   != -1) ? select_end_line   : cursor_line;
+    int sl = has_selection() ? select_start_line : cursor_line;
+    int el = has_selection() ? select_end_line : cursor_line;
     for (int l = sl; l <= el; l++) {
         if (!unindent) {
             if (!insert_text_single_line(l, 0, " ", 1)) return false;
@@ -1222,14 +1233,16 @@ static bool indent_lines(bool unindent)
         }
     }
     if (!unindent) {
-        if (select_start_col != -1) select_start_col = MIN(select_start_col + 1, line_lengths[sl]);
-        if (select_end_col   != -1) select_end_col   = MIN(select_end_col   + 1, line_lengths[el]);
+        if (has_selection()) select_start_col = MIN(select_start_col + 1, line_lengths[sl]);
+        if (has_selection()) select_end_col   = MIN(select_end_col   + 1, line_lengths[el]);
+        assert_selection_valid();
         cursor_col = MIN(cursor_col + 1, line_lengths[cursor_line]);
         assert(cursor_line < line_count);
         assert(cursor_col <= line_lengths[cursor_line]);
     } else {
         if (select_start_col > 0) select_start_col--;
         if (select_end_col   > 0) select_end_col--;
+        assert_selection_valid();
         if (cursor_col > line_lengths[cursor_line]) cursor_col = line_lengths[cursor_line];
         assert(cursor_line < line_count);
         assert(cursor_col <= line_lengths[cursor_line]);
@@ -1325,8 +1338,8 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
     int old_cursor_line = cursor_line;
     bool shift = (keymod & KMOD_SHIFT) != 0;
 
-#define BEGIN_SHIFT_MOVE() do { if (shift && select_anchor_line == -1) { select_anchor_line = cursor_line; select_anchor_col = cursor_col; } } while (0)
-#define END_SHIFT_MOVE()   do { if (shift) update_selection(); else clear_selection(); } while (0)
+#define BEGIN_SHIFT_MOVE() do { if (shift && select_anchor_line == -1) { select_anchor_line = cursor_line; select_anchor_col = cursor_col; assert_selection_valid(); } } while (0)
+#define END_SHIFT_MOVE()   do { if (shift) update_selection(); else clear_selection(); assert_selection_valid(); } while (0)
 
     switch (scancode) {
         case SCANCODE_UP:
@@ -1345,8 +1358,7 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
                 cursor_line--;
                 if (cursor_col > line_lengths[cursor_line]) cursor_col = line_lengths[cursor_line];
             }
-            assert(cursor_line < line_count);
-            assert(cursor_col <= line_lengths[cursor_line]);
+            assert_cursor_valid();
             END_SHIFT_MOVE();
             break;
         case SCANCODE_DOWN:
@@ -1365,8 +1377,7 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
                 cursor_line++;
                 if (cursor_col > line_lengths[cursor_line]) cursor_col = line_lengths[cursor_line];
             }
-            assert(cursor_line < line_count);
-            assert(cursor_col <= line_lengths[cursor_line]);
+            assert_cursor_valid();
             END_SHIFT_MOVE();
             break;
         case SCANCODE_LEFT:
@@ -1374,8 +1385,7 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
             if (keymod & KMOD_CTRL) { move_word_left(); }
             else if (cursor_col > 0) { cursor_col--; }
             else if (cursor_line > 0) { cursor_line--; cursor_col = line_lengths[cursor_line]; }
-            assert(cursor_line < line_count);
-            assert(cursor_col <= line_lengths[cursor_line]);
+            assert_cursor_valid();
             END_SHIFT_MOVE();
             break;
         case SCANCODE_RIGHT:
@@ -1383,40 +1393,39 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
             if (keymod & KMOD_CTRL) { move_word_right(); }
             else if (cursor_col < line_lengths[cursor_line]) { cursor_col++; }
             else if (cursor_line < line_count - 1) { cursor_line++; cursor_col = 0; }
-            assert(cursor_line < line_count);
-            assert(cursor_col <= line_lengths[cursor_line]);
+            assert_cursor_valid();
             END_SHIFT_MOVE();
             break;
         case SCANCODE_PAGEUP:
             BEGIN_SHIFT_MOVE();
             cursor_line = MAX(cursor_line - MAX(lines_per_page - 1, 1), 0);
             if (cursor_col > line_lengths[cursor_line]) cursor_col = line_lengths[cursor_line];
-            assert(cursor_line < line_count);
-            assert(cursor_col <= line_lengths[cursor_line]);
+            assert_cursor_valid();
             END_SHIFT_MOVE();
             break;
         case SCANCODE_PAGEDOWN:
             BEGIN_SHIFT_MOVE();
             cursor_line = MIN(cursor_line + MAX(lines_per_page - 1, 1), line_count - 1);
             if (cursor_col > line_lengths[cursor_line]) cursor_col = line_lengths[cursor_line];
-            assert(cursor_line < line_count);
-            assert(cursor_col <= line_lengths[cursor_line]);
+            assert_cursor_valid();
             END_SHIFT_MOVE();
             break;
         case SCANCODE_HOME:
             BEGIN_SHIFT_MOVE();
             cursor_col = 0;
             scroll_offset_x = 0;
+            assert_cursor_valid();
             END_SHIFT_MOVE();
             break;
         case SCANCODE_END:
             BEGIN_SHIFT_MOVE();
             cursor_col = line_lengths[cursor_line];
+            assert_cursor_valid();
             END_SHIFT_MOVE();
             break;
         case SCANCODE_DEL:
             // Delete forward
-            if (select_start_line != -1) {
+            if (has_selection()) {
                 push_undo(); delete_selected_text(); finalize_undo();
             } else if (cursor_col < line_lengths[cursor_line]) {
                 push_undo();
@@ -1438,10 +1447,10 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
                 switch (scancode) {
                     case SCANCODE_P: puny_mode = !puny_mode; break;
                     case SCANCODE_W: /* start of line */
-                        clear_selection(); cursor_col = 0; scroll_offset_x = 0;
+                        clear_selection(); cursor_col = 0; scroll_offset_x = 0; assert_cursor_valid();
                         break;
                     case SCANCODE_E: /* end of line */
-                        clear_selection(); cursor_col = line_lengths[cursor_line];
+                        clear_selection(); cursor_col = line_lengths[cursor_line]; assert_cursor_valid();
                         break;
                     case SCANCODE_D: /* duplicate line */
                         push_undo();
@@ -1464,7 +1473,7 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
                     case SCANCODE_V: /* paste */
                         if (clipboard) {
                             push_undo();
-                            if (select_start_line != -1) delete_selected_text();
+                            if (has_selection()) delete_selected_text();
                             if (!insert_text_at_cursor(clipboard)) pop_undo();
                             else finalize_undo();
                         }
@@ -1500,8 +1509,7 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
                             cursor_line = line - 1;
                             if (cursor_col > line_lengths[cursor_line])
                                 cursor_col = line_lengths[cursor_line];
-                            assert(cursor_line < line_count);
-                            assert(cursor_col <= line_lengths[cursor_line]);
+                            assert_cursor_valid();
                         }
                         break; }
                     default:
@@ -1517,7 +1525,7 @@ text_input:;
                 }
                 switch (keypress) {
                     case 8: /* backspace */
-                        if (select_start_line != -1) {
+                        if (has_selection()) {
                             push_undo(); delete_selected_text(); finalize_undo();
                         } else if (cursor_col > 0) {
                             push_undo();
@@ -1569,8 +1577,8 @@ text_input:;
 #undef BEGIN_SHIFT_MOVE
 #undef END_SHIFT_MOVE
 
-    assert(cursor_line < line_count);
-    assert(cursor_col <= line_lengths[cursor_line]);
+    assert_selection_valid();
+    assert_cursor_valid();
     if (old_cursor_line != cursor_line) {
         if (cursor_line < scroll_offset_y + 4)
             scroll_offset_y = MAX(MIN(cursor_line - 4, line_count - lines_per_page), 0);
@@ -1638,6 +1646,8 @@ static void code_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp,
         cursor_col  = col;
         update_selection();
     }
+
+    assert_selection_valid();
 }
 
 static void code_handle_mouse_wheel(int mx, int my, int wheel, int buttons, int keymod)

@@ -72,7 +72,8 @@ def extract_declarations(filepath: Path) -> list[str]:
         line = line.strip()
 
         if re.match(r'^\s*#\s*define', line):
-            declarations.append(f"{line}")
+            if not '(' in line:
+                declarations.append(f"{line}")
             continue
 
         # Skip if doesn't start with static, struct, union or typedef

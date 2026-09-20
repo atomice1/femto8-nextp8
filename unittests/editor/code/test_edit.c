@@ -2,6 +2,8 @@
  * test_edit.c - Tests for various types of edit
  */
 
+#include <stdlib.h>
+
 #include "p8_editor_code_test_common.h"
 
 /* Test: Insert a single character */
@@ -394,8 +396,290 @@ void test_delete_line(void **state)
     split_lines("Line 1\nLine 2\nLine 3");
 
     code_handle_keypress(SCANCODE_DOWN, 0, 0);
+    assert_int_equal(cursor_line, 1);
     code_handle_keypress(SCANCODE_END, 0, 0);
     code_handle_keypress(SCANCODE_HOME, 0, KMOD_SHIFT);
     code_handle_keypress(0, 8, 0);  /* 8 = backspace */
+    assert_int_equal(cursor_line, 1);
     code_handle_keypress(0, 8, 0);  /* 8 = backspace */
+    assert_int_equal(cursor_line, 0);
+    assert_line_equal(0, "Line 1");
+    assert_line_equal(1, "Line 3");
+}
+
+void test_random(void **state)
+{
+    srand(4269);
+    
+    /* Initialize with 100 lines of random text */
+    {
+        char *script = malloc(10000);
+        int pos = 0;
+        for (int line = 0; line < 100; line++) {
+            int line_len = 1 + (random() % 80);
+            for (int col = 0; col < line_len; col++) {
+                int ch = 32 + (random() % 95); /* printable ASCII */
+                if (ch == '\n') ch = ' ';
+                script[pos++] = ch;
+            }
+            script[pos++] = '\n';
+        }
+        script[pos] = '\0';
+        split_lines(script);
+        free(script);
+    }
+    
+    /* Move cursor to a random position */
+    {
+        int target_line = random() % line_count;
+        int target_col = random() % (line_lengths[target_line] + 1);
+        move_cursor_to(target_line, target_col);
+    }
+    
+    for (int i=0;i<10000;++i) {
+        int scancode, keypress, keymod;
+        int repeat = 0;
+        int n = random() % 32;
+        switch (n) {
+            case 0:
+                /* UP arrow */
+                scancode = SCANCODE_UP;
+                keypress = 0;
+                keymod = 0;
+                repeat = 1;
+                break;
+            case 1:
+                /* DOWN arrow */
+                scancode = SCANCODE_DOWN;
+                keypress = 0;
+                keymod = 0;
+                repeat = 1;
+                break;
+            case 2:
+                /* LEFT arrow */
+                scancode = SCANCODE_LEFT;
+                keypress = 0;
+                keymod = 0;
+                repeat = 1;
+                break;
+            case 3:
+                /* RIGHT arrow */
+                scancode = SCANCODE_RIGHT;
+                keypress = 0;
+                keymod = 0;
+                repeat = 1;
+                break;
+            case 4:
+                /* PAGEUP */
+                scancode = SCANCODE_PAGEUP;
+                keypress = 0;
+                keymod = 0;
+                repeat = 1;
+                break;
+            case 5:
+                /* PAGEDOWN */
+                scancode = SCANCODE_PAGEDOWN;
+                keypress = 0;
+                keymod = 0;
+                repeat = 1;
+                break;
+            case 6:
+                /* HOME */
+                scancode = SCANCODE_HOME;
+                keypress = 0;
+                keymod = 0;
+                repeat = 1;
+                break;
+            case 7:
+                /* END */
+                scancode = SCANCODE_END;
+                keypress = 0;
+                keymod = 0;
+                repeat = 1;
+                break;
+            case 8:
+                /* DEL */
+                scancode = SCANCODE_DEL;
+                keypress = 0;
+                keymod = 0;
+                repeat = 1;
+                break;
+            case 9:
+                /* TAB */
+                scancode = SCANCODE_TAB;
+                keypress = 0;
+                keymod = 0;
+                repeat = 1;
+                break;
+            case 10:
+                /* Backspace */
+                scancode = 0;
+                keypress = 8;
+                keymod = 0;
+                repeat = 1;
+                break;
+            case 11:
+                /* Newline/Return */
+                scancode = 0;
+                keypress = '\n';
+                keymod = 0;
+                repeat = 1;
+                break;
+            case 12:
+                /* Ctrl+V (paste) */
+                scancode = SCANCODE_V;
+                keypress = 0;
+                keymod = KMOD_CTRL;
+                repeat = 0;
+                break;
+            case 13:
+                /* Ctrl+C (copy) */
+                scancode = SCANCODE_C;
+                keypress = 0;
+                keymod = KMOD_CTRL;
+                repeat = 0;
+                break;
+            case 14:
+                /* Ctrl+X (cut) */
+                scancode = SCANCODE_X;
+                keypress = 0;
+                keymod = KMOD_CTRL;
+                repeat = 0;
+                break;
+            case 15:
+                /* Ctrl+Z (undo) */
+                scancode = SCANCODE_Z;
+                keypress = 0;
+                keymod = KMOD_CTRL;
+                repeat = 0;
+                break;
+            case 16:
+                /* Ctrl+Y (redo) */
+                scancode = SCANCODE_Y;
+                keypress = 0;
+                keymod = KMOD_CTRL;
+                repeat = 0;
+                break;
+            case 17:
+                /* Ctrl+D (duplicate line) */
+                scancode = SCANCODE_D;
+                keypress = 0;
+                keymod = KMOD_CTRL;
+                repeat = 0;
+                break;
+            case 18:
+                /* Ctrl+B (comment/uncomment) */
+                scancode = SCANCODE_B;
+                keypress = 0;
+                keymod = KMOD_CTRL;
+                repeat = 0;
+                break;
+            case 19:
+                /* Ctrl+F (find) */
+                scancode = SCANCODE_F;
+                keypress = 0;
+                keymod = KMOD_CTRL;
+                repeat = 0;
+                break;
+            case 20:
+                /* Ctrl+G (find next) */
+                scancode = SCANCODE_G;
+                keypress = 0;
+                keymod = KMOD_CTRL;
+                repeat = 0;
+                break;
+            case 21:
+                /* Ctrl+L (goto line) */
+                scancode = SCANCODE_L;
+                keypress = 0;
+                keymod = KMOD_CTRL;
+                repeat = 0;
+                break;
+            case 22:
+                /* Ctrl+Left (word left) */
+                scancode = SCANCODE_LEFT;
+                keypress = 0;
+                keymod = KMOD_CTRL;
+                repeat = 0;
+                break;
+            case 23:
+                /* Ctrl+Right (word right) */
+                scancode = SCANCODE_RIGHT;
+                keypress = 0;
+                keymod = KMOD_CTRL;
+                repeat = 0;
+                break;
+            case 24:
+                /* Shift+UP (selection up) */
+                scancode = SCANCODE_UP;
+                keypress = 0;
+                keymod = KMOD_SHIFT;
+                repeat = 1;
+                break;
+            case 25:
+                /* Shift+DOWN (selection down) */
+                scancode = SCANCODE_DOWN;
+                keypress = 0;
+                keymod = KMOD_SHIFT;
+                repeat = 1;
+                break;
+            case 26:
+                /* Shift+LEFT (selection left) */
+                scancode = SCANCODE_LEFT;
+                keypress = 0;
+                keymod = KMOD_SHIFT;
+                repeat = 1;
+                break;
+            case 27:
+                /* Shift+RIGHT (selection right) */
+                scancode = SCANCODE_RIGHT;
+                keypress = 0;
+                keymod = KMOD_SHIFT;
+                repeat = 1;
+                break;
+            case 28:
+                /* Shift+HOME (selection to start) */
+                scancode = SCANCODE_HOME;
+                keypress = 0;
+                keymod = KMOD_SHIFT;
+                repeat = 1;
+                break;
+            case 29:
+                /* Shift+END (selection to end) */
+                scancode = SCANCODE_END;
+                keypress = 0;
+                keymod = KMOD_SHIFT;
+                repeat = 1;
+                break;
+            case 30:
+                /* Regular character input */
+                scancode = 0;
+                keypress = 32 + (random() % 95); /* printable ASCII 32-126 */
+                keymod = 0;
+                repeat = 1;
+                break;
+            case 31:
+                /* Ctrl+Up (goto start of file) */
+                scancode = SCANCODE_UP;
+                keypress = 0;
+                keymod = KMOD_CTRL;
+                repeat = 0;
+                break;
+            default:
+                /* Fallback - should never happen */
+                scancode = 0;
+                keypress = ' ';
+                keymod = 0;
+                repeat = 0;
+                break;
+        }
+        if (repeat) {
+            int num_repeats = 1 + (random() % 10);
+            for (int r = 0; r < num_repeats; r++) {
+                code_handle_keypress(scancode, keypress, keymod);
+            }
+        } else {
+            code_handle_keypress(scancode, keypress, keymod);
+        }
+    }
 }
