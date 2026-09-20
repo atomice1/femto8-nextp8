@@ -4,6 +4,9 @@
 
 #include "p8_http_test_common.h"
 
+extern int parse_url(const char *url, bool *use_ssl, char *host, size_t host_len,
+                     unsigned *port, char *path, size_t path_len);
+
 /* Test parse_url with http:// URLs */
 void test_parse_url_http_basic(void **state)
 {
