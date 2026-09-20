@@ -359,3 +359,32 @@ void test_long_line(void **state)
 
     assert_line_equal(0, expected);
 }
+
+void test_copy_paste(void **state)
+{
+    split_lines("--foo\n  for v=1,bricksv do\n--bar\n    for h=1,bricksh do\n--foobar\n\n--baz\n  end");
+
+    assert_line_equal(1, "  for v=1,bricksv do");
+    assert_line_equal(3, "    for h=1,bricksh do");
+    assert_line_equal(7, "  end");
+
+    for (int i=0;i<1;i++)
+        code_handle_keypress(SCANCODE_DOWN, 0, 0);
+    assert_int_equal(cursor_line, 1);
+
+    code_handle_keypress(SCANCODE_DOWN, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_DOWN, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_DOWN, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_C, 0, KMOD_CTRL);
+
+    for (int i=4;i<7;i++)
+        code_handle_keypress(SCANCODE_DOWN, 0, 0);
+
+    assert_int_equal(cursor_line, 7);
+
+    code_handle_keypress(SCANCODE_V, 0, KMOD_CTRL);
+    assert_line_equal(7, "  for v=1,bricksv do");
+    assert_line_equal(9, "    for h=1,bricksh do");
+    assert_line_equal(10, "-  end");
+}

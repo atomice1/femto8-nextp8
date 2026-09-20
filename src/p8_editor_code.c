@@ -642,12 +642,16 @@ static bool insert_text_multi_line_raw(int line, int col, const char *text, int 
     const char *end = text + len;
     for (const char *p = text; p < end; ) {
         const char *nl = memchr(p, '\n', end - p);
-        int slen = nl ? (int)(nl - p) : len;
+        int slen = nl ? (int)(nl - p) : (end - p);
+        assert(p + slen <= end);
+        if (nl) {
+            assert(col <= line_lengths[line]);
+            int remaining_len = line_lengths[line] - col;
+            if (!insert_line_raw(line + 1, &lines[line][col], remaining_len)) return false;
+            line_resize(line, col);
+        }
         if (!insert_text_single_line_raw(line, col, p, slen)) return false;
         if (nl) {
-            int remaining_len = line_lengths[line] - col;
-            line_resize(line, col + slen);
-            if (!insert_line_raw(line + 1, &lines[line][col], remaining_len)) return false;
             line++;
             col = 0;
             p = nl + 1;
