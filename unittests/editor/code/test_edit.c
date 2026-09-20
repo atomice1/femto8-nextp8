@@ -388,3 +388,14 @@ void test_copy_paste(void **state)
     assert_line_equal(9, "    for h=1,bricksh do");
     assert_line_equal(10, "-  end");
 }
+
+void test_delete_line(void **state)
+{
+    split_lines("Line 1\nLine 2\nLine 3");
+
+    code_handle_keypress(SCANCODE_DOWN, 0, 0);
+    code_handle_keypress(SCANCODE_END, 0, 0);
+    code_handle_keypress(SCANCODE_HOME, 0, KMOD_SHIFT);
+    code_handle_keypress(0, 8, 0);  /* 8 = backspace */
+    code_handle_keypress(0, 8, 0);  /* 8 = backspace */
+}

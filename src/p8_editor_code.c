@@ -717,6 +717,7 @@ static void delete_text_single_line_no_undo(int line, int start_col, int end_col
             cursor_col = start_col;
         else
             cursor_col -= (end_col - start_col);
+        assert(cursor_col >= 0);
         assert(cursor_col <= line_lengths[cursor_line]);
     }
     if (select_start_line == line && select_start_col > start_col) {
@@ -724,12 +725,16 @@ static void delete_text_single_line_no_undo(int line, int start_col, int end_col
             select_start_col = start_col;
         else
             select_start_col -= (end_col - start_col);
+        assert(select_start_col >= 0);
+        assert(select_start_col <= line_lengths[cursor_line]);
     }
     if (select_end_line == line && select_end_col > start_col) {
         if (select_end_col < end_col)
             select_end_col = start_col;
         else
             select_end_col -= (end_col - start_col);
+        assert(select_end_col >= 0);
+        assert(select_end_col <= line_lengths[cursor_line]);
     }
 }
 
@@ -763,33 +768,42 @@ static void delete_text_multi_line_no_undo(int start_line, int start_col, int en
     delete_text_multi_line_raw(start_line, start_col, end_line, end_col);
     if (cursor_line > end_line) {
         cursor_line -= (end_line - start_line);
+        assert(cursor_line >= 0);
         assert(cursor_line < line_count);
         assert(cursor_col <= line_lengths[cursor_line]);
     } else if (cursor_line == end_line) {
         cursor_line = start_line;
-        cursor_col = start_col + (cursor_col - end_col);
-        assert(cursor_line < line_count);
+        cursor_col = (cursor_col > end_col) ? (start_col + (cursor_col - end_col)) : start_col;
+        assert(cursor_col >= 0);
         assert(cursor_col <= line_lengths[cursor_line]);
     } else if (cursor_line >= start_line && cursor_line < end_line) {
         cursor_line = start_line;
         cursor_col = start_col;
-        assert(cursor_line < line_count);
-        assert(cursor_col <= line_lengths[cursor_line]);
     }
     if (select_start_line > end_line) {
         select_start_line -= (end_line - start_line);
+        assert(select_start_line >= 0);
+        assert(select_start_line < line_count);
+        assert(select_start_col <= line_lengths[select_end_line]);
     } else if (select_start_line == end_line) {
         select_start_line = start_line;
-        select_start_col = start_col + (select_start_col - end_col);
+        select_start_col = (select_start_col > end_col) ? (start_col + (select_start_col - end_col)) : start_col;
+        assert(select_start_col >= 0);
+        assert(select_start_col <= line_lengths[cursor_line]);
     } else if (select_start_line >= start_line && select_start_line < end_line) {
         select_start_line = start_line;
         select_start_col = start_col;
     }
     if (select_end_line > end_line) {
         select_end_line -= (end_line - start_line);
+        assert(select_end_line >= 0);
+        assert(select_end_line < line_count);
+        assert(select_end_col <= line_lengths[select_end_line]);
     } else if (select_end_line == end_line) {
         select_end_line = start_line;
-        select_end_col = start_col + (select_end_col - end_col);
+        select_end_col = (select_end_col > end_col) ? (start_col + (select_end_col - end_col)) : start_col;
+        assert(select_end_col >= 0);
+        assert(select_end_col <= line_lengths[cursor_line]);
     } else if (select_end_line >= start_line && select_end_line < end_line) {
         select_end_line = start_line;
         select_end_col = start_col;

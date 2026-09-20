@@ -31,6 +31,7 @@ extern void test_tab(void **state);
 extern void test_comment(void **state);
 extern void test_long_line(void **state);
 extern void test_copy_paste(void **state);
+extern void test_delete_line(void **state);
 
 /* Undo tests */
 extern void test_undo_insert_char(void **state);
@@ -95,6 +96,7 @@ int main(int argc, char *argv[])
         cmocka_unit_test_setup_teardown(test_comment, setup, teardown),
         cmocka_unit_test_setup_teardown(test_long_line, setup, teardown),
         cmocka_unit_test_setup_teardown(test_copy_paste, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_delete_line, setup, teardown),
         cmocka_unit_test_setup_teardown(test_undo_insert_char, setup, teardown),
         cmocka_unit_test_setup_teardown(test_undo_backspace, setup, teardown),
         cmocka_unit_test_setup_teardown(test_undo_delete_char, setup, teardown),
