@@ -89,25 +89,35 @@ typedef enum {
     EDIT_TYPE_NONE = 0,
     EDIT_TYPE_SIMPLE_INSERT_CHAR,
     EDIT_TYPE_SIMPLE_INSERT_CHAR_FORWARD,
+    EDIT_TYPE_SIMPLE_INSERT_NEWLINE,
+    EDIT_TYPE_SIMPLE_INSERT_NEWLINE_FORWARD,
     EDIT_TYPE_SIMPLE_DELETE_FORWARD,
     EDIT_TYPE_SIMPLE_DELETE_BACKWARD,
+    EDIT_TYPE_SIMPLE_DELETE_NEWLINE,
+    EDIT_TYPE_SIMPLE_DELETE_NEWLINE_FORWARD,
     EDIT_TYPE_COMPLEX
 } edit_type_t;
 
 typedef struct edit_t {
     int type;
+    int old_cursor_line;
+    int old_cursor_col;
+    int new_cursor_line;
+    int new_cursor_col;
     union {
         char ch;
         struct {
             int start_line_incl;
             int new_end_line_excl;
             int old_end_line_excl;
-            int old_cursor_line;
-            int old_cursor_col;
             int old_select_start_line;
             int old_select_end_line;
             int old_select_start_col;
             int old_select_end_col;
+            int new_select_start_line;
+            int new_select_end_line;
+            int new_select_start_col;
+            int new_select_end_col;
             char **old_lines;
             int *old_line_lengths;
         };
@@ -378,8 +388,14 @@ static void add_lines_to_undo(int start_line_incl, int old_end_line_excl, int ne
         edit->start_line_incl = start_line_incl;
         edit->new_end_line_excl = new_end_line_excl;
         edit->old_end_line_excl = old_end_line_excl;
-        edit->old_cursor_line = cursor_line;
-        edit->old_cursor_col = cursor_col;
+        edit->old_select_start_line = select_start_line;
+        edit->old_select_end_line = select_end_line;
+        edit->old_select_start_col = select_start_col;
+        edit->old_select_end_col = select_end_col;
+        edit->new_select_start_line = -1;
+        edit->new_select_end_line = -1;
+        edit->new_select_start_col = -1;
+        edit->new_select_end_col = -1;
         assert(edit->old_lines == NULL);
         assert(edit->old_line_lengths == NULL);
         if (old_end_line_excl > start_line_incl) {
@@ -906,48 +922,59 @@ static bool insert_text_at_cursor(const char *text)
 static bool undo_edit(const edit_t *edit)
 {
     bool success = true;
+    select_anchor_line = -1;
+    select_anchor_col = -1;
+    if (edit->type != EDIT_TYPE_COMPLEX) {
+        select_start_line = -1;
+        select_end_line = -1;
+        select_start_col = -1;
+        select_end_col = -1;
+    }
     switch (edit->type) {
     case EDIT_TYPE_NONE:
         break;
     case EDIT_TYPE_SIMPLE_INSERT_CHAR:
-        assert(select_start_line == -1);
-        if (cursor_col > 0)
-            delete_text_single_line_no_undo(cursor_line, cursor_col - 1, cursor_col);
-        else if (cursor_line > 0)
-            delete_text_multi_line_no_undo(cursor_line - 1, line_lengths[cursor_line - 1], cursor_line, 0);
+        delete_text_single_line_no_undo(edit->new_cursor_line, edit->old_cursor_col, edit->new_cursor_col);
+        break;
+    case EDIT_TYPE_SIMPLE_INSERT_NEWLINE:
+        delete_text_multi_line_no_undo(edit->old_cursor_line, edit->old_cursor_col, edit->new_cursor_line, 0);
         break;
     case EDIT_TYPE_SIMPLE_INSERT_CHAR_FORWARD:
-        assert(select_start_line == -1);
-        if (cursor_col < line_lengths[cursor_line])
-            delete_text_single_line_no_undo(cursor_line, cursor_col, cursor_col + 1);
-        else if (cursor_line < line_count - 1)
-            delete_text_multi_line_no_undo(cursor_line, cursor_col, cursor_line + 1, 0);
+        delete_text_single_line_no_undo(edit->new_cursor_line, edit->old_cursor_col, edit->new_cursor_col + 1);
+        break;
+    case EDIT_TYPE_SIMPLE_INSERT_NEWLINE_FORWARD:
+        delete_text_multi_line_no_undo(edit->old_cursor_line, edit->old_cursor_col, edit->new_cursor_line + 1, 0);
         break;
     case EDIT_TYPE_SIMPLE_DELETE_BACKWARD:
-        assert(select_start_line == -1);
-        if (edit->ch == '\n')
-            success = insert_text_multi_line_no_undo(cursor_line, cursor_col, "\n", 1);
-        else
-            success = insert_text_single_line_no_undo(cursor_line, cursor_col, (char *)&edit->ch, 1);
+        success = insert_text_single_line_no_undo(edit->new_cursor_line, edit->new_cursor_col, (char *)&edit->ch, 1);
+        break;
+    case EDIT_TYPE_SIMPLE_DELETE_NEWLINE:
+        success = insert_text_multi_line_no_undo(edit->new_cursor_line, edit->new_cursor_col, "\n", 1);
         break;
     case EDIT_TYPE_SIMPLE_DELETE_FORWARD:
-        assert(select_start_line == -1);
-        success = insert_text_single_line_no_undo(cursor_line, cursor_col, (char *)&edit->ch, 1);
-        if (success)
-            cursor_col--;
+        success = insert_text_single_line_no_undo(edit->new_cursor_line, edit->new_cursor_col, (char *)&edit->ch, 1);
+        break;
+    case EDIT_TYPE_SIMPLE_DELETE_NEWLINE_FORWARD:
+        success = insert_text_multi_line_no_undo(edit->new_cursor_line, edit->new_cursor_col, "\n", 1);
         break;
     case EDIT_TYPE_COMPLEX:
         invalidate_lines_from(edit->start_line_incl);
         success = replace_lines_raw(edit->start_line_incl, edit->new_end_line_excl - edit->start_line_incl,
                                     edit->old_end_line_excl - edit->start_line_incl,
                                     (const char **) edit->old_lines, edit->old_line_lengths);
-        cursor_line = MIN(edit->old_cursor_line, line_count - 1);
-        cursor_col = MIN(edit->old_cursor_col, line_lengths[cursor_line]);
+        assert(edit->old_select_start_line < line_count);
+        assert(edit->old_select_end_line < line_count);
+        assert(edit->old_select_start_col <= line_lengths[edit->old_select_start_line]);
+        assert(edit->old_select_end_col <= line_lengths[edit->old_select_end_line]);
         select_start_line = MIN(edit->old_select_start_line, line_count - 1);
         select_end_line = MIN(edit->old_select_end_line, line_count - 1);
         select_start_col = select_start_line != -1 ? MIN(edit->old_select_start_col, line_lengths[select_start_line]) : -1;
         select_end_col = select_end_line != -1 ? MIN(edit->old_select_end_col, line_lengths[select_end_line]) : -1;
     }
+    assert(edit->old_cursor_line < line_count);
+    assert(edit->old_cursor_col <= line_lengths[edit->old_cursor_line]);
+    cursor_line = MIN(edit->old_cursor_line, line_count - 1);
+    cursor_col = MIN(edit->old_cursor_col, line_lengths[cursor_line]);
     return success;
 }
 
@@ -967,18 +994,18 @@ static bool reverse_edit(edit_t *dest, const edit_t *src)
         break;
     case EDIT_TYPE_SIMPLE_INSERT_CHAR:
         dest->type = EDIT_TYPE_SIMPLE_DELETE_BACKWARD;
-        if (cursor_col == 0)
-            dest->ch = '\n';
-        else
-            dest->ch = lines[cursor_line][cursor_col - 1];
+        dest->ch = lines[src->old_cursor_line][src->old_cursor_col];
+        break;
+    case EDIT_TYPE_SIMPLE_INSERT_NEWLINE:
+        dest->type = EDIT_TYPE_SIMPLE_DELETE_NEWLINE;
+        dest->ch = '\n';
         break;
     case EDIT_TYPE_SIMPLE_INSERT_CHAR_FORWARD:
         dest->type = EDIT_TYPE_SIMPLE_DELETE_FORWARD;
-        assert(cursor_col < line_lengths[cursor_line]);
-        if (cursor_col == line_lengths[cursor_line] - 1)
-            dest->ch = '\n';
-        else
-            dest->ch = lines[cursor_line][cursor_col];
+        dest->ch = lines[src->old_cursor_line][src->old_cursor_col];
+        break;
+    case EDIT_TYPE_SIMPLE_INSERT_NEWLINE_FORWARD:
+        dest->type = EDIT_TYPE_SIMPLE_DELETE_NEWLINE_FORWARD;
         break;
     case EDIT_TYPE_COMPLEX:
         assert(src->start_line_incl >= 0 && src->start_line_incl <= line_count);
@@ -988,12 +1015,14 @@ static bool reverse_edit(edit_t *dest, const edit_t *src)
         dest->start_line_incl = src->start_line_incl;
         dest->new_end_line_excl = src->old_end_line_excl;
         dest->old_end_line_excl = src->new_end_line_excl;
-        dest->old_cursor_line = cursor_line;
-        dest->old_cursor_col = cursor_col;
-        dest->old_select_start_line = select_start_line;
-        dest->old_select_end_line = select_end_line;
-        dest->old_select_start_col = select_start_col;
-        dest->old_select_end_col = select_end_col;
+        dest->old_select_start_line = src->new_select_start_line;
+        dest->old_select_end_line = src->new_select_end_line;
+        dest->old_select_start_col = src->new_select_start_col;
+        dest->old_select_end_col = src->new_select_end_col;
+        dest->new_select_start_line = src->old_select_start_line;
+        dest->new_select_end_line = src->old_select_end_line;
+        dest->new_select_start_col = src->old_select_start_col;
+        dest->new_select_end_col = src->old_select_end_col;
         {
             size_t count = dest->old_end_line_excl - dest->start_line_incl;
             char **old_lines = malloc(sizeof(char *) * count);
@@ -1021,19 +1050,25 @@ static bool reverse_edit(edit_t *dest, const edit_t *src)
         }
         break;
     }
+    dest->old_cursor_line = src->new_cursor_line;
+    dest->old_cursor_col = src->new_cursor_col;
+    dest->new_cursor_line = src->old_cursor_line;
+    dest->new_cursor_col = src->old_cursor_col;
     return true;
 }
 
 static void push_undo(void)
-{ 
+{
     if (undo_depth == UNDO_LIMIT) {
         free_edit(&undo_stack[0]);
         memmove(undo_stack, undo_stack + 1, (UNDO_LIMIT - 1) * sizeof(edit_t));
         undo_depth--;
     }
-    undo_depth[undo_stack].type = EDIT_TYPE_NONE;
-    undo_depth[undo_stack].old_lines = NULL;
-    undo_depth[undo_stack].old_line_lengths = NULL;
+    undo_stack[undo_depth].type = EDIT_TYPE_NONE;
+    undo_stack[undo_depth].old_cursor_line = cursor_line;
+    undo_stack[undo_depth].old_cursor_col = cursor_col;
+    undo_stack[undo_depth].old_lines = NULL;
+    undo_stack[undo_depth].old_line_lengths = NULL;
     undo_depth++;
     for (int i = 0; i < redo_depth; i++) { free_edit(&redo_stack[i]); }
     redo_depth = 0;
@@ -1049,6 +1084,13 @@ static void pop_redo(void)
 {
     if (redo_depth == 0) return;
     free_edit(&redo_stack[--redo_depth]);
+}
+
+static void finalize_undo(void)
+{
+    assert(undo_depth > 0);
+    undo_stack[undo_depth - 1].new_cursor_line = cursor_line;
+    undo_stack[undo_depth - 1].new_cursor_col = cursor_col;
 }
 
 static void do_undo(void)
@@ -1375,17 +1417,18 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
         case SCANCODE_DEL:
             // Delete forward
             if (select_start_line != -1) {
-                push_undo(); delete_selected_text();
+                push_undo(); delete_selected_text(); finalize_undo();
             } else if (cursor_col < line_lengths[cursor_line]) {
                 push_undo();
                 undo_stack[undo_depth-1].type = EDIT_TYPE_SIMPLE_DELETE_FORWARD;
                 undo_stack[undo_depth-1].ch = lines[cursor_line][cursor_col];
                 delete_text_single_line_no_undo(cursor_line, cursor_col, cursor_col + 1);
+                finalize_undo();
             } else if (cursor_line < line_count - 1) {
                 push_undo();
-                undo_stack[undo_depth-1].type = EDIT_TYPE_SIMPLE_DELETE_FORWARD;
-                undo_stack[undo_depth-1].ch = '\n';
+                undo_stack[undo_depth-1].type = EDIT_TYPE_SIMPLE_DELETE_NEWLINE_FORWARD;
                 delete_text_multi_line_no_undo(cursor_line, cursor_col, cursor_line + 1, 0);
+                finalize_undo();
             }
             sync_required = true;
             p8_editor_mark_modified();
@@ -1403,14 +1446,16 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
                     case SCANCODE_D: /* duplicate line */
                         push_undo();
                         if (!duplicate_line()) pop_undo();
+                        else finalize_undo();
                         break;
                     case SCANCODE_B: /* comment / uncomment */
                         push_undo();
                         if (!comment_uncomment()) pop_undo();
+                        else finalize_undo();
                         break;
                     case SCANCODE_X: { /* cut */
                         char *sel = get_selected_text();
-                        if (sel) { push_undo(); free(clipboard); clipboard = sel; delete_selected_text(); }
+                        if (sel) { push_undo(); free(clipboard); clipboard = sel; delete_selected_text(); finalize_undo(); }
                         break; }
                     case SCANCODE_C: { /* copy */
                         char *sel = get_selected_text();
@@ -1421,6 +1466,7 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
                             push_undo();
                             if (select_start_line != -1) delete_selected_text();
                             if (!insert_text_at_cursor(clipboard)) pop_undo();
+                            else finalize_undo();
                         }
                         break;
                     case SCANCODE_Z: do_undo(); break;
@@ -1466,33 +1512,37 @@ text_input:;
                 if (scancode == SCANCODE_TAB) {
                     push_undo();
                     if (!indent_lines(shift)) pop_undo();
+                    else finalize_undo();
                     break;
                 }
                 switch (keypress) {
                     case 8: /* backspace */
                         if (select_start_line != -1) {
-                            push_undo(); delete_selected_text();
+                            push_undo(); delete_selected_text(); finalize_undo();
                         } else if (cursor_col > 0) {
                             push_undo();
                             undo_stack[undo_depth-1].type = EDIT_TYPE_SIMPLE_DELETE_BACKWARD;
                             undo_stack[undo_depth-1].ch = lines[cursor_line][cursor_col-1];
                             delete_text_single_line_no_undo(cursor_line, cursor_col - 1, cursor_col);
+                            finalize_undo();
                         } else if (cursor_line > 0) {
                             push_undo();
-                            undo_stack[undo_depth-1].type = EDIT_TYPE_SIMPLE_DELETE_BACKWARD;
-                            undo_stack[undo_depth-1].ch =  '\n';
+                            undo_stack[undo_depth-1].type = EDIT_TYPE_SIMPLE_DELETE_NEWLINE;
                             delete_text_multi_line_no_undo(cursor_line - 1, line_lengths[cursor_line - 1], cursor_line, 0);
+                            finalize_undo();
                         }
                         break;
                     case '\n': /* newline */
                     case 13: /* return */
                         push_undo();
                         if (select_start_line == -1) {
-                            undo_stack[undo_depth-1].type = EDIT_TYPE_SIMPLE_INSERT_CHAR;
+                            undo_stack[undo_depth-1].type = EDIT_TYPE_SIMPLE_INSERT_NEWLINE;
                             if (!insert_text_multi_line_no_undo(cursor_line, cursor_col, "\n", 1)) pop_undo();
+                            else finalize_undo();
                         } else {
                             delete_selected_text();
                             if (!insert_text_multi_line(cursor_line, cursor_col, "\n", 1)) pop_undo();
+                            else finalize_undo();
                         }
                         break;
                     default:
@@ -1505,9 +1555,11 @@ text_input:;
                             if (select_start_line == -1) {
                                 undo_stack[undo_depth-1].type = EDIT_TYPE_SIMPLE_INSERT_CHAR;
                                 if (!insert_text_single_line_no_undo(cursor_line, cursor_col, (char *)&keypress, 1)) pop_undo();
+                                else finalize_undo();
                             } else {
                                 delete_selected_text();
                                 if (!insert_text_single_line(cursor_line, cursor_col, (char *)&keypress, 1)) pop_undo();
+                                else finalize_undo();
                             }
                         }
                 }

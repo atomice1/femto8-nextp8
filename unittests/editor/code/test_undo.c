@@ -102,8 +102,16 @@ void test_undo_insert_newline(void **state)
     assert_int_equal(line_count, 1);
     assert_line_equal(0, "Hello");
 
+    printf("before redo\n");
+    for (int i=0;i<line_count;++i)
+        printf("line %d: >>%s<<\n", i, lines[i]);
+
     /* Redo (Ctrl+Y) */
     code_handle_keypress(SCANCODE_Y, 0, KMOD_CTRL);
+
+    printf("after redo\n");
+    for (int i=0;i<line_count;++i)
+        printf("line %d: >>%s<<\n", i, lines[i]);
 
     assert_int_equal(line_count, 2);
     assert_line_equal(0, "He");
@@ -374,4 +382,184 @@ void test_redo_stack_limit(void **state)
     /* 9th redo should be a no-op */
     code_handle_keypress(SCANCODE_Y, 0, KMOD_CTRL);
     assert_line_equal(0, "Hello012345678");
+}
+
+void test_undo_with_selection(void **state)
+{
+    split_lines("abcdefghijklmnopqrstuvwxyz");
+    assert_line_equal(0, "abcdefghijklmnopqrstuvwxyz");
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 3);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(0, ' ', 0);
+    assert_line_equal(0, "abc defghijklmnopqrstuvwxyz");
+    assert_int_equal(cursor_col, 4);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 7);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    assert_int_equal(cursor_col, 10);
+    assert_int_equal(select_start_col, 7);
+    assert_int_equal(select_end_col, 10);
+
+    code_handle_keypress(0, '*', 0);
+    assert_line_equal(0, "abc def*jklmnopqrstuvwxyz");
+    assert_int_equal(cursor_col, 8);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 11);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(0, '_', 0);
+    assert_line_equal(0, "abc def*jkl_mnopqrstuvwxyz");
+    assert_int_equal(cursor_col, 12);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 15);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    assert_int_equal(cursor_col, 16);
+    assert_int_equal(select_start_col, 15);
+    assert_int_equal(select_end_col, 16);
+
+    code_handle_keypress(0, '%', 0);
+    assert_line_equal(0, "abc def*jkl_mno%qrstuvwxyz");
+    assert_int_equal(cursor_col, 16);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 19);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(0, '!', 0);
+    assert_line_equal(0, "abc def*jkl_mno%qrs!tuvwxyz");
+    assert_int_equal(cursor_col, 20);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 23);
+
+    code_handle_keypress(SCANCODE_Z, 0, KMOD_CTRL);
+    assert_line_equal(0, "abc def*jkl_mno%qrstuvwxyz");
+    assert_int_equal(cursor_col, 19);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 22);
+
+    code_handle_keypress(SCANCODE_Z, 0, KMOD_CTRL);
+    assert_line_equal(0, "abc def*jkl_mnopqrstuvwxyz");
+    assert_int_equal(cursor_col, 16);
+    assert_int_equal(select_start_col, 15);
+    assert_int_equal(select_end_col, 16);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 19);
+
+    code_handle_keypress(SCANCODE_Z, 0, KMOD_CTRL);
+    assert_line_equal(0, "abc def*jklmnopqrstuvwxyz");
+    assert_int_equal(cursor_col, 11);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 14);
+
+    code_handle_keypress(SCANCODE_Z, 0, KMOD_CTRL);
+    assert_line_equal(0, "abc defghijklmnopqrstuvwxyz");
+    assert_int_equal(cursor_col, 10);
+    assert_int_equal(select_start_col, 7);
+    assert_int_equal(select_end_col, 10);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 13);
+
+    code_handle_keypress(SCANCODE_Z, 0, KMOD_CTRL);
+    assert_line_equal(0, "abcdefghijklmnopqrstuvwxyz");
+    assert_int_equal(cursor_col, 3);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 6);
+
+    code_handle_keypress(SCANCODE_Y, 0, KMOD_CTRL);
+    assert_line_equal(0, "abc defghijklmnopqrstuvwxyz");
+    assert_int_equal(cursor_col, 4);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 7);
+
+    code_handle_keypress(SCANCODE_Y, 0, KMOD_CTRL);
+    assert_line_equal(0, "abc def*jklmnopqrstuvwxyz");
+    assert_int_equal(cursor_col, 8);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 11);
+
+    code_handle_keypress(SCANCODE_Y, 0, KMOD_CTRL);
+    assert_line_equal(0, "abc def*jkl_mnopqrstuvwxyz");
+    assert_int_equal(cursor_col, 12);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 15);
+
+    code_handle_keypress(SCANCODE_Y, 0, KMOD_CTRL);
+    assert_line_equal(0, "abc def*jkl_mno%qrstuvwxyz");
+    assert_int_equal(cursor_col, 16);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 19);
+
+    code_handle_keypress(SCANCODE_Y, 0, KMOD_CTRL);
+    assert_line_equal(0, "abc def*jkl_mno%qrs!tuvwxyz");
+    assert_int_equal(cursor_col, 20);
+    assert_int_equal(select_start_col, select_end_col);
+
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    code_handle_keypress(SCANCODE_RIGHT, 0, KMOD_SHIFT);
+    code_handle_keypress(SCANCODE_RIGHT, 0, 0);
+    assert_int_equal(cursor_col, 23);
 }

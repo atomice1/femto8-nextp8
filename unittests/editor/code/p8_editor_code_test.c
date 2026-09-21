@@ -49,6 +49,7 @@ extern void test_undo_empty_stack(void **state);
 extern void test_redo_empty_stack(void **state);
 extern void test_redo_twice_with_one_edit(void **state);
 extern void test_redo_stack_limit(void **state);
+extern void test_undo_with_selection(void **state);
 
 int setup(void **state)
 {
@@ -112,6 +113,7 @@ int main(int argc, char *argv[])
         cmocka_unit_test_setup_teardown(test_redo_empty_stack, setup, teardown),
         cmocka_unit_test_setup_teardown(test_redo_twice_with_one_edit, setup, teardown),
         cmocka_unit_test_setup_teardown(test_redo_stack_limit, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_undo_with_selection, setup, teardown),
     };
 
     int result = cmocka_run_group_tests(tests, NULL, NULL);

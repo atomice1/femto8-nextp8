@@ -15,26 +15,32 @@
  */
 
 /* Assertion helpers */
-static inline void assert_line_equal(int line_idx, const char *expected)
+static inline void _assert_line_equal0(int line_idx, const char *expected, const char *file, int line)
 {
     int len = line_lengths[line_idx];
     char *actual = malloc(len + 1);
     memcpy(actual, lines[line_idx], len);
     actual[len] = '\0';
-    assert_string_equal(actual, expected);
+    _assert_string_equal((actual), (expected), file, line);
     free(actual);
 }
 
-static inline void assert_cursor_position(int expected_line, int expected_col)
+#define assert_line_equal(line_idx, expected) _assert_line_equal0(line_idx, expected, __FILE__, __LINE__)
+
+static inline void _assert_cursor_position(int expected_line, int expected_col, const char *file, int line)
 {
-    assert_int_equal(cursor_line, expected_line);
-    assert_int_equal(cursor_col, expected_col);
+    _assert_int_equal(cursor_line, expected_line, file, line);
+    _assert_int_equal(cursor_col, expected_col, file, line);
 }
 
-static inline void assert_line_count(int expected)
+#define assert_cursor_position(expected_line, expected_col) _assert_cursor_position(expected_line, expected_col, __FILE__, __LINE__)
+
+static inline void _assert_line_count(int expected, const char *file, int line)
 {
-    assert_int_equal(line_count, expected);
+    _assert_int_equal(line_count, expected, file, line);
 }
+
+#define assert_line_count(expected) _assert_line_count(expected, __FILE__, __LINE__)
 
 /* Move cursor to a given line and column using keypresses */
 /* First resets to (0,0) using Ctrl+Up, then moves to target position */
