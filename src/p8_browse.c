@@ -38,6 +38,8 @@
 #include "p8_preview.h"
 #include "strtcpy.h"
 
+extern int wrap_text(const char *text, int max_lines, int max_chars_per_line, char *output_lines);
+
 #define PREVIEW_LABEL_DISPLAY_SIZE 64
 #define PREVIEW_DIALOG_CONTENT_WIDTH PREVIEW_LABEL_DISPLAY_SIZE
 #define PREVIEW_BORDER_SIZE 6
@@ -54,10 +56,8 @@ static bool preview_loaded = false;
 static p8_clock_t preview_highlight_time;
 static bool preview_showing = false;
 static p8_clock_t preview_last_button_time;
-static char preview_title_line1[128];
-static char preview_title_line2[128];
-static char preview_author_line1[128];
-static char preview_author_line2[128];
+static char preview_title_lines[2][128];
+static char preview_author_lines[2][128];
 static char *filename_mem = NULL;
 static char *filename_mem_ptr = NULL;
 static char *filename_mem_end = NULL;
@@ -201,34 +201,6 @@ void draw_file_name(const char *str, int x, int y, int col)
         overlay_draw_char(display_char, cursor_x, y, col);
         cursor_x += GLYPH_WIDTH;
     }
-}
-
-static int wrap_text(const char *text, int max_chars,
-                     char *line1, int line1_size,
-                     char *line2, int line2_size)
-{
-    int len = (int)strlen(text);
-    if (len <= max_chars) {
-        snprintf(line1, line1_size, "%s", text);
-        line2[0] = '\0';
-        return 1;
-    }
-
-    int break_pos = max_chars;
-    for (int i = max_chars - 1; i >= 0; i--) {
-        if (text[i] == ' ') {
-            break_pos = i;
-            break;
-        }
-    }
-    int copy1 = break_pos < line1_size - 1 ? break_pos : line1_size - 1;
-    memcpy(line1, text, copy1);
-    line1[copy1] = '\0';
-    const char *rest = text + break_pos;
-    if (*rest == ' ')
-        rest++;
-    snprintf(line2, line2_size, "%.*s", max_chars, rest);
-    return 2;
 }
 
 static inline void screen_pixel(int x, int y, int col)
@@ -560,19 +532,15 @@ static void browse_update(void)
         unsigned elapsed_ms = p8_clock_ms(p8_clock_delta(preview_last_button_time, p8_clock()));
         if (elapsed_ms >= PREVIEW_SHOW_DELAY_MS) {
             int ncontrols = 1;
-            int n_title = wrap_text(preview_info.title, PREVIEW_CHARS_PER_LINE,
-                                   preview_title_line1, sizeof(preview_title_line1),
-                                   preview_title_line2, sizeof(preview_title_line2));
-            preview_controls[ncontrols++].label = preview_title_line1;
+            int n_title = wrap_text(preview_info.title, 2, PREVIEW_CHARS_PER_LINE, &preview_title_lines[0][0]);
+            preview_controls[ncontrols++].label = preview_title_lines[0];
             if (n_title == 2)
-                preview_controls[ncontrols++].label = preview_title_line2;
+                preview_controls[ncontrols++].label = preview_title_lines[1];
             if (preview_info.author[0] != '\0') {
-                int n_author = wrap_text(preview_info.author, PREVIEW_CHARS_PER_LINE,
-                                        preview_author_line1, sizeof(preview_author_line1),
-                                        preview_author_line2, sizeof(preview_author_line2));
-                preview_controls[ncontrols++].label = preview_author_line1;
+                int n_author = wrap_text(preview_info.author, 2, PREVIEW_CHARS_PER_LINE, &preview_author_lines[0][0]);
+                preview_controls[ncontrols++].label = preview_author_lines[0];
                 if (n_author == 2)
-                    preview_controls[ncontrols++].label = preview_author_line2;
+                    preview_controls[ncontrols++].label = preview_author_lines[1];
             }
             p8_dialog_init(&preview_dialog, NULL, preview_controls, ncontrols,
                            PREVIEW_DIALOG_CONTENT_WIDTH + PREVIEW_BORDER_SIZE);

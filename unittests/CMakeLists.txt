@@ -13,7 +13,11 @@ add_subdirectory(editor)
 # Add the http subdirectory
 add_subdirectory(http)
 
+# Add the emu subdirectory
+add_subdirectory(emu)
+
 # Run tests
 enable_testing()
 add_test(NAME p8_editor_tests COMMAND p8_editor_tests)
 add_test(NAME p8_http_tests COMMAND p8_http_tests)
+add_test(NAME p8_emu_tests COMMAND p8_emu_tests)
