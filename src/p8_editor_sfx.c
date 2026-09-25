@@ -591,6 +591,25 @@ static void draw_pitch_mode(int x, int y, int w, int h)
     int bar_h = h - GLYPH_HEIGHT * 2 - strip_h; /* leave a status line at bottom */
     if (bar_h < 1) bar_h = 1;
 
+
+    /* Pitch axis labels: C0..C5 guide lines + labels at the right edge */
+    {
+        for (int i = 0; i <= 5; i++) {
+            int pitch_c = i * 12; /* C0..C5 */
+            int bh = (pitch_c * bar_h + 32) / 64;
+            int ly = ybase + bar_h - bh;
+            //if (ly < ybase || ly >= ybase + bar_h) continue;
+            overlay_draw_hline(x, x + w - 1, ly, 5);  /* dim guide */
+            int label_y = ly - GLYPH_HEIGHT;
+            if (label_y < ybase) label_y = ybase;
+            int lx = x + w - 2 * GLYPH_WIDTH;
+            overlay_draw_rectfill(lx, label_y, lx + 2 * GLYPH_WIDTH - 1,
+                                  label_y + GLYPH_HEIGHT - 1, 1);
+            char lbl[4]; lbl[0] = 'c'; lbl[1] = '0' + i; lbl[2] = '\0';
+            overlay_draw_simple_text(lbl, lx, label_y, 7);
+        }
+    }
+
     /* Each note: 4px wide bar */
     for (int n = 0; n < SFX_NOTES; n++) {
         uint16_t nd = sfx_note(sfx_detail, n);
@@ -619,24 +638,6 @@ static void draw_pitch_mode(int x, int y, int w, int h)
         uint8_t lpe_p = m_cart_memory[MEMORY_SFX + sfx_detail * SFX_ENTRY_BYTES + SFX_HDR_LOOP_END];
         overlay_draw_vline(x + lps_p * 4, ybase, ybase + bar_h, 11); /* green */
         overlay_draw_vline(x + lpe_p * 4 + 3, ybase, ybase + bar_h, 8); /* red */
-    }
-
-    /* Pitch axis labels: C0..C5 guide lines + labels at the right edge */
-    {
-        for (int i = 0; i <= 5; i++) {
-            int pitch_c = i * 12; /* C0..C5 */
-            int bh = (pitch_c * bar_h + 32) / 64;
-            int ly = ybase + bar_h - bh;
-            //if (ly < ybase || ly >= ybase + bar_h) continue;
-            overlay_draw_hline(x, x + w - 1, ly, 5);  /* dim guide */
-            int label_y = ly - GLYPH_HEIGHT;
-            if (label_y < ybase) label_y = ybase;
-            int lx = x + w - 2 * GLYPH_WIDTH;
-            overlay_draw_rectfill(lx, label_y, lx + 2 * GLYPH_WIDTH - 1,
-                                  label_y + GLYPH_HEIGHT - 1, 1);
-            char lbl[4]; lbl[0] = 'c'; lbl[1] = '0' + i; lbl[2] = '\0';
-            overlay_draw_simple_text(lbl, lx, label_y, 7);
-        }
     }
 
     /* Status: note info */
