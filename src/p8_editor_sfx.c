@@ -19,54 +19,10 @@
 #include "p8_input.h"
 #include "p8_overlay_helper.h"
 #include "p8_editor_tab.h"
+#include "scancodes.h"
 
 /* --- USB HID scancodes ---------------------------------------------------- */
-#define SCANCODE_A         4
-#define SCANCODE_B         5
-#define SCANCODE_C         6
-#define SCANCODE_D         7
-#define SCANCODE_E         8
-#define SCANCODE_F         9
-#define SCANCODE_G        10
-#define SCANCODE_H        11
-#define SCANCODE_I        12
-#define SCANCODE_J        13
-#define SCANCODE_K        14
-#define SCANCODE_L        15
-#define SCANCODE_M        16
-#define SCANCODE_N        17
-#define SCANCODE_O        18
-#define SCANCODE_P        19
-#define SCANCODE_Q        20
-#define SCANCODE_R        21
-#define SCANCODE_S        22
-#define SCANCODE_T        23
-#define SCANCODE_U        24
-#define SCANCODE_V        25
-#define SCANCODE_W        26
-#define SCANCODE_X        27
-#define SCANCODE_Y        28
-#define SCANCODE_Z        29
-#define SCANCODE_1        30
-#define SCANCODE_2        31
-#define SCANCODE_3        32
-#define SCANCODE_4        33
-#define SCANCODE_5        34
-#define SCANCODE_6        35
-#define SCANCODE_7        36
-#define SCANCODE_8        37
-#define SCANCODE_9        38
-#define SCANCODE_0        39
-#define SCANCODE_TAB      43
-#define SCANCODE_UP       82
-#define SCANCODE_DOWN     81
-#define SCANCODE_LEFT     80
-#define SCANCODE_RIGHT    79
-#define SCANCODE_PAGEUP   75
-#define SCANCODE_PAGEDOWN 78
-#define SCANCODE_HOME     74
-#define SCANCODE_END      77
-#define SCANCODE_DELETE   76
+/* All scancodes now defined in scancodes.h */
 
 /* --- SFX memory constants ------------------------------------------------- */
 #define SFX_COUNT         64
@@ -1164,7 +1120,7 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
                     else sfx_mode = 0;
                 }
                 break;
-            case SCANCODE_DELETE:
+            case SCANCODE_DEL:
                 if (sfx_mode == 0) {
                     /* Delete current selected note and move selection to prev non-empty or first non-empty */
                     sfx_undo_maybe_push();

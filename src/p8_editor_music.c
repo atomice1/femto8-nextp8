@@ -17,7 +17,7 @@
 #include "p8_input.h"
 #include "p8_overlay_helper.h"
 #include "p8_editor_tab.h"
-#include "p8_editor_music.h"
+#include "scancodes.h"
 
 /* =========================================================================
  * CONSTANTS
@@ -33,19 +33,7 @@
 #define MUS_CH2  2              /* bit7=stop,        bits0-6=ch2 SFX */
 #define MUS_CH3  3              /* bits0-6=ch3 SFX */
 
-#define SCANCODE_UP       82
-#define SCANCODE_DOWN     81
-#define SCANCODE_LEFT     80
-#define SCANCODE_RIGHT    79
-#define SCANCODE_PAGEUP   75
-#define SCANCODE_PAGEDOWN 78
-#define SCANCODE_R        21
-#define SCANCODE_S        22
-#define SCANCODE_A         4
-#define SCANCODE_Y        28
-#define SCANCODE_Z        29
-#define SCANCODE_C         6
-#define SCANCODE_V        25
+/* All scancodes now defined in scancodes.h */
 
 /* =========================================================================
  * STATE

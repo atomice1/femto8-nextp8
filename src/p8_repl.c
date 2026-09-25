@@ -13,6 +13,7 @@
 #include "p8_overlay_helper.h"
 #include "p8_print_helper.h"
 #include "p8_repl.h"
+#include "scancodes.h"
 #include "strtcpy.h"
 #include <sys/types.h>
 #include <dirent.h>
@@ -23,9 +24,6 @@
 /* =========================================================================
  * CONSTANTS
  * ========================================================================= */
-
-#define SCANCODE_UP       82
-#define SCANCODE_DOWN     81
 
 #define REPL_HISTORY_MAX   32          /* number of history lines to keep    */
 #define REPL_LINE_MAX      96          /* max chars per history line         */

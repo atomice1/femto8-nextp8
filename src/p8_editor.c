@@ -16,6 +16,7 @@
 #include "p8_input.h"
 #include "p8_overlay_helper.h"
 #include "p8_parser.h"
+#include "scancodes.h"
 #include "strtcpy.h"
 
 extern void draw_file_name(const char *str, int x, int y, int col);
@@ -28,21 +29,6 @@ static void editor_screen_hide();
 
 #define EDITOR_BG_NORMAL      DIALOG_BG_NORMAL
 #define EDITOR_TEXT_NORMAL    DIALOG_TEXT_NORMAL
-
-#define SCANCODE_F1       58
-#define SCANCODE_F2       59
-#define SCANCODE_F3       60
-#define SCANCODE_F4       61
-#define SCANCODE_F5       62
-#define SCANCODE_F6       63
-#define SCANCODE_F7       64
-/* Letter scancodes for ctrl-key handling */
-#define SCANCODE_A         4
-#define SCANCODE_N        17
-#define SCANCODE_R        21
-#define SCANCODE_S        22
-#define SCANCODE_LEFT     80
-#define SCANCODE_RIGHT    79
 
 static p8_tab_t active_tab = P8_TAB_CODE;
 static bool cart_modified = false;

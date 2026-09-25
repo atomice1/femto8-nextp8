@@ -17,39 +17,13 @@
 #include "p8_input.h"
 #include "p8_overlay_helper.h"
 #include "p8_editor_tab.h"
+#include "scancodes.h"
 
 #define EDITOR_BG_NORMAL      DIALOG_BG_NORMAL
 #define EDITOR_BG_HIGHLIGHT   DIALOG_BG_INVERTED
 #define EDITOR_BG_CURSOR      DIALOG_BG_HIGHLIGHT
 #define EDITOR_TEXT_NORMAL    DIALOG_TEXT_NORMAL
 #define EDITOR_TEXT_HIGHLIGHT DIALOG_TEXT_HIGHLIGHT
-
-#define SCANCODE_A         4
-#define SCANCODE_B         5
-#define SCANCODE_C         6
-#define SCANCODE_D         7
-#define SCANCODE_E         8
-#define SCANCODE_F         9
-#define SCANCODE_G        10
-#define SCANCODE_L        15
-#define SCANCODE_P        19
-#define SCANCODE_R        21
-#define SCANCODE_S        22
-#define SCANCODE_V        25
-#define SCANCODE_W        26
-#define SCANCODE_X        27
-#define SCANCODE_Y        28
-#define SCANCODE_Z        29
-#define SCANCODE_TAB      43
-#define SCANCODE_UP       82
-#define SCANCODE_DOWN     81
-#define SCANCODE_LEFT     80
-#define SCANCODE_RIGHT    79
-#define SCANCODE_PAGEUP   75
-#define SCANCODE_PAGEDOWN 78
-#define SCANCODE_HOME     74
-#define SCANCODE_DEL      76
-#define SCANCODE_END      77
 
 /* Extra capacity for lines being edited */
 #define EXTRA_CAPACITY 40

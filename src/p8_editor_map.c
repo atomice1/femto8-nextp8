@@ -16,24 +16,10 @@
 #include "p8_input.h"
 #include "p8_overlay_helper.h"
 #include "p8_editor_tab.h"
+#include "scancodes.h"
 
 /* --- USB HID scancodes ---------------------------------------------------- */
-#define SCANCODE_A         4
-#define SCANCODE_C         6
-#define SCANCODE_Q        20
-#define SCANCODE_R        21
-#define SCANCODE_S        22
-#define SCANCODE_V        25
-#define SCANCODE_W        26
-#define SCANCODE_Y        28
-#define SCANCODE_Z        29
-#define SCANCODE_UP       82
-#define SCANCODE_DOWN     81
-#define SCANCODE_LEFT     80
-#define SCANCODE_RIGHT    79
-#define SCANCODE_SPACE    44
-#define SCANCODE_PAGEUP   75
-#define SCANCODE_PAGEDOWN 78
+/* All scancodes now defined in scancodes.h */
 
 /* MAP dimensions */
 #define MAP_COLS 128
