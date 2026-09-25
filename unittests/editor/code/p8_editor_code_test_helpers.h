@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #include "p8_editor_code_priv.h"
+#include "scancodes.h"
 #include "strtcpy.h"
 
 /**
