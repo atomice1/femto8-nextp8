@@ -1495,11 +1495,11 @@ static void sfx_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp, 
                 sfx_update_current_note(pitch, sfx_wave_cursor, sfx_vol_cursor, sfx_eff_cursor, sfx_custom);
             }
         }
-        /* Bar area RMB: clear the note (silence) at that column. Support drag clearing. */
+        /* Bar area RMB: select note at that column. */
         if ((rmb_pressed || rmb_held) && mx >= 0 && mx < SFX_NOTES * 4 &&
             my >= ybase && my < ybase + bar_h) {
             int n = mx / 4;
-            if (n >= 0 && n < SFX_NOTES) {
+            if (n >= 0 && n < SFX_NOTES && sfx_note(sfx_detail, n) != 0) {
                 /* Right-click: select note and adopt its instrument+volume */
                 sfx_set_note_cursor(n);
             }
