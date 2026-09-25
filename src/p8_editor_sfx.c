@@ -1100,6 +1100,8 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
         /* A: release looping sample (stop sfx on all channels) */
         if (scancode == SCANCODE_A && !(keymod & KMOD_CTRL)) {
 #ifdef ENABLE_AUDIO
+            /* Sync SFX data from m_cart_memory to m_memory before playback */
+            memcpy(m_memory + MEMORY_SFX, m_cart_memory + MEMORY_SFX, MEMORY_SFX_SIZE);
             audio_sound(sfx_detail, -2, 0, 0);
 #endif
         }
@@ -1112,9 +1114,13 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
                 if (audio_stat(16 + ch) == sfx_detail) { playing = true; break; }
             }
             if (playing) {
+                /* Sync SFX data from m_cart_memory to m_memory before playback */
+                memcpy(m_memory + MEMORY_SFX, m_cart_memory + MEMORY_SFX, MEMORY_SFX_SIZE);
                 audio_sound(sfx_detail, -2, 0, 0); /* stop this SFX on all channels */
             } else {
                 int start = (keymod & KMOD_SHIFT) ? sfx_note_cursor : 0;
+                /* Sync SFX data from m_cart_memory to m_memory before playback */
+                memcpy(m_memory + MEMORY_SFX, m_cart_memory + MEMORY_SFX, MEMORY_SFX_SIZE);
                 audio_sound(sfx_detail, -1, start, SFX_NOTES - start);
             }
 #endif
