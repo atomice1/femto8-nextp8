@@ -22,13 +22,41 @@
 
 /* --- USB HID scancodes ---------------------------------------------------- */
 #define SCANCODE_A         4
+#define SCANCODE_B         5
 #define SCANCODE_C         6
+#define SCANCODE_D         7
+#define SCANCODE_E         8
+#define SCANCODE_F         9
+#define SCANCODE_G        10
 #define SCANCODE_H        11
+#define SCANCODE_I        12
+#define SCANCODE_J        13
+#define SCANCODE_K        14
+#define SCANCODE_L        15
+#define SCANCODE_M        16
+#define SCANCODE_N        17
+#define SCANCODE_O        18
+#define SCANCODE_P        19
+#define SCANCODE_Q        20
 #define SCANCODE_R        21
 #define SCANCODE_S        22
+#define SCANCODE_T        23
+#define SCANCODE_U        24
 #define SCANCODE_V        25
+#define SCANCODE_W        26
+#define SCANCODE_X        27
 #define SCANCODE_Y        28
 #define SCANCODE_Z        29
+#define SCANCODE_1        30
+#define SCANCODE_2        31
+#define SCANCODE_3        32
+#define SCANCODE_4        33
+#define SCANCODE_5        34
+#define SCANCODE_6        35
+#define SCANCODE_7        36
+#define SCANCODE_8        37
+#define SCANCODE_9        38
+#define SCANCODE_0        39
 #define SCANCODE_TAB      43
 #define SCANCODE_UP       82
 #define SCANCODE_DOWN     81
@@ -1333,7 +1361,39 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
                 }
                 break;
             }
-            default:
+            default: {
+                /* Number key handling in tracker mode */
+                if (sfx_mode == 1 && scancode >= SCANCODE_1 && scancode <= SCANCODE_0) {
+                    int digit = (scancode == SCANCODE_0) ? 0 : (scancode + 1 - SCANCODE_1);
+                    /* In both edit and non-edit mode: if wave/vol/eff column is selected, set that value */
+                    switch (sfx_field_cursor) {
+                        case 1: { /* wave: 0-7 */
+                            int wave = digit;
+                            if (wave > 7) wave = 7;
+                            sfx_wave_cursor = wave;
+                            sfx_update_current_note(-1, wave, -1, -1, -1);
+                            break;
+                        }
+                        case 2: { /* volume: 0-7 */
+                            int vol = digit;
+                            if (vol > 7) vol = 7;
+                            sfx_vol_cursor = vol;
+                            sfx_update_current_note(-1, -1, vol, -1, -1);
+                            break;
+                        }
+                        case 3: { /* effect: 0-7 */
+                            int eff = digit;
+                            if (eff > 7) eff = 7;
+                            sfx_eff_cursor = eff;
+                            sfx_update_current_note(-1, -1, -1, eff, -1);
+                            break;
+                        }
+                    }
+                    /* If we handled volume/effect/instrument, skip piano handler */
+                    if (sfx_field_cursor >= 1 && sfx_field_cursor <= 3) {
+                        break;
+                    }
+                }
                 /* Piano keyboard note entry in tracker mode.
                  * Layout: q2w3er5t6y7ui (upper, C4) / zsxdcvgbhnjm (lower, C3)
                  * SHIFT transposes both rows down one octave. */
@@ -1367,6 +1427,7 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
                 }
                 /* waveform selector removed: no-op here */
                 break;
+            }
         }
     }
 
