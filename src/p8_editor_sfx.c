@@ -1486,8 +1486,12 @@ static void sfx_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp, 
             if (n >= 0 && n < SFX_NOTES) {
                 // Update note cursor, but *not* the selected waveform, volume or effect.
                 sfx_note_cursor = n;
+                int old_pitch = NOTE_PITCH(sfx_note(sfx_detail, n));
                 /* Compute new pitch from mouse Y */
-                int pitch = (bar_h - 1 - (my - ybase)) * 63 / (bar_h - 1);
+                int pitch =  (bar_h - 1 - (my - ybase - 1)) * 63 / (bar_h - 1);
+                int pitch2 = (bar_h - 1 - (my - ybase)) * 63 / (bar_h - 1);
+                if (pitch != old_pitch && pitch2 == old_pitch)
+                    pitch = pitch2;
                 if (pitch < 0)  pitch = 0;
                 if (pitch > 63) pitch = 63;
                 if (keymod & KMOD_CTRL) pitch = snap_to_scale(pitch);
