@@ -214,7 +214,7 @@ static void handle_action(p8_dialog_t *dialog, int action)
 
 /* --- Autosave -------------------------------------------------------------- */
 
-static void editor_autoload(void)
+void p8_editor_autoload(void)
 {
     if (!autosave_file_path[0] || !autosave_metadata_file_path[0]) return;
     if (access(autosave_file_path, F_OK) == 0) {
@@ -285,7 +285,6 @@ static void editor_screen_init(void)
     }
     p8_make_full_path(autosave_file_path, sizeof(autosave_file_path), DEFAULT_CARTS_PATH, AUTOSAVE_FILE_NAME);
     p8_make_full_path(autosave_metadata_file_path, sizeof(autosave_metadata_file_path), DEFAULT_CARTS_PATH, AUTOSAVE_METADATA_FILE_NAME);
-    editor_autoload();
     p8_dialog_init(&editor_dialog, NULL, editor_controls, sizeof(editor_controls) / sizeof(editor_controls[0]), P8_WIDTH);
     editor_dialog.draw_border = false;
     editor_dialog.padding = 0;

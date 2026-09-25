@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "p8_editor.h"
 #include "p8_main.h"
 #include "p8_parser.h"
 #include "p8_emu.h"
@@ -50,6 +51,7 @@ int main(int argc, char *argv[])
     const char *file_name = NULL;
     const char *param_string = NULL;
     bool skip_main_loop = false;
+    bool show_editor = false;
     int exit_code = EXIT_SUCCESS;
 
     for (int i = 1; i < argc; i++) {
@@ -62,6 +64,8 @@ int main(int argc, char *argv[])
             m_no_frame_delay = true;
         } else if (strcmp(argv[i], "--no-frame-skip") == 0) {
             m_no_frame_skip = true;
+        } else if (strcmp(argv[i], "--edit") == 0) {
+            show_editor = true;
         } else if (strcmp(argv[i], "-p") == 0) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "Error: -p flag requires an argument\n");
@@ -95,6 +99,9 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
 
     if (file_name == NULL) {
+        p8_new_cart();
+        p8_editor_autoload();
+        p8_set_active_screen(P8_SCREEN_BROWSE);
         do {
             p8_main();
         } while (p8_is_reboot_requested());
@@ -104,9 +111,14 @@ int main(int argc, char *argv[])
         if (p8_load(file_name, param_string, NULL, NULL) != 0) {
             exit_code = EXIT_FAILURE;
         } else {
-            if (p8_run() != 0) {
-                lua_print_error();
-                exit_code = EXIT_FAILURE;
+            if (show_editor) {
+                p8_set_active_screen(P8_SCREEN_EDIT);
+                p8_main();
+            } else {
+                if (p8_run() != 0) {
+                    lua_print_error();
+                    exit_code = EXIT_FAILURE;
+                }
             }
         }
     }

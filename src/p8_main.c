@@ -42,17 +42,17 @@ void p8_main(void)
     p8_clear_reboot_requested();
     p8_clear_quit_requested();
 
-    p8_new_cart();
-
-    p8_set_active_screen(P8_SCREEN_BROWSE);
-
     /* Initialize all screens */
     for (int i = 0; i < NUM_SCREENS; i++) {
         if (screens[i]->init)
             screens[i]->init();
     }
 
-    /* Show initial screen */
+    /* Show current screen */
+    if (screen_switch_requested) {
+        screen_switch_requested = false;
+        current_screen = pending_screen;
+    }
     if (screens[current_screen]->show)
         screens[current_screen]->show();
 
@@ -64,10 +64,10 @@ void p8_main(void)
                 /* Hide old screen */
                 if (screens[current_screen]->hide)
                     screens[current_screen]->hide();
-                
+
                 /* Switch to new screen */
                 current_screen = pending_screen;
-                
+
                 /* Show new screen */
                 if (screens[current_screen]->show)
                     screens[current_screen]->show();
@@ -92,7 +92,7 @@ void p8_main(void)
 
         /* Handle button input */
         bool buttons_handled = false;
-        if (screen->handle_buttons) 
+        if (screen->handle_buttons)
             buttons_handled = screen->handle_buttons(button_mask, buttonp_mask);
 
         /* Escape switches screens: BROWSE -> EDIT -> REPL -> EDIT -> REPL -> ... (forever) */

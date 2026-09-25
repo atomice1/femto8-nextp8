@@ -27,4 +27,7 @@ extern void p8_editor_mark_modified(void);
 /** Synchronize all editor tabs with the current cart state */
 extern void p8_editor_sync(void);
 
+/** Load a previous auto-save **/
+extern void p8_editor_autoload(void);
+
 #endif
