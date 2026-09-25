@@ -38,7 +38,7 @@
 #define SCANCODE_PAGEDOWN 78
 #define SCANCODE_HOME     74
 #define SCANCODE_END      77
-#define SCANCODE_DELETE   83
+#define SCANCODE_DELETE   76
 
 /* --- SFX memory constants ------------------------------------------------- */
 #define SFX_COUNT         64
@@ -984,7 +984,6 @@ static int snap_to_scale(int pitch)
 
 static void sfx_handle_keypress(int scancode, int keypress, int keymod)
 {
-    (void)keypress;
     sfx_undo_pushed_this_key = false;
     if (keymod & KMOD_CTRL) {
         if (scancode == SCANCODE_Z) { if (p8_editor_undo_do_undo(sfx_undo_ctx)) return; }
@@ -1062,9 +1061,24 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
             sfx_set_note_cursor(0);
         }
         /* Backspace in tracker mode: clear current note */
-        if (keypress == 8 && sfx_mode == 1) {
-            sfx_undo_maybe_push();
-            sfx_note_write(sfx_detail, sfx_note_cursor, 0);
+        if (keypress == 8) {
+            if (sfx_mode == 0) {
+                /* Delete current selected note and move selection to prev non-empty or first non-empty */
+                sfx_undo_maybe_push();
+                sfx_note_write(sfx_detail, sfx_note_cursor, 0);
+                int found = -1;
+                for (int i = sfx_note_cursor - 1; i >= 0; i--) {
+                    if (NOTE_VOL(sfx_note(sfx_detail, i)) > 0) { found = i; break; }
+                }
+                if (found < 0) {
+                    for (int i = 0; i < SFX_NOTES; i++) if (NOTE_VOL(sfx_note(sfx_detail, i)) > 0) { found = i; break; }
+                }
+                if (found >= 0) sfx_set_note_cursor(found);
+                tracker_ensure_visible();
+            } else if (sfx_mode == 1) {
+                sfx_undo_maybe_push();
+                sfx_note_write(sfx_detail, sfx_note_cursor, 0);
+            }
         }
         /* A: release looping sample (stop sfx on all channels) */
         if (scancode == SCANCODE_A && !(keymod & KMOD_CTRL)) {
@@ -1141,6 +1155,9 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
                     }
                     if (found >= 0) sfx_set_note_cursor(found);
                     tracker_ensure_visible();
+                } else if (sfx_mode == 1) {
+                    sfx_undo_maybe_push();
+                    sfx_note_write(sfx_detail, sfx_note_cursor, 0);
                 }
                 break;
             case SCANCODE_HOME:
