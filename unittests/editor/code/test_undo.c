@@ -137,8 +137,7 @@ void test_undo_paste(void **state)
     split_lines("Hello\n");
 
     /* Set clipboard and paste */
-    free(clipboard);
-    clipboard = strdup("XYZ");
+    p8_clipboard_set("XYZ");
     move_cursor_to(0, 2);
     code_handle_keypress(SCANCODE_V, 0, KMOD_CTRL);
 
@@ -153,9 +152,6 @@ void test_undo_paste(void **state)
     code_handle_keypress(SCANCODE_Y, 0, KMOD_CTRL);
 
     assert_line_equal(0, "HeXYZllo");
-
-    free(clipboard);
-    clipboard = NULL;
 }
 
 /* Test: Undo/redo duplicate line (Ctrl+D) */

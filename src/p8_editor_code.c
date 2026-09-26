@@ -59,9 +59,7 @@ static void *memdup(const void *src, size_t n)
     return dst;
 }
 
-/* --- Clipboard, search, and undo state ------------------------------------- */
-
-static char *clipboard = NULL;
+/* --- Search and undo state ------------------------------------- */
 
 static char search_str[128] = "";
 
@@ -1431,27 +1429,44 @@ static void code_handle_keypress(int scancode, int keypress, int keymod)
                         if (!duplicate_line()) pop_undo();
                         else finalize_undo();
                         break;
-                    case SCANCODE_B: /* comment / uncomment */
+                    case SCANCODE_B: /* c~
+                    omment / uncomment */
                         push_undo();
                         if (!comment_uncomment()) pop_undo();
                         else finalize_undo();
                         break;
                     case SCANCODE_X: { /* cut */
                         char *sel = get_selected_text();
-                        if (sel) { push_undo(); free(clipboard); clipboard = sel; delete_selected_text(); finalize_undo(); }
+                        if (sel) {
+                            push_undo();
+                            p8_clipboard_set(sel);
+                            free(sel);
+                            delete_selected_text();
+                            finalize_undo();
+                        }
                         break; }
                     case SCANCODE_C: { /* copy */
                         char *sel = get_selected_text();
-                        if (sel) { free(clipboard); clipboard = sel; }
+                        if (sel) {
+                            p8_clipboard_set(sel);
+                            free(sel);
+                        }
                         break; }
                     case SCANCODE_V: /* paste */
-                        if (clipboard) {
-                            push_undo();
-                            if (has_selection()) delete_selected_text();
-                            if (!insert_text_at_cursor(clipboard)) pop_undo();
-                            else finalize_undo();
+                        {
+                            char *clipboard_text = p8_clipboard_get();
+                            if (clipboard_text) {
+                                push_undo();
+                                if (has_selection()) delete_selected_text();
+                                if (insert_text_at_cursor(clipboard_text)) {
+                                    finalize_undo();
+                                } else {
+                                    pop_undo();
+                                }
+                                free(clipboard_text);
+                            }
+                            break;
                         }
-                        break;
                     case SCANCODE_Z: do_undo(); break;
                     case SCANCODE_Y: do_redo(); break;
                     case SCANCODE_F: { /* find */
@@ -1664,7 +1679,6 @@ static void code_init(void)
     assert(lines == NULL);
     assert(line_lengths == NULL);
     assert(line_count == 0);
-    assert(clipboard == NULL);
     assert(syn_color_cache == NULL);
     assert(syn_color_cache_cap == NULL);
     assert(syntax_contexts == NULL);
@@ -1688,8 +1702,6 @@ static void code_init(void)
 static void code_shutdown(void)
 {
     free_lines();
-    free(clipboard);
-    clipboard = NULL;
     for (int i = 0; i < redo_depth; i++) { free_edit(&redo_stack[i]); }
     redo_depth = 0;
     for (int i = 0; i < undo_depth; i++) { free_edit(&undo_stack[i]);}

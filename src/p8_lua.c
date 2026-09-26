@@ -59,8 +59,6 @@
 lua_State *L = NULL;
 static int m_status = 0;
 
-/* m_clipboard is a fixed-size buffer defined in p8_emu.c */
-
 static int m_tline_precision = 13;
 
 static int m_load_result = 0;  /* stat(107): 1=success, -1=not found, -2=fetch failed, -3=no bbs */
@@ -1817,7 +1815,7 @@ int printh(lua_State *L)
     if (!str) str = "";
 
     if (filename && strcmp(filename, "@clip") == 0) {
-        strtcpy(m_clipboard, str, sizeof(m_clipboard));
+        p8_clipboard_set(str);
         lua_pushboolean(L, 1);
         return 1;
     }
@@ -1871,7 +1869,15 @@ int lua_stat(lua_State *L)
         lua_pushinteger(L, 0);
         break;
     case STAT_CLIPBOARD:
-        lua_pushstring(L, m_clipboard);
+        {
+            char *clip_text = p8_clipboard_get();
+            if (clip_text) {
+                lua_pushstring(L, clip_text);
+                free(clip_text);
+            } else {
+                lua_pushstring(L, "");
+            }
+        }
         break;
     case STAT_VERSION:
         lua_pushnumber(L, fix32_from_double(0.43));

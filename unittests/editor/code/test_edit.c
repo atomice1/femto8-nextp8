@@ -246,8 +246,7 @@ void test_paste(void **state)
     split_lines("Hello\n");
 
     /* Set clipboard content */
-    free(clipboard);
-    clipboard = strdup("XYZ");
+    p8_clipboard_set("XYZ");
 
     /* Set cursor at position 2 */
     move_cursor_to(0, 2);
@@ -257,9 +256,6 @@ void test_paste(void **state)
 
     assert_line_equal(0, "HeXYZllo");
     assert_int_equal(cursor_col, 5);  /* After "XYZ" */
-    
-    free(clipboard);
-    clipboard = NULL;
 }
 
 /* Test: Cut selection (Ctrl+X) */
@@ -278,10 +274,9 @@ void test_cut(void **state)
     assert_int_equal(cursor_col, 0);
 
     /* Verify clipboard contains "Hello" */
-    assert_string_equal(clipboard, "Hello");
-
-    free(clipboard);
-    clipboard = NULL;
+    char *clip = p8_clipboard_get();
+    assert_string_equal(clip, "Hello");
+    free(clip);
 }
 
 /* Test: Copy selection (Ctrl+C) */
@@ -300,10 +295,9 @@ void test_copy(void **state)
     assert_line_equal(0, "Hello World");
 
     /* Verify clipboard contains "Hello" */
-    assert_string_equal(clipboard, "Hello");
-
-    free(clipboard);
-    clipboard = NULL;
+    char *clip = p8_clipboard_get();
+    assert_string_equal(clip, "Hello");
+    free(clip);
 }
 
 /* Test: Duplicate line (Ctrl+D) */

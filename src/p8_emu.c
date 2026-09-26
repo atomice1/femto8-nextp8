@@ -1547,3 +1547,31 @@ void p8_show_lua_error_dialog(void)
     if (lineno > 0)
         p8_editor_code_set_line(lineno);
 }
+
+
+/* Clipboard functions */
+void p8_clipboard_set(const char *text)
+{
+#if defined(SDL)
+    SDL_SetClipboardText(text);
+#else
+    strtcpy(m_clipboard, text, sizeof(m_clipboard));
+#endif
+}
+
+char *p8_clipboard_get(void)
+{
+    char *text;
+#if defined(SDL)
+    char *clip_text = SDL_GetClipboardText();
+    if (clip_text) {
+        text = strdup(clip_text);
+        SDL_free(clip_text);
+    } else {
+        text = strdup("");
+    }
+#else
+    text = strdup(m_clipboard);
+#endif
+    return text;
+}

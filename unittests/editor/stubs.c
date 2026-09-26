@@ -31,6 +31,23 @@ size_t m_lua_script_size = 0;
 /* m_mouse_wheel */
 int m_mouse_wheel = 0;
 
+/* Clipboard stubs */
+char m_clipboard[1024] = {0};
+
+void p8_clipboard_set(const char *text)
+{
+    if (text) {
+        strncpy(m_clipboard, text, sizeof(m_clipboard) - 1);
+        m_clipboard[sizeof(m_clipboard) - 1] = '\0';
+    }
+}
+
+char *p8_clipboard_get(void)
+{
+    /* Return a copy of m_clipboard - caller must free */
+    return strdup(m_clipboard);
+}
+
 void p8_dialog_init(p8_dialog_t *dlg, const char *title,
                     p8_dialog_control_t *controls, int control_count, int x)
 {
