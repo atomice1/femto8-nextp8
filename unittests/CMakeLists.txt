@@ -21,7 +21,7 @@ add_subdirectory(dialog)
 
 # Run tests
 enable_testing()
-add_test(NAME p8_editor_tests COMMAND p8_editor_tests)
-add_test(NAME p8_http_tests COMMAND p8_http_tests)
+add_test(NAME p8_editor_code_tests COMMAND p8_editor_code_test)
+add_test(NAME p8_http_tests COMMAND p8_http_test)
 add_test(NAME p8_emu_tests COMMAND p8_emu_tests)
 add_test(NAME p8_dialog_tests COMMAND p8_dialog_tests)

@@ -40,6 +40,7 @@ SRC_DIRS := src src/lua src/data src/lodepng src/lexaloffle src/wifi
 
 # Create build directories
 $(shell mkdir -p $(BUILD_DIR)/lua $(BUILD_DIR)/lexaloffle $(BUILD_DIR)/lodepng $(BUILD_DIR)/wifi)
+$(shell mkdir -p $(BUILD_DIR)/unittests/emu $(BUILD_DIR)/unittests/dialog $(BUILD_DIR)/unittests/editor)
 
 # Collect all source files
 SOURCES_LUA := $(wildcard src/lua/*.c) src/p8_lua.c
@@ -53,7 +54,14 @@ OBJECTS_LUA := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SOURCES_LUA))
 
 OBJECTS := $(OBJECTS_C) $(OBJECTS_CXX) $(OBJECTS_LUA)
 
-all: $(TARGET)
+all: $(TARGET) unittests
+
+$(BUILD_DIR)/unittests/CMakeCache.txt:
+	@mkdir -p $(BUILD_DIR)/unittests
+	cmake -S unittests -B $(BUILD_DIR)/unittests -DCMAKE_BUILD_TYPE=Debug
+
+unittests: $(BUILD_DIR)/unittests/CMakeCache.txt
+	cmake --build $(BUILD_DIR)/unittests
 
 $(TARGET): $(OBJECTS)
 	$(LINKER) $(CFLAGS) $(LDFLAGS) $(OBJECTS) -o $@ $(LIBS)
@@ -72,8 +80,13 @@ $(OBJECTS_LUA): $(BUILD_DIR)/%.o: src/%.c
 
 clean::
 	rm -f $(OBJECTS) $(OBJECTS:.o=.d) $(TARGET)
+	rm -rf $(BUILD_DIR)/unittests
 
-.PHONY: clean
+test: unittests
+	@echo "Running tests..."
+	cd $(BUILD_DIR)/unittests && ctest --output-on-failure
+
+.PHONY: clean test
 
 -include $(OBJECTS:.o=.d)
 -include Makefile.$(PLATFORM).post
