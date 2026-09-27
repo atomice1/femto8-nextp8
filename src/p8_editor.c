@@ -405,6 +405,12 @@ static void editor_screen_handle_mouse_buttons(int mx, int my, int buttons, int 
         tab_subeditors[active_tab]->handle_mouse_buttons(mx, my, buttons, buttonsp, keymod);
 }
 
+static void editor_screen_handle_mouse_move(int mx, int my, int mx_rel, int my_rel, int buttons, int keymod)
+{
+    if (tab_subeditors[active_tab]->handle_mouse_move)
+        tab_subeditors[active_tab]->handle_mouse_move(mx, my, mx_rel, my_rel, buttons, keymod);
+}
+
 static void editor_screen_handle_mouse_wheel(int mx, int my, int wheel, int buttons, int keymod)
 {
     (void)mx; (void)my; (void)wheel; (void)buttons; (void)keymod;
@@ -452,6 +458,7 @@ p8_screen_t p8_screen_edit = {
     .draw = editor_screen_draw,
     .update = editor_screen_update,
     .handle_keypress = editor_screen_handle_keypress,
+    .handle_mouse_move = editor_screen_handle_mouse_move,
     .handle_mouse_buttons = editor_screen_handle_mouse_buttons,
     .handle_mouse_wheel = editor_screen_handle_mouse_wheel,
     .handle_buttons = editor_screen_handle_buttons

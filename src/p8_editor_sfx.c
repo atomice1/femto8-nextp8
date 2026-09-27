@@ -102,10 +102,9 @@ static int  sfx_hdr_drag_field     = -1;  /* field being dragged, -1=none */
 static int  sfx_hdr_drag_start_x   = 0;
 static int  sfx_hdr_drag_start_val = 0;
 /* Tracker note range selection */
-static int  sfx_sel_start   = -1;        /* selection start row, -1=none */
-static int  sfx_sel_end     = -1;        /* selection end row (inclusive) */
-/* Tracker "all fields" selection (double-click) */
-static bool sfx_all_fields  = false;     /* true = all 4 fields of cursor note highlighted */
+static int  sfx_sel_anchor  = -1;        /* selection anchor row (fixed point) */
+static int  sfx_sel_start   = -1;        /* selection start row */
+static int  sfx_sel_end     = -1;        /* selection end row (exclusive) */
 /* Copy/paste clipboard */
 static uint16_t sfx_clipboard[SFX_NOTES];
 static int      sfx_clipboard_len = 0;
@@ -721,12 +720,7 @@ static void draw_tracker_mode(int x, int y, int w, int h)
         int ry = ybase + GLYPH_HEIGHT + i * GLYPH_HEIGHT;
         bool sel = (n == sfx_note_cursor);
         /* Determine if note is within selection range */
-        bool in_sel = false;
-        if (sfx_sel_start >= 0) {
-            int lo = sfx_sel_start < sfx_sel_end ? sfx_sel_start : sfx_sel_end;
-            int hi = sfx_sel_start < sfx_sel_end ? sfx_sel_end   : sfx_sel_start;
-            in_sel = (n >= lo && n <= hi);
-        }
+        bool in_sel = (n >= sfx_sel_start && n < sfx_sel_end);
         if (sel)    overlay_draw_rectfill(x, ry, x + w - 1, ry + GLYPH_HEIGHT - 1, 5);
         else if (in_sel) overlay_draw_rectfill(x, ry, x + w - 1, ry + GLYPH_HEIGHT - 1, 2);
         int fg = sel ? 7 : in_sel ? 7 : 6;
@@ -756,18 +750,9 @@ static void draw_tracker_mode(int x, int y, int w, int h)
             static const int field_col[4] = { 3, 7, 11, 13 };
             static const int field_len[4] = { 3, 3,  1,  3 };
             int edit_col = sfx_tracker_edit_mode ? 10 : 2;
-            if (sfx_all_fields) {
-                /* Double-click mode: highlight all 4 fields */
-                for (int f = 0; f < 4; f++) {
-                    int fx = x + 1 + field_col[f] * GLYPH_WIDTH;
-                    int fw = field_len[f] * GLYPH_WIDTH;
-                    overlay_draw_rect(fx - 1, ry - 1, fx + fw, ry + GLYPH_HEIGHT - 1, edit_col);
-                }
-            } else {
-                int fx = x + 1 + field_col[sfx_field_cursor] * GLYPH_WIDTH;
-                int fw = field_len[sfx_field_cursor] * GLYPH_WIDTH;
-                overlay_draw_rect(fx - 1, ry - 1, fx + fw, ry + GLYPH_HEIGHT - 1, edit_col);
-            }
+            int fx = x + 1 + field_col[sfx_field_cursor] * GLYPH_WIDTH;
+            int fw = field_len[sfx_field_cursor] * GLYPH_WIDTH;
+            overlay_draw_rect(fx - 1, ry - 1, fx + fw, ry + GLYPH_HEIGHT - 1, edit_col);
     }
     }
 
@@ -1018,10 +1003,14 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
         if (scancode == SCANCODE_Y) { if (p8_editor_undo_do_redo(sfx_undo_ctx)) return; }
         /* CTRL-C: copy selected notes (or single note if no selection) */
         if (scancode == SCANCODE_C && sfx_detail >= 0 && sfx_mode == 1) {
-            int lo = sfx_note_cursor, hi = sfx_note_cursor;
-            if (sfx_sel_start >= 0) {
-                lo = sfx_sel_start < sfx_sel_end ? sfx_sel_start : sfx_sel_end;
-                hi = sfx_sel_start < sfx_sel_end ? sfx_sel_end   : sfx_sel_start;
+            int lo, hi;
+            if (sfx_sel_start != sfx_sel_end) {
+                assert(sfx_sel_start < sfx_sel_end);
+                lo = sfx_sel_start;
+                hi = sfx_sel_end - 1;  /* inclusive */
+            } else {
+                lo = sfx_note_cursor;
+                hi = sfx_note_cursor;
             }
             sfx_clipboard_len = hi - lo + 1;
             /* Clamp to clipboard array size */
@@ -1040,7 +1029,7 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
             int end = sfx_note_cursor + sfx_clipboard_len;
             if (end > SFX_NOTES) end = SFX_NOTES;
             sfx_set_note_cursor(end - 1);
-            sfx_sel_start = -1; sfx_sel_end = -1;
+            sfx_sel_anchor = -1; sfx_sel_start = -1; sfx_sel_end = -1;
             tracker_ensure_visible();
             return;
         }
@@ -1218,6 +1207,12 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
                     if (sfx_note_cursor > 0) sfx_set_note_cursor(sfx_note_cursor - 1);
                     tracker_ensure_visible();
                 }
+                /* Unshifted left arrow: clear selection */
+                if (!(keymod & KMOD_SHIFT)) {
+                    sfx_sel_anchor = -1;
+                    sfx_sel_start = -1;
+                    sfx_sel_end   = -1;
+                }
                 break;
             case SCANCODE_RIGHT:
                 if (sfx_hdr_editing) {
@@ -1228,6 +1223,12 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
                 } else {
                     if (sfx_note_cursor < SFX_NOTES - 1) sfx_set_note_cursor(sfx_note_cursor + 1);
                     tracker_ensure_visible();
+                }
+                /* Unshifted right arrow: clear selection */
+                if (!(keymod & KMOD_SHIFT)) {
+                    sfx_sel_anchor = -1;
+                    sfx_sel_start = -1;
+                    sfx_sel_end   = -1;
                 }
                 break;
             case SCANCODE_UP: {
@@ -1251,43 +1252,25 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
                     if (p < 63)
                         sfx_update_current_note(p + 1, -1, -1, -1, -1);
                 } else if (sfx_mode == 1) {
-                    if (!sfx_tracker_edit_mode) {
+                    if (keymod & KMOD_SHIFT) {
+                        /* Shift+up: extend selection */
+                        if (sfx_sel_anchor == -1) sfx_sel_anchor = sfx_note_cursor;
+                        if (sfx_note_cursor > 0) {
+                            sfx_note_cursor--;
+                            /* Selection is [min, max] inclusive, which is [min, max+1) exclusive */
+                            int min_row = sfx_sel_anchor < sfx_note_cursor ? sfx_sel_anchor : sfx_note_cursor;
+                            int max_row = sfx_sel_anchor > sfx_note_cursor ? sfx_sel_anchor : sfx_note_cursor;
+                            sfx_sel_start = min_row;
+                            sfx_sel_end = max_row + 1;  /* exclusive end */
+                            tracker_ensure_visible();
+                        }
+                    } else {
+                        /* Unshifted: clear selection and move cursor */
+                        sfx_sel_anchor = -1;
+                        sfx_sel_start = -1;
+                        sfx_sel_end   = -1;
                         if (sfx_note_cursor > 0) sfx_note_cursor--;
                         tracker_ensure_visible();
-                    } else {
-                        sfx_undo_maybe_push();
-                        uint16_t nd = sfx_note(sfx_detail, sfx_note_cursor);
-                        switch (sfx_field_cursor) {
-                            case 0: {
-                                int p = NOTE_PITCH(nd);
-                                if (p < 63)
-                                    sfx_update_current_note(p + 1, -1, -1, -1, -1);
-                                break;
-                            }
-                            case 1: {
-                                int w = NOTE_WAVE(nd) + 8 * NOTE_CUSTOM(nd);
-                                int wave = (w + 1) % 8;
-                                int custom = (w != 15 && ((w + 1) >= 8)) ? 1 : 0;
-                                sfx_wave_cursor = wave;
-                                sfx_custom = custom;
-                                sfx_update_current_note(-1, wave, -1, -1, custom);
-                                break;
-                            }
-                            case 2: {
-                                int v = NOTE_VOL(nd);
-                                if (v < 7) {
-                                    sfx_vol_cursor = v + 1;
-                                    sfx_update_current_note(-1, -1, sfx_vol_cursor, -1, -1);
-                                }
-                                break;
-                            }
-                            case 3: {
-                                int e = NOTE_EFF(nd);
-                                sfx_eff_cursor = (e + 1) % 8;
-                                sfx_update_current_note(-1, -1, -1, sfx_eff_cursor, -1);
-                                break;
-                            }
-                        }
                     }
                 } else {
                     if (sfx_note_cursor > 0) sfx_note_cursor--;
@@ -1317,43 +1300,25 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
                     if (p > 0)
                         sfx_update_current_note(p - 1, -1, -1, -1, -1);
                 } else if (sfx_mode == 1) {
-                    if (!sfx_tracker_edit_mode) {
+                    if (keymod & KMOD_SHIFT) {
+                        /* Shift+down: extend selection */
+                        if (sfx_sel_anchor == -1) sfx_sel_anchor = sfx_note_cursor;
+                        if (sfx_note_cursor < SFX_NOTES - 1) {
+                            sfx_note_cursor++;
+                            /* Selection is [min, max] inclusive, which is [min, max+1) exclusive */
+                            int min_row = sfx_sel_anchor < sfx_note_cursor ? sfx_sel_anchor : sfx_note_cursor;
+                            int max_row = sfx_sel_anchor > sfx_note_cursor ? sfx_sel_anchor : sfx_note_cursor;
+                            sfx_sel_start = min_row;
+                            sfx_sel_end = max_row + 1;  /* exclusive end */
+                            tracker_ensure_visible();
+                        }
+                    } else {
+                        /* Unshifted: clear selection and move cursor */
+                        sfx_sel_anchor = -1;
+                        sfx_sel_start = -1;
+                        sfx_sel_end   = -1;
                         if (sfx_note_cursor < SFX_NOTES - 1) sfx_note_cursor++;
                         tracker_ensure_visible();
-                    } else {
-                        sfx_undo_maybe_push();
-                        uint16_t nd = sfx_note(sfx_detail, sfx_note_cursor);
-                        switch (sfx_field_cursor) {
-                            case 0: {
-                                int p = NOTE_PITCH(nd);
-                                if (p > 0 )
-                                    sfx_update_current_note(p - 1, -1, -1, -1, -1);
-                                break;
-                            }
-                            case 1: {
-                                int w = NOTE_WAVE(nd) + 8 * NOTE_CUSTOM(nd);
-                                int wave = (w == 0) ? 7 : ((w - 1) % 8);
-                                int custom = ((w == 0) || ((w - 1) >= 8)) ? 1 : 0;
-                                sfx_wave_cursor = wave;
-                                sfx_custom = custom;
-                                sfx_update_current_note(-1, wave, -1, -1, custom);
-                                break;
-                            }
-                            case 2: {
-                                int v = NOTE_VOL(nd);
-                                if (v > 0) {
-                                    sfx_vol_cursor = v - 1;
-                                    sfx_update_current_note(-1, -1, sfx_vol_cursor, -1, -1);
-                                }
-                                break;
-                            }
-                            case 3: {
-                                int e = NOTE_EFF(nd);
-                                sfx_eff_cursor = (e == 0) ? 7 : (e - 1);
-                                sfx_update_current_note(-1, -1, -1, sfx_eff_cursor, -1);
-                                break;
-                            }
-                        }
                     }
                 } else {
                     if (sfx_note_cursor < SFX_NOTES - 1) sfx_note_cursor++;
@@ -1391,6 +1356,10 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
                     }
                     /* If we handled volume/effect/instrument, skip piano handler */
                     if (sfx_field_cursor >= 1 && sfx_field_cursor <= 3) {
+                        if (sfx_note_cursor < SFX_NOTES - 1) {
+                            sfx_note_cursor++;
+                            tracker_ensure_visible();
+                        }
                         break;
                     }
                 }
@@ -1590,8 +1559,10 @@ static void sfx_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp, 
 
     } else if (sfx_mode == 1) {
         /* ── Tracker mode ───────────────────────────────────────────────── */
-
-
+        /* Compute ybase to match draw_tracker_mode:
+         * ybase = y + GLYPH_HEIGHT + strip_h where strip_h = GLYPH_HEIGHT * 2 + 1
+         * Note: first note row is at ybase + GLYPH_HEIGHT (column header is at ybase) */
+        int tracker_ybase = cy + GLYPH_HEIGHT + (GLYPH_HEIGHT * 2 + 1) + GLYPH_HEIGHT;
 
         /* Title/header + instrument strip handling */
         if (handle_title_and_strip_mouse(mx, my, 0, cy, P8_WIDTH,
@@ -1637,9 +1608,9 @@ static void sfx_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp, 
         /* Row click: move note cursor; SHIFT+click extends selection or
          * applies a single field to all notes; second click on same row
          * toggles all-fields highlight mode */
-        if (lmb_pressed && my >= ybase &&
-            my < ybase + TRACKER_ROWS * GLYPH_HEIGHT) {
-            int row_i = (my - ybase) / GLYPH_HEIGHT;
+        if (lmb_pressed && my >= tracker_ybase &&
+            my < tracker_ybase + TRACKER_ROWS * GLYPH_HEIGHT) {
+            int row_i = (my - tracker_ybase) / GLYPH_HEIGHT;
             int n = sfx_note_scroll + row_i;
             if (n >= 0 && n < SFX_NOTES) {
                 /* Determine which column was clicked */
@@ -1652,38 +1623,28 @@ static void sfx_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp, 
                     if (mx >= fx - 1 && mx < fx + fw) { clicked_f = f; break; }
                 }
                 if (keymod & KMOD_SHIFT) {
-                    /* SHIFT+click on wave/vol/eff column: apply that field to all notes */
-                    if (clicked_f >= 1) {
-                        uint16_t src = sfx_note(sfx_detail, n);
-                        int lo = 0, hi = SFX_NOTES - 1;
-                        if (sfx_sel_start >= 0) {
-                            lo = sfx_sel_start < sfx_sel_end ? sfx_sel_start : sfx_sel_end;
-                            hi = sfx_sel_start < sfx_sel_end ? sfx_sel_end   : sfx_sel_start;
-                        }
-                        sfx_undo_maybe_push();
-                        for (int i = lo; i <= hi; i++) {
-                            uint16_t nd = sfx_note(sfx_detail, i);
-                            switch (clicked_f) {
-                                case 1: nd = (nd & ~0x01C0) | (src & 0x01C0); break;
-                                case 2: nd = (nd & ~0x0E00) | (src & 0x0E00); break;
-                                case 3: nd = (nd & ~0x7000) | (src & 0x7000); break;
-                            }
-                            sfx_note_write(sfx_detail, i, nd);
-                        }
-                    } else {
-                        /* SHIFT+click on pitch col or row# area: extend selection */
-                        if (sfx_sel_start < 0) sfx_sel_start = sfx_note_cursor;
-                        sfx_sel_end = n;
-                        sfx_all_fields = false;
-                    }
-                } else if (n == sfx_note_cursor && !(keymod & KMOD_CTRL)) {
-                    /* Double-click (second click on same row): select all fields */
-                    sfx_all_fields = !sfx_all_fields;
+                    /* SHIFT+click on pitch col or row# area: extend selection */
+                    if (sfx_sel_anchor == -1) sfx_sel_anchor = sfx_note_cursor;
+                    /* Move cursor to clicked position first */
+                    sfx_note_cursor = n;
+                    /* Selection is [min, max] inclusive, which is [min, max+1) exclusive */
+                    int min_row = sfx_sel_anchor < sfx_note_cursor ? sfx_sel_anchor : sfx_note_cursor;
+                    int max_row = sfx_sel_anchor > sfx_note_cursor ? sfx_sel_anchor : sfx_note_cursor;
+                    sfx_sel_start = min_row;
+                    sfx_sel_end = max_row + 1;  /* exclusive end */
+                    tracker_ensure_visible();
+                } else if (n == sfx_note_cursor) {
+                    /* Double-click on same row: select that row */
+                    sfx_set_note_cursor(n);
+                    sfx_sel_anchor = n;
+                    sfx_sel_start = n;
+                    sfx_sel_end   = n + 1;  /* exclusive end */
+                    tracker_ensure_visible();
                 } else {
-                    /* Normal click: move cursor, clear selection and all-fields */
+                    /* Normal click: move cursor, clear selection */
+                    sfx_sel_anchor = -1;
                     sfx_sel_start = -1;
                     sfx_sel_end   = -1;
-                    sfx_all_fields = false;
                     sfx_set_note_cursor(n);
                     tracker_ensure_visible();
                 }
@@ -1762,10 +1723,8 @@ static bool sfx_handle_buttons(int button_mask, int buttonsp_mask)
         } else if (sfx_hdr_editing) {
             sfx_hdr_editing = false;
             return true;
-        } else if (sfx_all_fields) {
-            sfx_all_fields = false;
-            return true;
-        } else if (sfx_sel_start >= 0) {
+        } else if (sfx_sel_anchor == -1) {
+            sfx_sel_anchor = -1;
             sfx_sel_start = -1;
             sfx_sel_end = -1;
             return true;
@@ -1811,9 +1770,9 @@ static void sfx_init(void)
     sfx_hdr_editing = false;
     sfx_hdr_col = 0;
     sfx_hdr_drag_field = -1;
+    sfx_sel_anchor = -1;
     sfx_sel_start = -1;
     sfx_sel_end = -1;
-    sfx_all_fields = false;
     sfx_clipboard_len = 0;
     sfx_custom = 0;
 
@@ -1843,13 +1802,39 @@ static void sfx_shutdown(void)
     sfx_hdr_editing = false;
     sfx_hdr_col = 0;
     sfx_hdr_drag_field = -1;
+    sfx_sel_anchor = -1;
     sfx_sel_start = -1;
     sfx_sel_end = -1;
-    sfx_all_fields = false;
     sfx_clipboard_len = 0;
     sfx_custom = 0;
     sfx_drag_loop = -1;
     memset(sfx_clipboard, 0, sizeof(sfx_clipboard));
+}
+
+static void sfx_handle_mouse_move(int mx, int my, int mx_rel, int my_rel, int buttons, int keymod)
+{
+    (void)mx_rel; (void)my_rel; (void)keymod;
+    /* Mouse drag selection in tracker mode */
+    if (sfx_detail >= 0 && sfx_mode == 1) {
+        int cy = GLYPH_HEIGHT;  /* Title bar height */
+        int tracker_ybase = cy + GLYPH_HEIGHT + (GLYPH_HEIGHT * 2 + 1) + GLYPH_HEIGHT;
+
+        /* If LMB is held, we're dragging to extend selection */
+        if (buttons & 1) {
+            /* We're already dragging, update selection based on current row */
+            int row_i = (my - tracker_ybase) / GLYPH_HEIGHT;
+            int n = sfx_note_scroll + row_i;
+            if (n >= 0 && n < SFX_NOTES) {
+                if (sfx_sel_anchor == -1) sfx_sel_anchor = n;
+                int min_row = sfx_sel_anchor < n ? sfx_sel_anchor : n;
+                int max_row = sfx_sel_anchor > n ? sfx_sel_anchor : n;
+                sfx_sel_start = min_row;
+                sfx_sel_end = max_row + 1;  /* exclusive end */
+                sfx_note_cursor = n;
+                tracker_ensure_visible();
+            }
+        }
+    }
 }
 
 static void sfx_hide(void)
@@ -1866,6 +1851,7 @@ p8_editor_tab_t p8_subeditor_sfx = {
     .hide=sfx_hide,
     .draw=sfx_draw,
     .handle_keypress=sfx_handle_keypress,
+    .handle_mouse_move=sfx_handle_mouse_move,
     .handle_mouse_buttons=sfx_handle_mouse_buttons,
     .handle_mouse_wheel=sfx_handle_mouse_wheel,
     .handle_buttons=sfx_handle_buttons
