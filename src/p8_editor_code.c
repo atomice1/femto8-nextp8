@@ -1576,10 +1576,13 @@ text_input:;
     }
     if (old_cursor_col != cursor_col) {
         int cursor_x = overlay_get_text_width_len(lines[cursor_line], cursor_col);
+        int text_width = overlay_get_text_width_len(lines[cursor_line], line_lengths[cursor_line]);
         if (cursor_x < scroll_offset_x + GLYPH_WIDTH * 4)
             scroll_offset_x = MAX(cursor_x - GLYPH_WIDTH * 4, 0);
         if (cursor_x >= scroll_offset_x + width - GLYPH_WIDTH * 4)
             scroll_offset_x = MAX(cursor_x - width + GLYPH_WIDTH * 4, 0);
+        if (scroll_offset_x > text_width + GLYPH_WIDTH - width)
+            scroll_offset_x = MAX(text_width + GLYPH_WIDTH - width, 0);
     }
 }
 
