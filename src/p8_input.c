@@ -13,6 +13,7 @@
 #include "gdi.h"
 #elif defined(NEXTP8)
 #include "nextp8.h"
+#include "scancodes.h"
 #endif
 
 #ifdef SDL
@@ -452,6 +453,35 @@ static void queue_keypress(unsigned scancode, uint8_t keychar, unsigned mod)
     m_key_queue_buffer[m_key_queue_write_index].keymod = mod;
     m_key_queue_write_index = (m_key_queue_write_index + 1) % MAX_KEY_EVENTS;
 }
+
+#ifdef NEXTP8
+/* Transform scancode based on modifier key combinations for keyboard shortcuts.
+ * Returns the (potentially modified) scancode. */
+static unsigned resolve_key_alias(unsigned scancode, unsigned keymod)
+{
+    /* Ctrl+1 to Ctrl+9 are aliases for F1 to F9 */
+    if (keymod & KMOD_CTRL) {
+        if (scancode == SCANCODE_1 ||
+            (scancode >= SCANCODE_3 && scancode <= SCANCODE_9)) {
+            return SCANCODE_F1 + (scancode - SCANCODE_1);
+        } else if (scancode == SCANCODE_2 && !(keymod & KMOD_ALT)) {
+            return SCANCODE_F2;
+        }
+    }
+
+    /* Ctrl+Alt+2 is an alias for Home */
+    if ((keymod & KMOD_CTRL) && (keymod & KMOD_ALT) && scancode == SCANCODE_2) {
+        return SCANCODE_HOME;
+    }
+
+    /* Ctrl+M is an alias for End */
+    if ((keymod & KMOD_CTRL) && scancode == SCANCODE_M) {
+        return SCANCODE_END;
+    }
+
+    return scancode;
+}
+#endif
 
 static void queue_mouse_click(int buttons, int x, int y, unsigned mod)
 {
@@ -900,10 +930,11 @@ void p8_update_input()
         if (keymap_page) {
             if (press) {
                 // Key press event: fire immediately and arm repeat
+                unsigned resolved_scancode = resolve_key_alias(scancode, keymod);
                 char ch = (scancode < 256) ? keymap_page[scancode] : '\0';
-                queue_keypress(scancode, ch, keymod);
+                queue_keypress(resolved_scancode, ch, keymod);
                 if (!is_modifier(scancode)) {
-                    repeat_sc = scancode;
+                    repeat_sc = resolved_scancode;
                     repeat_char = ch;
                     repeat_mod = keymod;
                     repeat_down_time = p8_clock();
