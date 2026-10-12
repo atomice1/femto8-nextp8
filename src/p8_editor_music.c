@@ -42,12 +42,17 @@
 static int     music_cursor = 0;   /* currently selected pattern (0-63) */
 static int     music_scroll = 0;   /* first visible pattern index */
 static int     music_col    = 0;   /* column cursor: 0=flags, 1-4=ch0-ch3 */
-static int     music_sel_start = -1; /* selection start row, -1=none */
-static int     music_sel_end   = -1; /* selection end row (inclusive) */
+static int     music_sel_anchor = -1; /* selection anchor row (fixed point) */
+static int     music_sel_start = -1; /* selection start row */
+static int     music_sel_end   = -1; /* selection end row (exclusive) */
+static int     music_sel_col_start = 0; /* selection start column (0-4) */
+static int     music_sel_col_end   = 5; /* selection end column (exclusive, 1-5) */
 static int     music_sfx_input        = -1; /* digit accumulator for SFX# entry */
 static int     music_sfx_input_digits =  0;
-static uint8_t music_copy_buf[MUSIC_ENTRY_BYTES];
+static uint8_t music_copy_buf[MUSIC_ENTRY_BYTES * MUSIC_COUNT];
+static int     music_copy_len = 0;
 static bool    music_copy_valid = false;
+static uint8_t music_copy_mask = 0; /* bit0-4 = columns to copy/paste */
 
 static p8_editor_undo_ctx_t *music_undo_ctx = NULL;
 static bool music_edit_mode = false; /* when true, up/down edit the selected cell */
@@ -98,20 +103,20 @@ static void music_draw(const p8_dialog_t *dialog, void *user_data,
 
         int ry  = y + GLYPH_HEIGHT + i * GLYPH_HEIGHT;
         bool sel = (pat == music_cursor);
-        bool in_sel = false;
-        if (music_sel_start >= 0) {
-            int lo = music_sel_start < music_sel_end ? music_sel_start : music_sel_end;
-            int hi = music_sel_start < music_sel_end ? music_sel_end   : music_sel_start;
-            in_sel = (pat >= lo && pat <= hi);
-        }
+        bool in_sel = (pat >= music_sel_start && pat < music_sel_end);
         bool playing = (audio_stat(54) == pat);
+
+        /* Check if this row and column is in the rectangle selection */
+        bool in_rect_sel = false;
+        if (in_sel && music_col >= music_sel_col_start && music_col < music_sel_col_end)
+            in_rect_sel = true;
 
         if (sel)
             overlay_draw_rectfill(x, ry, x + w - 1, ry + GLYPH_HEIGHT - 1, 5);
-        else if (in_sel)
+        else if (in_rect_sel)
             overlay_draw_rectfill(x, ry, x + w - 1, ry + GLYPH_HEIGHT - 1, 2);
 
-        int fg = sel ? 7 : in_sel ? 7 : 6;
+        int fg = sel ? 7 : in_rect_sel ? 7 : 6;
         if (playing) fg = sel ? 15 : 11;  /* bright/green when this pattern plays */
 
         uint8_t b0 = music_byte(pat, MUS_CH0);
@@ -152,6 +157,15 @@ static void music_draw(const p8_dialog_t *dialog, void *user_data,
             int col = music_edit_mode ? 10 : 2;
             overlay_draw_rect(fc - 1, ry - 1, fc + fcw, ry + GLYPH_HEIGHT - 1, col);
         }
+
+        /* Highlight selected columns in selected rows */
+        if (in_sel && music_col >= music_sel_col_start && music_col < music_sel_col_end) {
+            static const int col_char[5] = { 3, 7, 10, 13, 16 };
+            static const int col_len[5]  = { 3, 2,  2,  2,  2 };
+            int fc  = x + 1 + col_char[music_col] * GLYPH_WIDTH;
+            int fcw = col_len[music_col] * GLYPH_WIDTH;
+            overlay_draw_rect(fc - 1, ry - 1, fc + fcw, ry + GLYPH_HEIGHT - 1, 8);  /* red highlight */
+        }
     }
 
     /* Status bar */
@@ -189,16 +203,63 @@ static void music_handle_keypress(int scancode, int keypress, int keymod)
         if (scancode == SCANCODE_Z) { if (p8_editor_undo_do_undo(music_undo_ctx)) return; }
         if (scancode == SCANCODE_Y) { if (p8_editor_undo_do_redo(music_undo_ctx)) return; }
         if (scancode == SCANCODE_C) {
-            memcpy(music_copy_buf,
-                   &m_cart_memory[MEMORY_MUSIC + music_cursor * MUSIC_ENTRY_BYTES],
-                   MUSIC_ENTRY_BYTES);
-            music_copy_valid = true;
+            int lo, hi;
+            if (music_sel_start != music_sel_end) {
+                /* Range copy: copy selected patterns and columns */
+                assert(music_sel_start < music_sel_end);
+                lo = music_sel_start;
+                hi = music_sel_end - 1;  /* inclusive */
+                music_copy_len = hi - lo + 1;
+                /* Clamp to clipboard array size */
+                if (music_copy_len > MUSIC_COUNT) music_copy_len = MUSIC_COUNT;
+                if (music_copy_len < 0) music_copy_len = 0;
+                /* Build column mask: bit0-4 = flags, ch0, ch1, ch2, ch3 */
+                music_copy_mask = 0;
+                for (int c = music_sel_col_start; c < music_sel_col_end; c++)
+                    music_copy_mask |= (1u << c);
+                /* Copy only the selected columns for each pattern */
+                for (int i = 0; i < music_copy_len; i++) {
+                    int pat = lo + i;
+                    uint8_t *dst = &music_copy_buf[i * MUSIC_ENTRY_BYTES];
+                    const uint8_t *src = &m_cart_memory[MEMORY_MUSIC + pat * MUSIC_ENTRY_BYTES];
+                    /* Copy bytes based on mask */
+                    if (music_copy_mask & (1u << 0)) dst[0] = src[0];  /* flags (b0) */
+                    if (music_copy_mask & (1u << 1)) dst[1] = src[1];  /* ch0 */
+                    if (music_copy_mask & (1u << 2)) dst[2] = src[2];  /* ch1 */
+                    if (music_copy_mask & (1u << 3)) dst[3] = src[3];  /* ch2 */
+                    if (music_copy_mask & (1u << 4)) dst[4] = src[4];  /* ch3 */
+                }
+            } else {
+                /* Single pattern copy */
+                memcpy(music_copy_buf,
+                       &m_cart_memory[MEMORY_MUSIC + music_cursor * MUSIC_ENTRY_BYTES],
+                       MUSIC_ENTRY_BYTES);
+                music_copy_len = 1;
+                music_copy_mask = 0x1F;  /* All 5 columns */
+                music_copy_valid = true;
+            }
             return;
         }
-        if (scancode == SCANCODE_V && music_copy_valid) {
+        if (scancode == SCANCODE_V && music_copy_len > 0) {
             p8_editor_undo_push(music_undo_ctx);
-            memcpy(&m_cart_memory[MEMORY_MUSIC + music_cursor * MUSIC_ENTRY_BYTES],
-                   music_copy_buf, MUSIC_ENTRY_BYTES);
+            for (int i = 0; i < music_copy_len && music_cursor + i < MUSIC_COUNT; i++) {
+                uint8_t *dst = &m_cart_memory[MEMORY_MUSIC + (music_cursor + i) * MUSIC_ENTRY_BYTES];
+                const uint8_t *src = &music_copy_buf[i * MUSIC_ENTRY_BYTES];
+                /* Paste only the columns that were copied (based on mask) */
+                if (music_copy_mask & (1u << 0)) dst[0] = src[0];  /* flags (b0) */
+                if (music_copy_mask & (1u << 1)) dst[1] = src[1];  /* ch0 */
+                if (music_copy_mask & (1u << 2)) dst[2] = src[2];  /* ch1 */
+                if (music_copy_mask & (1u << 3)) dst[3] = src[3];  /* ch2 */
+                if (music_copy_mask & (1u << 4)) dst[4] = src[4];  /* ch3 */
+            }
+            /* Move cursor to end of pasted region */
+            int end = music_cursor + music_copy_len;
+            if (end > MUSIC_COUNT) end = MUSIC_COUNT;
+            music_cursor = end - 1;
+            music_sel_anchor = -1;
+            music_sel_start = -1;
+            music_sel_end   = -1;
+            music_ensure_visible();
             return;
         }
     }
@@ -206,11 +267,27 @@ static void music_handle_keypress(int scancode, int keypress, int keymod)
     switch (scancode) {
         case SCANCODE_LEFT:
             music_commit_sfx_input();
-            if (music_col > 0) music_col--;
+            if (keymod & KMOD_SHIFT) {
+                /* Shift+left: clear selection */
+                music_sel_anchor = -1;
+                music_sel_start = -1;
+                music_sel_end   = -1;
+            } else {
+                /* Unshifted: move column */
+                if (music_col > 0) music_col--;
+            }
             break;
         case SCANCODE_RIGHT:
             music_commit_sfx_input();
-            if (music_col < 4) music_col++;
+            if (keymod & KMOD_SHIFT) {
+                /* Shift+right: clear selection */
+                music_sel_anchor = -1;
+                music_sel_start = -1;
+                music_sel_end   = -1;
+            } else {
+                /* Unshifted: move column */
+                if (music_col < 4) music_col++;
+            }
             break;
         case SCANCODE_UP:
             if (music_edit_mode && music_col > 0) {
@@ -223,7 +300,25 @@ static void music_handle_keypress(int scancode, int keypress, int keymod)
                 }
             } else {
                 music_commit_sfx_input();
-                if (music_cursor > 0) { music_cursor--; music_ensure_visible(); }
+                if (keymod & KMOD_SHIFT) {
+                    /* Shift+up: extend selection */
+                    if (music_sel_anchor < 0) music_sel_anchor = music_cursor;
+                    if (music_cursor > 0) {
+                        music_cursor--;
+                        /* Selection is [min, max] inclusive, which is [min, max+1) exclusive */
+                        int min_row = music_sel_anchor < music_cursor ? music_sel_anchor : music_cursor;
+                        int max_row = music_sel_anchor > music_cursor ? music_sel_anchor : music_cursor;
+                        music_sel_start = min_row;
+                        music_sel_end = max_row + 1;  /* exclusive end */
+                        music_ensure_visible();
+                    }
+                } else {
+                    /* Unshifted: clear selection and move cursor */
+                    music_sel_anchor = -1;
+                    music_sel_start = -1;
+                    music_sel_end   = -1;
+                    if (music_cursor > 0) { music_cursor--; music_ensure_visible(); }
+                }
             }
             break;
         case SCANCODE_DOWN:
@@ -236,7 +331,25 @@ static void music_handle_keypress(int scancode, int keypress, int keymod)
                 }
             } else {
                 music_commit_sfx_input();
-                if (music_cursor < MUSIC_COUNT - 1) { music_cursor++; music_ensure_visible(); }
+                if (keymod & KMOD_SHIFT) {
+                    /* Shift+down: extend selection */
+                    if (music_sel_anchor < 0) music_sel_anchor = music_cursor;
+                    if (music_cursor < MUSIC_COUNT - 1) {
+                        music_cursor++;
+                        /* Selection is [min, max] inclusive, which is [min, max+1) exclusive */
+                        int min_row = music_sel_anchor < music_cursor ? music_sel_anchor : music_cursor;
+                        int max_row = music_sel_anchor > music_cursor ? music_sel_anchor : music_cursor;
+                        music_sel_start = min_row;
+                        music_sel_end = max_row + 1;  /* exclusive end */
+                        music_ensure_visible();
+                    }
+                } else {
+                    /* Unshifted: clear selection and move cursor */
+                    music_sel_anchor = -1;
+                    music_sel_start = -1;
+                    music_sel_end   = -1;
+                    if (music_cursor < MUSIC_COUNT - 1) { music_cursor++; music_ensure_visible(); }
+                }
             }
             break;
         case SCANCODE_PAGEUP:
@@ -320,16 +433,26 @@ static void music_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp
         int clicked_pat = music_scroll + row_i;
         if (clicked_pat >= 0 && clicked_pat < MUSIC_COUNT) {
             if (keymod & KMOD_SHIFT) {
-                /* Shift-click: extend selection from cursor to clicked row */
-                if (music_sel_start < 0) music_sel_start = music_cursor;
-                music_sel_end = clicked_pat;
-                music_cursor  = clicked_pat;
+                /* SHIFT+click: set anchor and extend selection */
+                music_sel_anchor = music_cursor;
+                music_cursor = clicked_pat;
+                /* Selection is [min, max] inclusive, which is [min, max+1) exclusive */
+                int min_row = music_sel_anchor < music_cursor ? music_sel_anchor : music_cursor;
+                int max_row = music_sel_anchor > music_cursor ? music_sel_anchor : music_cursor;
+                music_sel_start = min_row;
+                music_sel_end = max_row + 1;  /* exclusive end */
+                /* Set column selection from current column */
+                music_sel_col_start = music_col;
+                music_sel_col_end = music_col + 1;
                 music_ensure_visible();
             } else {
                 /* Normal click: move cursor, clear selection */
-                music_cursor = clicked_pat;
+                music_sel_anchor = -1;
                 music_sel_start = -1;
                 music_sel_end   = -1;
+                music_sel_col_start = 0;
+                music_sel_col_end = 5;
+                music_cursor = clicked_pat;
                 music_ensure_visible();
             }
 
@@ -341,6 +464,8 @@ static void music_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp
                 int fcw = col_len[c] * GLYPH_WIDTH;
                 if (mx >= fc - 1 && mx < fc + fcw) {
                     music_col = c;
+                    music_sel_col_start = c;
+                    music_sel_col_end = c + 1;
                     break;
                 }
             }
@@ -367,6 +492,28 @@ static void music_handle_mouse_buttons(int mx, int my, int buttons, int buttonsp
                                     music_byte(clicked_pat, MUS_CH2) ^ 0x80);
                 }
             }
+        }
+    }
+}
+
+static void music_handle_mouse_move(int mx, int my, int mx_rel, int my_rel, int buttons, int keymod)
+{
+    (void)mx_rel; (void)my_rel; (void)keymod;
+    /* Mouse drag selection */
+    if (buttons & 1) {
+        /* If LMB is held, we're dragging to extend selection */
+        int cy = GLYPH_HEIGHT;  /* Title bar height */
+        int ybase = cy + GLYPH_HEIGHT;
+        int row_i = (my - ybase) / GLYPH_HEIGHT;
+        int n = music_scroll + row_i;
+        if (n >= 0 && n < MUSIC_COUNT) {
+            if (music_sel_anchor < 0) music_sel_anchor = music_cursor;
+            int min_row = music_sel_anchor < n ? music_sel_anchor : n;
+            int max_row = music_sel_anchor > n ? music_sel_anchor : n;
+            music_sel_start = min_row;
+            music_sel_end = max_row + 1;  /* exclusive end */
+            music_cursor = n;
+            music_ensure_visible();
         }
     }
 }
@@ -402,10 +549,15 @@ static void music_init(void)
     music_cursor = 0;
     music_scroll = 0;
     music_col = 0;
+    music_sel_anchor = -1;
     music_sel_start = -1;
     music_sel_end = -1;
+    music_sel_col_start = 0;
+    music_sel_col_end = 5;
     music_sfx_input = -1;
+    music_copy_len = 0;
     music_copy_valid = false;
+    music_copy_mask = 0;
 
     music_undo_ctx = p8_editor_undo_create(MEMORY_MUSIC, MEMORY_MUSIC_SIZE);
 }
@@ -417,6 +569,20 @@ static void music_shutdown(void)
 #endif
     p8_editor_undo_destroy(music_undo_ctx);
     music_undo_ctx = NULL;
+    /* Reset all static state */
+    music_cursor = 0;
+    music_scroll = 0;
+    music_col = 0;
+    music_sel_anchor = -1;
+    music_sel_start = -1;
+    music_sel_end = -1;
+    music_sel_col_start = 0;
+    music_sel_col_end = 5;
+    music_sfx_input = -1;
+    music_copy_len = 0;
+    music_copy_valid = false;
+    music_copy_mask = 0;
+    memset(music_copy_buf, 0, sizeof(music_copy_buf));
 }
 
 static void music_hide(void)
@@ -433,6 +599,7 @@ p8_editor_tab_t p8_subeditor_music = {
     .hide=music_hide,
     .draw=music_draw,
     .handle_keypress=music_handle_keypress,
+    .handle_mouse_move=music_handle_mouse_move,
     .handle_mouse_buttons=music_handle_mouse_buttons,
     .handle_mouse_wheel=music_handle_mouse_wheel,
     .handle_buttons=music_handle_buttons,
