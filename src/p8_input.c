@@ -224,7 +224,7 @@ char memb_scancode_to_name[4][256] = {
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
     },
-    // Shift
+    // CapsShift
     {
         '\0', '\0', '\0', '\0', 'A', 'B', 'C', 'D',
         'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
@@ -259,7 +259,7 @@ char memb_scancode_to_name[4][256] = {
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
     },
-    // Ctrl
+    // SymShift
     {
         '\0', '\0', '\0', '\0', '\0', '*', '?', '\0',
         '\0', '\0', '\0', '^', '\0', '-', '+', '=',
@@ -294,7 +294,7 @@ char memb_scancode_to_name[4][256] = {
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
     },
-    // Shift + Ctrl
+    // SymShift+CapsShift
     {
         '\0', '\0', '\0', '\0', '~', '\0', '\0', '\\',
         '\0', '{', '}', '\0', '\0', '\0', '\0', '\0',
@@ -882,11 +882,11 @@ void p8_update_input()
         m_mouse_keymod = keymod;
         if (membrane_mode) {
             unsigned page_index;
-            if (keymod & (KMOD_SHIFT | KMOD_CTRL))
+            if (keymod & (KMOD_ALT & KMOD_SHIFT)) // Symbol Shift + Caps Shift
                 page_index = 3;
-            else if (keymod & (KMOD_CTRL))
+            else if (keymod & KMOD_ALT) // Symbol Shift
                 page_index = 2;
-            else if (keymod & (KMOD_SHIFT))
+            else if (keymod & KMOD_SHIFT) // Caps Shift
                 page_index = 1;
             else
                 page_index = 0;

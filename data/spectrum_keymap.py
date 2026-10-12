@@ -35,4 +35,8 @@ SPECTRUM_KEYMAP = [
     ('Q', 2, '<='),
     ('E', 2, '>='),
     ('W', 2, '<>'),
+    ('5', 1, 'cursor left'),
+    ('6', 1, 'cursor down'),
+    ('7', 1, 'cursor up'),
+    ('8', 1, 'cursor right')
 ]

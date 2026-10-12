@@ -238,7 +238,7 @@ mkeyboard_keymap = [{}, {}, {}, {}]
 for keymod in range(0, 2):
     for scancode, unicode in usb_hid_keymap[keymod].items():
         mkeyboard_keymap[keymod][scancode] = unicode
-        mkeyboard_keymap[keymod | CTRL][scancode] = None
+        mkeyboard_keymap[keymod | 2][scancode] = None
 
 for (key_name, keymod, unicode) in SPECTRUM_KEYMAP:
     usb_hid_name = get_usb_hid_name_from_spectrum_name(key_name)
@@ -360,7 +360,7 @@ def main():
     row = []
     #comment = []
     for keymod in range(0, 4):
-        print(f'    // {["Unshifted", "Shift", "Ctrl", "Shift + Ctrl"][keymod]}')
+        print(f'    // {["Unshifted", "CapsShift", "SymShift", "SymShift+CapsShift"][keymod]}')
         print('    {')
         for memb_scancode in range(0, 256):
             unicode = mkeyboard_keymap[keymod].get(memb_scancode)
