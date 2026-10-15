@@ -22,7 +22,7 @@ endif
 
 include $(PLATFORM_MK)
 
-BUILD_DIR := build-$(PLATFORM)
+BUILD_DIR ?= build-$(PLATFORM)
 TARGET_NAME := femto8
 TARGET := $(BUILD_DIR)/$(TARGET_NAME)
 

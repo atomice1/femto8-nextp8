@@ -1663,7 +1663,7 @@ int menuitem(lua_State *L)
     return 0;
 }
 
-// extcmd(cmd)
+// extcmd(cmd, ...)
 int extcmd(lua_State *L)
 {
     const char *cmd = luaL_checkstring(L, 1);
@@ -1679,7 +1679,47 @@ int extcmd(lua_State *L)
             if (p8_load(m_breadcrumb_cart_file_name, NULL, NULL, NULL) == 0)
                 p8_run();
         }
-    } else {
+    }
+#if defined(FUNCVAL)
+    else if (strcmp(cmd, "kb_matrix") == 0) {
+        // extcmd("kb_matrix", row, col, press)
+        // row: 0-7 (keyboard matrix row)
+        // col: 0-6 (keyboard matrix column)
+        // press: 1=pressed (active-low), 0=released
+        // This writes to MMIO at 0x380080+row, which is intercepted by sQLux
+        int row = luaL_checkinteger(L, 2);
+        int col = luaL_checkinteger(L, 3);
+        int press = lua_toboolean(L, 4);
+
+        // Validate row (0-7) and col (0-6)
+        if (row < 0 || row > 7) {
+            luaL_error(L, "kb_matrix: invalid row %d (must be 0-7)", row);
+            return 0;
+        }
+        if (col < 0 || col > 6) {
+            luaL_error(L, "kb_matrix: invalid col %d (must be 0-6)", col);
+            return 0;
+        }
+
+        // Shadow register for keyboard matrix row states (initialized to 0xFF = all released)
+        // Columns are active-low: bit=0 means pressed, bit=1 means released
+        static uint8_t kb_matrix_shadow[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+
+        // Update the shadow register for this row
+        if (press) {
+            // Pressed: clear the bit (active-low: 0 = pressed)
+            kb_matrix_shadow[row] &= ~(1 << col);
+        } else {
+            // Released: set the bit (active-low: 1 = released)
+            kb_matrix_shadow[row] |= (1 << col);
+        }
+
+        // Write to MMIO at 0x380080 + row to trigger the keyboard matrix change
+        // The funcval_testbench.c intercepts this write and drives keyb_col_i
+        *(volatile uint8_t*)(0x380080 + row) = kb_matrix_shadow[row];
+    }
+#endif
+    else {
         fprintf(stderr, "unsupported extcmd command: %s\n", cmd);
     }
 

@@ -4,14 +4,19 @@ CC = $(TOOLCHAIN)gcc
 CXX = $(TOOLCHAIN)g++
 OBJCOPY = $(TOOLCHAIN)objcopy
 
-ifndef NEXTP8_BSP
+ifeq ($(NEXTP8_BSP),)
 $(error Set NEXTP8_BSP to the path to the nextp8 BSP)
 endif
 
-BUILD_DIR = build-nextp8
+BUILD_DIR ?= build-nextp8
 
 INCFLAGS += -isystem$(NEXTP8_BSP)/include
 LDFLAGS += -L$(NEXTP8_BSP)/lib -T$(NEXTP8_BSP)/nextp8-ram.ld -Wl,--enable-non-contiguous-regions  -Wl,-Map=build-nextp8/femto8.map
 LIBS += -lm
 DEFINES += -DNEXTP8
 CFLAGS += -Wno-char-subscripts
+
+# FuncVal mode: enables keyboard matrix control via extcmd
+ifdef FUNCVAL
+    DEFINES += -DFUNCVAL
+endif

@@ -266,7 +266,7 @@ char memb_scancode_to_name[4][256] = {
         '\0', '\0', '\0', '^', '\0', '-', '+', '=',
         '.', ',', ';', '"', '\0', '<', '\0', '>',
         '\0', '/', '\0', '$', '\0', ':', '!', '@',
-        '#', '$', '%', '&', '\0', '(', ')', '_',
+        '#', '$', '%', '&', '\'', '(', ')', '_',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
@@ -432,14 +432,13 @@ static bool is_modifier(unsigned sdl2_sc)
 
 static void clear_input_queue(void)
 {
-	m_key_queue_read_index = m_key_queue_write_index;
     m_mouse_click_buttons = 0;
     m_mouse_click_x = 0;
     m_mouse_click_y = 0;
     m_mouse_click_mod = 0;
 }
 
-static void queue_keypress(unsigned scancode, uint8_t keychar, unsigned mod)
+void queue_keypress(unsigned scancode, uint8_t keychar, unsigned mod)
 {
     if (is_modifier(scancode))
         return;
@@ -903,16 +902,16 @@ void p8_update_input()
     static bool repeat_first = false;
     uint32_t key_event;
     while ((key_event = *(volatile uint32_t *)_KEYBOARD_EVENT_QUEUE_HI) != 0) {
-        bool press = (key_event & 0x80000000) != 0;
+        bool press = (key_event & 0x80000000) == 0;
         uint16_t scancode = key_event & 0xffff;
         uint16_t keymod = ((key_event >> 16) & 3) |
-                          ((key_event >> 12) & 0xc3f0);
+                          ((key_event >> 12) & 0xfc0);
         bool membrane_mode = (key_event & 0x40000000);
         char *keymap_page;
         m_mouse_keymod = keymod;
         if (membrane_mode) {
             unsigned page_index;
-            if (keymod & (KMOD_ALT & KMOD_SHIFT)) // Symbol Shift + Caps Shift
+            if ((keymod & KMOD_ALT) && (keymod & KMOD_SHIFT)) // Symbol Shift + Caps Shift
                 page_index = 3;
             else if (keymod & KMOD_ALT) // Symbol Shift
                 page_index = 2;

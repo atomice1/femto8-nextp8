@@ -19,6 +19,11 @@ endif
 DEFINES += -DLUA_USE_POSIX
 fpic := -fPIC
 
+# FUNCVAL mode for testing - adds -DFUNCVAL to compiler flags
+ifdef FUNCVAL
+  DEFINES += -DFUNCVAL
+endif
+
 # Conditional configuration for USE_NEXTP8_AUDIO
 # Include pre-rules first (settings that must be before all: target)
 ifeq ($(USE_NEXTP8_AUDIO),1)

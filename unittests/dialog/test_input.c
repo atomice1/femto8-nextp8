@@ -19,6 +19,8 @@
 /* Include the test header to expose static functions */
 #include "p8_dialog_test_priv.h"
 
+extern void queue_keypress(unsigned scancode, uint8_t keychar, unsigned mod);
+
 /* Test buffer and dialog for input box tests */
 static char test_buffer[64];
 static p8_dialog_control_t test_controls[] = {
