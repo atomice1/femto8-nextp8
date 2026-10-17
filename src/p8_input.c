@@ -38,6 +38,9 @@ static unsigned m_mouse_click_mod;
 static int16_t mouse_x_accum_prev = 0;
 static int16_t mouse_y_accum_prev = 0;
 static int16_t mouse_z_accum_prev = 0;
+
+/* Caps Lock state tracking */
+static bool caps_lock_on = false;
 #endif
 
 #define MAX_KEY_EVENTS 8
@@ -532,6 +535,11 @@ void p8_init_input(void)
     *(volatile uint8_t *)_JOYSTICK1_LATCHED = 0xff;
     *(volatile uint8_t *)_MOUSE_BUTTONS_LATCHED = 0xff;
     *(volatile uint8_t *)_KEYBOARD_EVENT_QUEUE_LO = 0x00;
+    // Ensure PS/2 keyboard LEDs are off
+    *(volatile uint8_t *)_PS2_LED_STATUS = 0x00;
+
+    // Reset Caps Lock state
+    caps_lock_on = false;
 #endif
 
     p8_reset_input();
@@ -909,22 +917,42 @@ void p8_update_input()
         bool membrane_mode = (key_event & 0x40000000);
         char *keymap_page;
         m_mouse_keymod = keymod;
+
+        // Handle Caps Lock toggle
+        if (scancode == SCANCODE_CAPS_LOCK && press) {
+            caps_lock_on = !caps_lock_on;
+            // Write LED status to PS/2 keyboard: bit 2 = Caps Lock
+            *(volatile uint8_t *)_PS2_LED_STATUS = caps_lock_on ? 0x04 : 0x00;
+        }
+
+        // When Caps Lock is on, toggle between base and shifted pages for letters
+        bool apply_caps_lock = caps_lock_on && scancode >= SCANCODE_A && scancode <= SCANCODE_Z;
+
         if (membrane_mode) {
             unsigned page_index;
+            // Determine keymap page from modifiers
             if ((keymod & KMOD_ALT) && (keymod & KMOD_SHIFT)) // Symbol Shift + Caps Shift
                 page_index = 3;
             else if (keymod & KMOD_ALT) // Symbol Shift
                 page_index = 2;
             else if (keymod & KMOD_SHIFT) // Caps Shift
-                page_index = 1;
+                page_index = apply_caps_lock ? 0 : 1;
             else
-                page_index = 0;
-            keymap_page = memb_scancode_to_name[page_index];
-        } else  {
+                page_index = apply_caps_lock ? 1 : 0;
             if (keymod & KMOD_CTRL)
                 keymap_page = NULL;
             else
-                keymap_page = usb_hid_scancode_to_name[(keymod & KMOD_SHIFT) ? 1 : 0];
+                keymap_page = memb_scancode_to_name[page_index];
+        } else  {
+            unsigned page_index;
+            if (keymod & KMOD_SHIFT)
+                page_index = apply_caps_lock ? 0 : 1;
+            else
+                page_index = apply_caps_lock ? 1 : 0;
+            if (keymod & KMOD_CTRL)
+                keymap_page = NULL;
+            else
+                keymap_page = usb_hid_scancode_to_name[page_index];
         }
         if (keymap_page) {
             if (press) {

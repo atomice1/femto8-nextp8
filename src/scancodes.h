@@ -91,4 +91,9 @@
 #define SCANCODE_LEFT_ALT     226
 #define SCANCODE_RIGHT_ALT    230
 
+/* Locking keys */
+#define SCANCODE_CAPS_LOCK    57
+#define SCANCODE_NUM_LOCK     83
+#define SCANCODE_SCROLL_LOCK  71
+
 #endif /* SCANCODES_H */
