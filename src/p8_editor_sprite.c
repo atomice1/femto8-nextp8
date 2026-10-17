@@ -28,13 +28,14 @@
 /* All scancodes now defined in scancodes.h */
 
 /* Tool IDs */
-#define SPRITE_TOOL_PENCIL  0
+#define SPRITE_TOOL_PENCIL   0
 #define SPRITE_TOOL_FILL     1
 #define SPRITE_TOOL_SELECT   2
 #define SPRITE_TOOL_PAN      3
 #define SPRITE_TOOL_LINE     4
 #define SPRITE_TOOL_RECT     5
 #define SPRITE_TOOL_OVAL     6
+#define SPRITE_TOOL_FILLRECT 7
 
 /* How many sprite-sheet rows are visible in sheet mode */
 #define SHEET_VISIBLE_ROWS 13
@@ -440,6 +441,18 @@ static void sprite_draw_oval(int x0, int y0, int x1, int y1, int color)
     }
 }
 
+/* Filled rectangle */
+static void sprite_draw_rect_filled(int x0, int y0, int x1, int y1, int color)
+{
+    if (x0 > x1) { int t = x0; x0 = x1; x1 = t; }
+    if (y0 > y1) { int t = y0; y0 = y1; y1 = t; }
+    for (int x = x0; x <= x1; x++) {
+        for (int y = y0; y <= y1; y++) {
+            if (x >= 0 && x < 8 && y >= 0 && y < 8) sprite_paint_pixel(x, y, color);
+        }
+    }
+}
+
 /* --- Draw ------------------------------------------------------------------ */
 
 static void draw_sheet_mode(int x, int y, int w, int h)
@@ -506,13 +519,13 @@ static void draw_edit_mode(int x, int y, int w, int h)
     /* Flags row: y+16..y+16+FLAGS_ROW_H-1 on right panel */
     draw_flags_row(rx, y + 16, sel_sprite);
 
-    /* Tool palette: two rows of 4 tools, 16px each (7 tools, last slot empty) */
+    /* Tool palette: two rows of 4 tools, 16px each (8 tools, last slot empty) */
     {
-        static const char *tool_names[7] = {
-            "pencil", "fill", "select", "pan", "line", "rect", "oval"
+        static const char *tool_names[8] = {
+            "pencil", "fill", "select", "pan", "line", "rect", "oval", "fillrect"
         };
         int tools_y0 = y + 16 + FLAGS_ROW_H + 1;  /* first row starts 1px below flags */
-        for (int t = 0; t < 7; t++) {
+        for (int t = 0; t < 8; t++) {
             int row = t / 4, col = t % 4;
             int bx = rx + col * 16;
             int by_t = tools_y0 + row * 9;
@@ -778,7 +791,7 @@ static void sprite_handle_mouse_buttons(int mx, int my, int buttons, int buttons
             int row = (my - (cy + 16 + FLAGS_ROW_H + 1)) / 9;
             int col = (mx - 64) / 16;
             int t = row * 4 + col;
-            if (t >= 0 && t < 7) {
+            if (t >= 0 && t < 8) {
                 sprite_tool = t;
                 sprite_shape_dragging = false;
             }
@@ -827,6 +840,7 @@ static void sprite_handle_mouse_buttons(int mx, int my, int buttons, int buttons
                         case SPRITE_TOOL_LINE: sprite_draw_line(sprite_shape_px0, sprite_shape_py0, px, py, sel_color); break;
                         case SPRITE_TOOL_RECT: sprite_draw_rect_outline(sprite_shape_px0, sprite_shape_py0, px, py, sel_color); break;
                         case SPRITE_TOOL_OVAL: sprite_draw_oval(sprite_shape_px0, sprite_shape_py0, px, py, sel_color); break;
+                        case SPRITE_TOOL_FILLRECT: sprite_draw_rect_filled(sprite_shape_px0, sprite_shape_py0, px, py, sel_color); break;
                         default: break;
                     }
                 }
