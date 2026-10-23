@@ -614,7 +614,7 @@ static bool insert_text_single_line_raw(int line, int col, const char *text, int
     assert(line >= 0 && line < line_count);
     assert(col >= 0 && col <= line_lengths[line]);
     assert(text != NULL);
-    if (!*text) return true;
+    if (len == 0) return true;
     int old_len = line_lengths[line];
     if (!line_resize(line, old_len + len)) return false;
     memmove(lines[line] + col + len, lines[line] + col, old_len - col);
@@ -650,7 +650,7 @@ static bool insert_text_multi_line_raw(int line, int col, const char *text, int 
     assert(line >= 0 && line < line_count);
     assert(col >= 0 && col <= line_lengths[line]);
     assert(text != NULL);
-    if (!*text) return true;
+    if (len == 0) return true;
     const char *end = text + len;
     for (const char *p = text; p < end; ) {
         const char *nl = memchr(p, '\n', end - p);
@@ -912,15 +912,18 @@ static bool undo_edit(const edit_t *edit)
     case EDIT_TYPE_SIMPLE_INSERT_NEWLINE_FORWARD:
         delete_text_multi_line_no_undo(edit->old_cursor_line, edit->old_cursor_col, edit->new_cursor_line + 1, 0);
         break;
-    case EDIT_TYPE_SIMPLE_DELETE_BACKWARD:
-        success = insert_text_single_line_no_undo(edit->new_cursor_line, edit->new_cursor_col, (char *)&edit->ch, 1);
+    case EDIT_TYPE_SIMPLE_DELETE_BACKWARD: {
+        char text[1] = {edit->ch};
+        success = insert_text_single_line_no_undo(edit->new_cursor_line, edit->new_cursor_col, text, 1);
         break;
-    case EDIT_TYPE_SIMPLE_DELETE_NEWLINE:
+    } case EDIT_TYPE_SIMPLE_DELETE_NEWLINE:
         success = insert_text_multi_line_no_undo(edit->new_cursor_line, edit->new_cursor_col, "\n", 1);
         break;
-    case EDIT_TYPE_SIMPLE_DELETE_FORWARD:
-        success = insert_text_single_line_no_undo(edit->new_cursor_line, edit->new_cursor_col, (char *)&edit->ch, 1);
+    case EDIT_TYPE_SIMPLE_DELETE_FORWARD: {
+        char text[1] = {edit->ch};
+        success = insert_text_single_line_no_undo(edit->new_cursor_line, edit->new_cursor_col, text, 1);
         break;
+    }
     case EDIT_TYPE_SIMPLE_DELETE_NEWLINE_FORWARD:
         success = insert_text_multi_line_no_undo(edit->new_cursor_line, edit->new_cursor_col, "\n", 1);
         break;
@@ -1549,13 +1552,14 @@ text_input:;
                             else if (keypress >= 'a' && keypress <= 'z' && puny_mode)
                                 keypress = keypress - 'a' + 'A';
                             push_undo();
+                            char text[1] = {keypress};
                             if (select_start_line == -1) {
                                 undo_stack[undo_depth-1].type = EDIT_TYPE_SIMPLE_INSERT_CHAR;
-                                if (!insert_text_single_line_no_undo(cursor_line, cursor_col, (char *)&keypress, 1)) pop_undo();
+                                if (!insert_text_single_line_no_undo(cursor_line, cursor_col, text, 1)) pop_undo();
                                 else finalize_undo();
                             } else {
                                 delete_selected_text();
-                                if (!insert_text_single_line(cursor_line, cursor_col, (char *)&keypress, 1)) pop_undo();
+                                if (!insert_text_single_line(cursor_line, cursor_col, text, 1)) pop_undo();
                                 else finalize_undo();
                             }
                         }
