@@ -84,11 +84,15 @@ static bool is_quick_dialog_mode(const p8_dialog_t *dialog)
                     break;
                 case DIALOG_LISTBOX: {
                     /* OK only if this is the last selectable control
-                     * (O then accepts instead of navigating) */
+                     * that would be reached in quick mode (O then accepts instead of navigating).
+                     * Buttonbars are skipped in quick mode navigation, so they don't count. */
                     int last_selectable_idx = -1;
                     for (int i = 0; i < dialog->control_count; i++) {
-                        if (dialog->controls[i].selectable) {
-                            last_selectable_idx = i;
+                        if (dialog->controls[i].selectable && dialog->controls[i].enabled) {
+                            /* In quick mode, buttonbars are skipped during navigation,
+                             * so they don't block the listbox from accepting */
+                            if (dialog->controls[i].type != DIALOG_BUTTONBAR)
+                                last_selectable_idx = i;
                         }
                     }
                     if (i != last_selectable_idx) {
