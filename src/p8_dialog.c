@@ -324,8 +324,9 @@ static void draw_control(const p8_dialog_t *dialog, int control_idx, int x, int 
                     int glyph_width = ((uint8_t)str[col] >= 0x80) ? GLYPH_WIDTH * 2 : GLYPH_WIDTH;
                     if (text_x <= text_right && text_x + glyph_width > text_left) {
                         int fg, bg;
-                        
-                        if (col == cursor_pos && (dialog->cursor_blink & 8)) {
+
+                        // Only show cursor when input box is focused
+                        if (focused && col == cursor_pos && (dialog->cursor_blink & 8)) {
                             fg = DIALOG_TEXT_HIGHLIGHT;
                             bg = DIALOG_BG_HIGHLIGHT;
                         } else if (col < len && select_start != -1 && col >= select_start && col < select_end) {
@@ -840,79 +841,85 @@ p8_dialog_action_t p8_dialog_update(p8_dialog_t *dialog)
     // Update cursor blink
     dialog->cursor_blink++;
 
+    // Handle input mode (for input boxes)
+    if (dialog->controls && dialog->focused_control >= 0 &&
+        dialog->focused_control < dialog->control_count &&
+        dialog->controls[dialog->focused_control].type == DIALOG_INPUTBOX) {
+        p8_dialog_control_t *control = &dialog->controls[dialog->focused_control];
+
+        unsigned scancode;
+        uint8_t keypress;
+        unsigned keymod;
+        bool consumed = false;
+
+        // Handle input box keypresses
+        while (p8_get_next_keypress(&scancode, &keypress, &keymod)) {
+            if (keypress == 10 || keypress == 13) {
+                if (!move_to_next_control(dialog, quick_mode)) {
+                    // No more controls, accept the dialog
+                    result.type = DIALOG_RESULT_ACCEPTED;
+                }
+                consumed = true;
+            } else {
+                consumed = handle_input_box_keypress(dialog, &control->data.inputbox,
+                    scancode, keypress, keymod, &result) || consumed;
+            }
+        }
+        if (consumed)
+            return result;
+    }
+
+    // Clear key queue
+    while (p8_get_next_keypress(NULL, NULL, NULL)) {
+        // Discard all pending keypresses
+    }
+
     if (dialog->focused_control >= 0) {
-        // Handle input mode (for input boxes)
-        if (dialog->controls && dialog->focused_control < dialog->control_count &&
-            dialog->controls[dialog->focused_control].type == DIALOG_INPUTBOX) {
-            p8_dialog_control_t *control = &dialog->controls[dialog->focused_control];
+        // Action buttons
+        p8_dialog_control_t *control = &dialog->controls[dialog->focused_control];
 
-            unsigned scancode;
-            uint8_t keypress;
-            unsigned keymod;
-            bool consumed = false;
+        // Button 1 (O) / Space activates focused control
+        if (buttons & (BUTTON_MASK_ACTION1 | BUTTON_MASK_SPACE | BUTTON_MASK_RETURN)) {
+            switch (control->type) {
+                case DIALOG_BUTTON:
+                case DIALOG_MENUITEM:
+                    if (control->enabled) {
+                        result.type = DIALOG_RESULT_BUTTON;
+                        result.action_id = control->data.button.action_id;
+                    }
+                    break;
 
-            // Handle input box keypresses
-            while (p8_get_next_keypress(&scancode, &keypress, &keymod)) {
-                if (keypress == 10 || keypress == 13) {
+                case DIALOG_CHECKBOX:
+                    if (control->enabled)
+                        *control->data.checkbox.value = !*control->data.checkbox.value;
+                    break;
+
+                case DIALOG_LISTBOX:
                     if (!move_to_next_control(dialog, quick_mode)) {
                         // No more controls, accept the dialog
                         result.type = DIALOG_RESULT_ACCEPTED;
                     }
-                    consumed = true;
-                } else {
-                    consumed = handle_input_box_keypress(dialog, &control->data.inputbox,
-                        scancode, keypress, keymod, &result) || consumed;
-                }
-            }
-            if (consumed)
-                return result;
-        } else {
-            // Action buttons
-            p8_dialog_control_t *control = &dialog->controls[dialog->focused_control];
+                    break;
 
-            // Button 1 (O) / Space activates focused control
-            if (buttons & (BUTTON_MASK_ACTION1 | BUTTON_MASK_SPACE | BUTTON_MASK_RETURN)) {
-                switch (control->type) {
-                    case DIALOG_BUTTON:
-                    case DIALOG_MENUITEM:
-                        if (control->enabled) {
-                            result.type = DIALOG_RESULT_BUTTON;
-                            result.action_id = control->data.button.action_id;
-                        }
-                        break;
-
-                    case DIALOG_CHECKBOX:
-                        if (control->enabled)
-                            *control->data.checkbox.value = !*control->data.checkbox.value;
-                        break;
-
-                    case DIALOG_LISTBOX:
-                        if (!move_to_next_control(dialog, quick_mode)) {
-                            // No more controls, accept the dialog
-                            result.type = DIALOG_RESULT_ACCEPTED;
-                        }
-                        break;
-
-                    case DIALOG_BUTTONBAR: {
-                        // Activate the focused button
-                        p8_dialog_control_t *buttonbar = &dialog->controls[dialog->focused_control];
-                        if (buttonbar->data.buttonbar.type == BUTTONBAR_CANCEL_ONLY) {
-                            result.type = DIALOG_RESULT_CANCELLED;
-                        } else if (dialog->focused_subcontrol == 0) {
-                            result.type = DIALOG_RESULT_ACCEPTED;
-                        } else {
-                            result.type = DIALOG_RESULT_CANCELLED;
-                        }
-                        // Return early if we've processed a button press
-                        if (buttons & (BUTTON_MASK_ACTION1 | BUTTON_MASK_ACTION2 | BUTTON_MASK_RETURN)) {
-                            return result;
-                        }
-                        break;
+                case DIALOG_BUTTONBAR: {
+                    // Activate the focused button
+                    p8_dialog_control_t *buttonbar = &dialog->controls[dialog->focused_control];
+                    if (buttonbar->data.buttonbar.type == BUTTONBAR_CANCEL_ONLY) {
+                        result.type = DIALOG_RESULT_CANCELLED;
+                    } else if (dialog->focused_subcontrol == 0) {
+                        result.type = DIALOG_RESULT_ACCEPTED;
+                    } else {
+                        result.type = DIALOG_RESULT_CANCELLED;
                     }
-
-                    default:
-                        break;
+                    // Return early if we've processed a button press
+                    if (buttons & (BUTTON_MASK_ACTION1 | BUTTON_MASK_ACTION2 | BUTTON_MASK_RETURN)) {
+                        return result;
+                    }
+                    break;
                 }
+
+                default:
+                    break;
             }
         }
     }
