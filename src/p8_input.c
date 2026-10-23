@@ -127,13 +127,13 @@ char usb_hid_scancode_to_name[2][256] = {
         'm', 'n', 'o', 'p', 'q', 'r', 's', 't',            // m and M, n and N, o and O, p and P, q and Q, r and R, s and S, t and T
         'u', 'v', 'w', 'x', 'y', 'z', '1', '2',            // u and U, v and V, w and W, x and X, y and Y, z and Z, 1 and !, 2 and @
         '3', '4', '5', '6', '7', '8', '9', '0',            // 3 and #, 4 and $, 5 and %, 6 and ^, 7 and &, 8 and *, 9 and (, 0 and )
-        '\n', '\0', '\b', '\t', ' ', '-', '=', '[',        // Return (ENTER), ESCAPE, DELETE (Backspace), Tab, Spacebar, - and (underscore), = and +, [ and {
+        13, '\0', '\b', '\t', ' ', '-', '=', '[',          // Return (ENTER), ESCAPE, DELETE (Backspace), Tab, Spacebar, - and (underscore), = and +, [ and {
         ']', '\\', '#', ';', '\'', '`', ',', '.',          // ] and }, \ and |, Non-US # and ˜, ; and :, ‘ and “, Grave Accent and Tilde, , and <, . and >
         '/', '\0', '\0', '\0', '\0', '\0', '\0', '\0',     // / and ?, Caps Lock, F1, F2, F3, F4, F5, F6
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F7, F8, F9, F10, F11, F12, PrintScreen, Scroll Lock
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Pause, Insert, Home, PageUp, Delete Forward, End, PageDown, RightArrow
         '\0', '\0', '\0', '\0', '/', '*', '-', '+',        // LeftArrow, DownArrow, UpArrow, Keypad Num Lock and Clear, Keypad /, Keypad *, Keypad -, Keypad +
-        '\n', '1', '2', '3', '4', '5', '6', '7',           // Keypad ENTER, Keypad 1 and End, Keypad 2 and Down Arrow, Keypad 3 and PageDn, Keypad 4 and Left Arrow, Keypad 5, Keypad 6 and Right Arrow, Keypad 7 and Home
+        13, '1', '2', '3', '4', '5', '6', '7',             // Keypad ENTER, Keypad 1 and End, Keypad 2 and Down Arrow, Keypad 3 and PageDn, Keypad 4 and Left Arrow, Keypad 5, Keypad 6 and Right Arrow, Keypad 7 and Home
         '8', '9', '0', '.', '\0', '\0', '\0', '=',         // Keypad 8 and Up Arrow, Keypad 9 and PageUp, Keypad 0 and Insert, Keypad . and Delete, Non-US \and |, Application, Power, Keypad =
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F13, F14, F15, F16, F17, F18, F19, F20
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F21, F22, F23, F24, Execute, Help, Menu, Keyboard
@@ -162,13 +162,13 @@ char usb_hid_scancode_to_name[2][256] = {
         'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',            // m and M, n and N, o and O, p and P, q and Q, r and R, s and S, t and T
         'U', 'V', 'W', 'X', 'Y', 'Z', '!', '@',            // u and U, v and V, w and W, x and X, y and Y, z and Z, 1 and !, 2 and @
         '#', '$', '%', '^', '&', '*', '(', ')',            // 3 and #, 4 and $, 5 and %, 6 and ^, 7 and &, 8 and *, 9 and (, 0 and )
-        '\n', '\0', '\b', '\t', ' ', '_', '+', '{',        // Return (ENTER), ESCAPE, DELETE (Backspace), Tab, Spacebar, - and (underscore), = and +, [ and {
+        13, '\0', '\b', '\t', ' ', '_', '+', '{',          // Return (ENTER), ESCAPE, DELETE (Backspace), Tab, Spacebar, - and (underscore), = and +, [ and {
         '}', '|', '~', ':', '"', '~', '<', '>',            // ] and }, \ and |, Non-US # and ˜, ; and :, ‘ and “, Grave Accent and Tilde, , and <, . and >
         '?', '\0', '\0', '\0', '\0', '\0', '\0', '\0',     // / and ?, Caps Lock, F1, F2, F3, F4, F5, F6
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F7, F8, F9, F10, F11, F12, PrintScreen, Scroll Lock
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // Pause, Insert, Home, PageUp, Delete Forward, End, PageDown, RightArrow
         '\0', '\0', '\0', '\0', '/', '*', '-', '+',        // LeftArrow, DownArrow, UpArrow, Keypad Num Lock and Clear, Keypad /, Keypad *, Keypad -, Keypad +
-        '\n', '\0', '\0', '\0', '\0', '5', '\0', '\0',     // Keypad ENTER, Keypad 1 and End, Keypad 2 and Down Arrow, Keypad 3 and PageDn, Keypad 4 and Left Arrow, Keypad 5, Keypad 6 and Right Arrow, Keypad 7 and Home
+        13, '\0', '\0', '\0', '\0', '5', '\0', '\0',       // Keypad ENTER, Keypad 1 and End, Keypad 2 and Down Arrow, Keypad 3 and PageDn, Keypad 4 and Left Arrow, Keypad 5, Keypad 6 and Right Arrow, Keypad 7 and Home
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '=',     // Keypad 8 and Up Arrow, Keypad 9 and PageUp, Keypad 0 and Insert, Keypad . and Delete, Non-US \and |, Application, Power, Keypad =
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F13, F14, F15, F16, F17, F18, F19, F20
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',    // F21, F22, F23, F24, Execute, Help, Menu, Keyboard
@@ -200,13 +200,13 @@ char memb_scancode_to_name[4][256] = {
         'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
         'u', 'v', 'w', 'x', 'y', 'z', '1', '2',
         '3', '4', '5', '6', '7', '8', '9', '0',
-        '\n', '\0', '\b', '\t', ' ', '-', '=', '[',
+        13, '\0', '\b', '\t', ' ', '-', '=', '[',
         ']', '\\', '#', ';', '\'', '`', ',', '.',
         '/', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
         '\0', '\0', '\0', '\0', '/', '*', '-', '+',
-        '\n', '1', '2', '3', '4', '5', '6', '7',
+        13, '1', '2', '3', '4', '5', '6', '7',
         '8', '9', '0', '.', '\0', '\0', '\0', '=',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
@@ -235,13 +235,13 @@ char memb_scancode_to_name[4][256] = {
         'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
         'U', 'V', 'W', 'X', 'Y', 'Z', '!', '@',
         '#', '$', '%', '^', '&', '*', '(', ')',
-        '\n', '\0', '\b', '\t', ' ', '_', '+', '{',
+        13, '\0', '\b', '\t', ' ', '_', '+', '{',
         '}', '|', '~', ':', '"', '~', '<', '>',
         '?', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
         '\0', '\0', '\0', '\0', '/', '*', '-', '+',
-        '\n', '\0', '\0', '\0', '\0', '5', '\0', '\0',
+        13, '\0', '\0', '\0', '\0', '5', '\0', '\0',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '=',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',
         '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0',

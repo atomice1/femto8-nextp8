@@ -248,7 +248,7 @@ static void map_handle_keypress(int scancode, int keypress, int keymod)
     if (keypress == ']' && map_sel_sprite < 255) map_sel_sprite++;
 
     /* Paint tile at cursor (Enter only; Space is reserved for pan-while-drag) */
-    if (keypress == 13) {
+    if (keypress == 10 || keypress == 13) {
         p8_editor_undo_push(map_undo_ctx);
         m_cart_memory[MEMORY_MAP + map_cursor_y * MAP_COLS + map_cursor_x] =
             (uint8_t)map_sel_sprite;

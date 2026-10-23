@@ -1532,7 +1532,7 @@ text_input:;
                             finalize_undo();
                         }
                         break;
-                    case '\n': /* newline */
+                    case 10: /* newline */
                     case 13: /* return */
                         push_undo();
                         if (select_start_line == -1) {

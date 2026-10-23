@@ -1012,7 +1012,7 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
                 list_ensure_visible();
                 break;
             default:
-                if (keypress == 13) { /* Enter: open detail */
+                if (keypress == 10 || keypress == 13) { /* Enter: open detail */
                     sfx_detail = sfx_cursor;
                     sfx_mode   = 0;
                     sfx_note_scroll = 0;
@@ -1344,9 +1344,9 @@ static void sfx_handle_keypress(int scancode, int keypress, int keymod)
                         break;
                     }
                 }
-                if (keypress == 13 && sfx_hdr_editing) {
+                if ((keypress == 10 || keypress == 13) && sfx_hdr_editing) {
                     sfx_hdr_editing = false; /* Enter also exits header editing */
-                } else if (keypress == 13 && sfx_mode == 1) {
+                } else if ((keypress == 10 || keypress == 13) && sfx_mode == 1) {
                     /* Toggle tracker edit mode */
                     sfx_tracker_edit_mode = !sfx_tracker_edit_mode;
                 }

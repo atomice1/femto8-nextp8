@@ -396,7 +396,7 @@ static void repl_handle_keypress(int scancode, int keypress, int keymod)
             repl_input_len = 0;
         }
         return;
-    } else if (keypress == 13) { /* Enter */
+    } else if (keypress == 10 || keypress == 13) { /* Enter */
         repl_execute();
     } else if (keypress == 8) { /* Backspace */
         if (repl_input_len > 0) {

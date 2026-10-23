@@ -849,7 +849,7 @@ p8_dialog_action_t p8_dialog_update(p8_dialog_t *dialog)
 
             // Handle input box keypresses
             while (p8_get_next_keypress(&scancode, &keypress, &keymod)) {
-                if (keypress == 13) {
+                if (keypress == 10 || keypress == 13) {
                     if (!move_to_next_control(dialog, quick_mode)) {
                         // No more controls, accept the dialog
                         result.type = DIALOG_RESULT_ACCEPTED;

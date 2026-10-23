@@ -661,7 +661,7 @@ static void sprite_handle_keypress(int scancode, int keypress, int keymod)
                 break;
             default: break;
         }
-        if (keypress == 32 || keypress == 13) {
+        if (keypress == 32 || keypress == 10 || keypress == 13) {
             p8_editor_undo_push(sprite_undo_ctx);
             if (sprite_tool == SPRITE_TOOL_FILL)
                 sprite_flood_fill(pixel_x, pixel_y, sel_color);
@@ -731,7 +731,7 @@ static void sprite_handle_keypress(int scancode, int keypress, int keymod)
                 break;
             default: break;
         }
-        if (keypress == 13) {
+        if (keypress == 10 || keypress == 13) {
             sprite_edit = true;
             pixel_x = pixel_y = 0;
         }

@@ -402,7 +402,7 @@ static void music_handle_keypress(int scancode, int keypress, int keymod)
                         /* Commit after 2 digits */
                         music_commit_sfx_input();
                     }
-                } else if (keypress == 13) {
+                } else if (keypress == 10 || keypress == 13) {
                     /* Toggle music cell edit mode */
                     music_edit_mode = !music_edit_mode;
                 }
