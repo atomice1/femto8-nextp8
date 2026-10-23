@@ -41,6 +41,7 @@
 #elif defined(NEXTP8)
 #include "nextp8.h"
 #include "postcodes.h"
+#include "p8_main.h"
 #endif
 
 #if defined(SDL)
@@ -912,7 +913,10 @@ void p8_render()
         memcpy((uint8_t *)_SECONDARY_PALETTE_BASE, secondary_palette, 32);
     }
     static int dialog_showing_clear_n = 0;
-    if (m_dialog_showing || dialog_showing_clear_n > 0)
+    // Optimization: copy full overlay for REPL (draws to full screen),
+    // copy only first 8 rows for other screens when no dialog is showing
+    extern p8_screen_index_t current_screen;
+    if (m_dialog_showing || dialog_showing_clear_n > 0 || current_screen == P8_SCREEN_REPL)
         memcpy((uint8_t *)_OVERLAY_BACK_BUFFER_BASE, m_overlay_memory, MEMORY_SCREEN_SIZE);
     else
         memcpy((uint8_t *)_OVERLAY_BACK_BUFFER_BASE, m_overlay_memory, 512); // optimization: only copy first 8 rows if pause menu not showing

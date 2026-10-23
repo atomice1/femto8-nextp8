@@ -21,7 +21,7 @@ static p8_screen_t *screens[] = {
 };
 #define NUM_SCREENS (sizeof(screens) / sizeof(screens[0]))
 
-static p8_screen_index_t current_screen = P8_SCREEN_BROWSE;
+p8_screen_index_t current_screen = P8_SCREEN_BROWSE;
 static p8_screen_index_t pending_screen = P8_SCREEN_BROWSE;
 static bool screen_switch_requested = false;
 
