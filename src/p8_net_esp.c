@@ -220,6 +220,8 @@ ssize_t net_recv(void *data, unsigned max_length)
         /* If we've filled the caller's buffer, return now */
         if (received >= max_length) {
             return received;
+        } else {
+            assert(overflow_len == 0);
         }
         /* Otherwise continue reading to fill the rest of the buffer */
     }
@@ -357,6 +359,7 @@ int net_close(void)
 
     /* AT+CIPCLOSE */
     _esp_send_at_command("AT+CIPCLOSE", "CLOSED", AT_TIMEOUT_US);
+    _esp_wait_for_response("OK", AT_TIMEOUT_US);
 
     connection_active = false;
     is_ssl_connection = false;
