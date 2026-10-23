@@ -573,24 +573,42 @@ static void browse_update(void)
 #ifdef ENABLE_BBS_DOWNLOAD
             case 2:
                 if (show_bbs_download_dialog(cart_id_buffer, sizeof(cart_id_buffer)) == DIALOG_RESULT_ACCEPTED) {
+                    /* Show Downloading dialog */
+                    p8_dialog_control_t download_controls[] = {
+                        DIALOG_LABEL("downloading...")
+                    };
+                    p8_dialog_t download_dialog;
+                    p8_dialog_init(&download_dialog, NULL, download_controls,
+                                  sizeof(download_controls) / sizeof(download_controls[0]), 100);
+                    p8_dialog_set_showing(&download_dialog, true);
+                    p8_dialog_draw(&download_dialog);
+                    p8_flip();
+
                     const char *cart_id = (cart_id_buffer[0] == '#') ? (cart_id_buffer + 1) : cart_id_buffer;
                     char cart_path[PATH_MAX];
-                    if (p8_download_bbs_cart(cart_id, m_current_cart_dir, cart_path, sizeof(cart_path), true) == 0) {
+                    int ret = p8_download_bbs_cart(cart_id, m_current_cart_dir, cart_path, sizeof(cart_path), true);
+
+                    /* Hide Downloading dialog */
+                    p8_dialog_set_showing(&download_dialog, false);
+                    p8_dialog_cleanup(&download_dialog);
+
+                    if (ret == 0) {
                         /* Hide browse screen before running cart */
                         browse_hide();
                         if (p8_load(cart_path, NULL, cart_id, NULL) == 0) {
                             if (p8_run() != 0)
                                 p8_show_lua_error_dialog();
                             p8_reset();
+                            /* Show browse screen again after cart exits */
+                            browse_show();
                         } else {
+                            browse_show();
                             const char *error_lines[] = {
                                 "failed to load",
                                 "downloaded cart"
                             };
                             p8_show_error_dialog(error_lines, 2, P8_ERROR_ERROR);
                         }
-                        /* Show browse screen again after cart exits */
-                        browse_show();
                     }
                 }
                 break;
@@ -625,7 +643,7 @@ static void browse_update(void)
             }
             list_dir();
             browse_controls[1].data.listbox.item_count = nitems;
-            
+
             // Reset preview state when directory changes
             preview_item = -1;
             preview_loaded = false;
@@ -657,7 +675,7 @@ static void browse_draw(int x, int y, int w, int h)
     (void)y;
     (void)w;
     (void)h;
-    
+
     p8_dialog_draw(&browse_dialog);
 
     if (preview_showing)

@@ -181,7 +181,7 @@ int p8_init()
 #ifdef SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0)
     {
-        printf("Error on SDL_Init().\n");
+        fprintf(stderr, "Error on SDL_Init().\n");
         return 1;
     }
 
@@ -1456,7 +1456,7 @@ int p8_download_bbs_cart(const char *cart_id, const char *download_dir, char *ca
     int ret = cache_download_to_dir(cart_id, download_dir, cached_filename, cached_filename_size, force_download);
     p8_show_io_icon(false);
     if (ret < 0) {
-        printf("Failed to download cart %s from BBS, error %d\n", cart_id, errno);
+        fprintf(stderr, "Failed to download cart %s from BBS, error %d\n", cart_id, errno);
         /* Show error dialog */
         const char *error_lines[] = {
             "failed to download cart",
