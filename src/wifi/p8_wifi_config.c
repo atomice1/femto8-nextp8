@@ -315,28 +315,33 @@ bool wifi_show_config_dialog(void)
     bool connected = wifi_wait_for_connected_internal(selected_ap->ssid, password);
 
     /* Show result dialog */
-    const char *result_msg;
-    char error_msg[64];
+    const char *title = "wi-fi connection";
     if (connected) {
-        result_msg = "connected successfully!";
+        p8_dialog_control_t result_controls[] = {
+            DIALOG_LABEL("connected successfully!"),
+            DIALOG_SPACING(),
+            DIALOG_BUTTONBAR_OK_ONLY()
+        };
+        p8_dialog_t result_dialog;
+        p8_dialog_init(&result_dialog, title, result_controls,
+                    sizeof(result_controls) / sizeof(result_controls[0]), 0);
+        p8_dialog_run(&result_dialog);
+        p8_dialog_cleanup(&result_dialog);
     } else {
-        snprintf(error_msg, sizeof(error_msg), "connection failed (error %d)", errno);
-        result_msg = error_msg;
+        char error_msg[64];
+        snprintf(error_msg, sizeof(error_msg), "error %d", errno);
+        p8_dialog_control_t result_controls[] = {
+            DIALOG_LABEL("connection failed"),
+            DIALOG_LABEL(error_msg),
+            DIALOG_SPACING(),
+            DIALOG_BUTTONBAR_OK_ONLY()
+        };
+        p8_dialog_t result_dialog;
+        p8_dialog_init(&result_dialog, title, result_controls,
+                    sizeof(result_controls) / sizeof(result_controls[0]), 0);
+        p8_dialog_run(&result_dialog);
+        p8_dialog_cleanup(&result_dialog);
     }
-
-    p8_dialog_control_t result_controls[] = {
-        DIALOG_LABEL(result_msg),
-        DIALOG_SPACING(),
-        DIALOG_BUTTONBAR_OK_ONLY()
-    };
-
-    p8_dialog_t result_dialog;
-    p8_dialog_init(&result_dialog, "wi-fi connection", result_controls,
-                  sizeof(result_controls) / sizeof(result_controls[0]), 0);
-
-    p8_dialog_run(&result_dialog);
-
-    p8_dialog_cleanup(&result_dialog);
 
     return connected;
 }
