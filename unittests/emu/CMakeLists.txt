@@ -5,6 +5,8 @@ set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../../src/p8_emu.c PROPE
 
 add_executable(p8_emu_tests
     p8_emu_test.c
+    p8_emu_test_wrap_text.c
+    p8_emu_test_make_full_path.c
     stubs.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/p8_emu.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../src/strtcpy.c

@@ -1204,7 +1204,9 @@ int p8_make_full_path(char *ret, int ret_size, const char *dir_path, const char 
             char *slash = strrchr(dir_path, '/');
             if (!slash)
                 slash = strrchr(dir_path, '\\');
-            if ((slash && strcmp(slash, "..") == 0) ||
+            /* Get the last component (after the last slash, or the whole string if no slash) */
+            const char *last_component = slash ? slash + 1 : dir_path;
+            if ((slash && strcmp(last_component, "..") == 0) ||
                 (!slash && strcmp(dir_path, "..") == 0)) {
                 int written = snprintf(ret, ret_size, "%s/%s", dir_path, file_name);
                 if (written < 0 || (size_t)written >= (size_t)ret_size)
