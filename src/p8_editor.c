@@ -436,6 +436,17 @@ void p8_editor_sync(void)
     }
 }
 
+void p8_editor_set_tab(p8_tab_t tab)
+{
+    if (tab < P8_TAB_COUNT) {
+        if (tab_subeditors[active_tab]->hide)
+            tab_subeditors[active_tab]->hide();
+        active_tab = tab;
+        if (tab_subeditors[active_tab]->show)
+            tab_subeditors[active_tab]->show();
+    }
+}
+
 p8_screen_t p8_screen_edit = {
     .init = editor_screen_init,
     .shutdown = editor_screen_shutdown,

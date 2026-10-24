@@ -27,6 +27,8 @@
 #define EDITOR_ACTION_GET_TAB(a)        ((p8_tab_t)((a) - 10))
 /* Leave the editor and go directly to the REPL. */
 #define EDITOR_ACTION_GOTO_REPL         (10 + P8_TAB_COUNT)
+/* Leave the editor and go directly to the browser. */
+#define EDITOR_ACTION_GOTO_BROWSE       (11 + P8_TAB_COUNT)
 
 /* ── Sub-editor descriptor ────────────────────────────────────────────────── */
 

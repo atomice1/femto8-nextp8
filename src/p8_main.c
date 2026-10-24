@@ -9,6 +9,7 @@
 #include "p8_input.h"
 #include "p8_main.h"
 #include "p8_repl.h"
+#include "scancodes.h"
 
 /* =========================================================================
  * SCREEN MANAGEMENT
@@ -83,9 +84,6 @@ void p8_main(void)
         /* Flip to display */
         p8_flip();
 
-        /* Update screen */
-        if (screen->update)
-            screen->update();
 
         int button_mask = m_buttons[0];
         int buttonp_mask = m_buttonsp[0];
@@ -117,11 +115,45 @@ void p8_main(void)
         }
 
         /* Handle keypress input */
-        if (screen->handle_keypress) {
-            unsigned scancode = 0, keymod = 0;
-            uint8_t keypress = 0;
-            while (p8_get_next_keypress(&scancode, &keypress, &keymod))
-                screen->handle_keypress(scancode, keypress, keymod);
+        unsigned scancode = 0, keymod = 0;
+        uint8_t keypress = 0;
+        while (p8_get_next_keypress(&scancode, &keypress, &keymod)) {
+            /* Check for global function keys (F1-F7, F10) that work from all screens */
+            switch (scancode) {
+                case SCANCODE_F1:
+                case SCANCODE_F2:
+                case SCANCODE_F3:
+                case SCANCODE_F4:
+                case SCANCODE_F5: {
+                    /* Switch to editor with the specified tab */
+                    int tab = scancode - SCANCODE_F1;
+                    p8_editor_set_tab((p8_tab_t)tab);
+                    p8_set_active_screen(P8_SCREEN_EDIT);
+                    break;
+                }
+                case SCANCODE_F6: {
+                    /* Switch to browse */
+                    p8_set_active_screen(P8_SCREEN_BROWSE);
+                    break;
+                }
+                case SCANCODE_F7: {
+                    /* Switch to REPL */
+                    p8_set_active_screen(P8_SCREEN_REPL);
+                    break;
+                }
+                case SCANCODE_F10: {
+                    /* Quit */
+                    p8_quit();
+                    break;
+                }
+                default: {
+                    /* Non-function key, pass to current screen's handler */
+                    if (screen->handle_keypress) {
+                        screen->handle_keypress(scancode, keypress, keymod);
+                    }
+                    break;
+                }
+            }
         }
 
         /* Handle mouse input - split into move, buttons, and wheel */
@@ -137,6 +169,10 @@ void p8_main(void)
         if (screen->handle_mouse_wheel && m_mouse_wheel != 0) {
             screen->handle_mouse_wheel(m_mouse_x, m_mouse_y, m_mouse_wheel, m_mouse_buttons, m_mouse_keymod);
         }
+
+        /* Update screen */
+        if (screen->update)
+            screen->update();
     }
 
     /* Shutdown all screens */

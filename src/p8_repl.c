@@ -432,8 +432,8 @@ static void repl_show(void)
          */
         const char *banner =
             "welcome to \f8n\fAe\fBx\fCt\f7p8\n\n"
-            "\f6type \f7browse\f6 to return to the\n"
-            "browser\n\n"
+            "\f6press \f7extend+6\f6/\f7f6\f6 to return to\n"
+            "the browser\n\n"
             "press \f7break/esc\f6 to return to\n"
             "the editor\n";
         int x, y;
