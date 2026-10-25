@@ -2,7 +2,7 @@ pico-8 cartridge // http://www.pico-8.com
 version 43
 __lua__
 -- snake demo cart
--- by Chris January
+-- by chris january
 state=0
 initlen=20
 
