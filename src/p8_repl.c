@@ -432,10 +432,9 @@ static void repl_show(void)
          */
         const char *banner =
             "welcome to \f8n\fAe\fBx\fCt\f7p8\n\n"
-            "\f6press \f7extend+6\f6/\f7f6\f6 to return to\n"
-            "the browser\n\n"
-            "press \f7break/esc\f6 to return to\n"
-            "the editor\n";
+            "\f7break\f6 / \f7esc\f6    editor\n"
+            "\f7extend+6\f6 / \f7f6\f6  browser\n"
+            "\f7extend+7\f6 / \f7f7\f6  repl\n";
         int x, y;
         cursor_get(&x, &y);
         draw_text(banner, strlen(banner), x, y, 6, 0, false, &x, &y, NULL, NULL);
