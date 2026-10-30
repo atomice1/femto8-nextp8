@@ -733,9 +733,9 @@ static inline void draw_simple_text(const char *str, int x, int y, int col)
 static inline int gfx_addr_remap(int location)
 {
     if (location == MEMORY_SPRITES)
-        return m_memory[MEMORY_SPRITE_PHYS] << 8;
+        return MIN(m_memory[MEMORY_SPRITE_PHYS] << 8, 0xe000);
     else if (location == MEMORY_SCREEN)
-        return m_memory[MEMORY_SCREEN_PHYS] << 8;
+        return MIN(m_memory[MEMORY_SCREEN_PHYS] << 8, 0xe000);
     else
         return location;
 }
