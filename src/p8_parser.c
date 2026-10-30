@@ -209,10 +209,9 @@ static int process_includes(char *lua_script_out, const char *lua_script, const 
             const char *end_p = p;
             while (*end_p) {
                 if (*end_p == ']') {
-                    int end_equals = 0;
                     const char *eq_p = end_p + 1;
                     while (*eq_p == '=')
-                        { end_equals++; eq_p++; }
+                        { eq_p++; }
                     if (*eq_p == ']') {
                         in_multiline_comment = false;
                         p = eq_p + 1;
@@ -595,7 +594,7 @@ static int parse_p8_ram(const char *file_name, uint8_t *buffer, int size, uint8_
         case P8TYPE_MAP:
         {
             uint8_t *write_mem = memory + m_p8_mem_offset[p8_type] + write_offset;
-            hex_to_bytes(write_mem, memory + MEMORY_SIZE - write_mem, line, line_length-1, &write_length);
+            hex_to_bytes(write_mem, memory + CART_MEMORY_SIZE - write_mem, line, line_length-1, &write_length);
 
             write_offset += write_length;
             break;
@@ -624,7 +623,7 @@ static int parse_p8_ram(const char *file_name, uint8_t *buffer, int size, uint8_
             hex_to_bytes(tmpbuf, sizeof(tmpbuf),line, line_length-1, &read_length);
 
             if (read_length > 0)
-                read_sfx(write_mem, memory + MEMORY_SIZE - write_mem, tmpbuf, read_length, &write_length);
+                read_sfx(write_mem, memory + CART_MEMORY_SIZE - write_mem, tmpbuf, read_length, &write_length);
             else
                 write_length = 0;
 
@@ -638,7 +637,7 @@ static int parse_p8_ram(const char *file_name, uint8_t *buffer, int size, uint8_
             hex_to_bytes(tmpbuf, sizeof(tmpbuf), line, line_length-1, &read_length);
 
             if (read_length > 0)
-                read_music(write_mem, memory + MEMORY_SIZE - write_mem, tmpbuf, read_length, &write_length);
+                read_music(write_mem, memory + CART_MEMORY_SIZE - write_mem, tmpbuf, read_length, &write_length);
             else
                 write_length = 0;
 
