@@ -1288,9 +1288,9 @@ int _memset(lua_State *L)
     int val = lua_tointeger(L, 2);
     unsigned len = lua_tounsigned(L, 3);
 
-    while (len > 0) {
-        unsigned chunk = MIN(len, 0x2000 - (destaddr & 0x1fff));
+    while (len > 0 && destaddr < 0x10000) {
         unsigned destaddr1 = addr_remap(destaddr);
+        unsigned chunk = MIN(len, 0x2000 - (destaddr1 & 0x1fff));
         memset(m_memory + destaddr1, val, chunk);
         destaddr += chunk;
         len -= chunk;
