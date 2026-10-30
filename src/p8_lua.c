@@ -1985,7 +1985,11 @@ int lua_stat(lua_State *L)
     case STAT_HOUR:
     case STAT_MINUTE:
     case STAT_SECOND: {
+#ifdef __AFL_COMPILER
+        time_t t = 0;
+#else
         time_t t = time(NULL);
+#endif
         struct tm *tm = localtime(&t);
         switch (n)
         {
@@ -2016,7 +2020,11 @@ int lua_stat(lua_State *L)
     case STAT_HOUR_UTC:
     case STAT_MINUTE_UTC:
     case STAT_SECOND_UTC: {
+#ifdef __AFL_COMPILER
+        time_t t = 0;
+#else
         time_t t = time(NULL);
+#endif
         struct tm *tm = gmtime(&t);
         switch (n)
         {

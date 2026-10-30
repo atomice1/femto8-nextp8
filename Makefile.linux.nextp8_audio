@@ -4,7 +4,7 @@
 VERILATOR_ROOT := /usr/share/verilator
 
 # Use g++ for linking when USE_NEXTP8_AUDIO=1 (C++ code)
-LINKER := g++
+LINKER ?= g++
 
 # Set DEFAULT_NEXTP8_CORE based on which directory exists
 ifneq ($(wildcard nextp8-core),)

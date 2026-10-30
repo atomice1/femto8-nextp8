@@ -48,7 +48,11 @@
 */
 #if !defined(luai_makeseed)
 #include <time.h>
+#ifdef __AFL_COMPILER
+#define luai_makeseed()		cast(unsigned int, 0)
+#else
 #define luai_makeseed()		cast(unsigned int, time(NULL))
+#endif
 #endif
 
 

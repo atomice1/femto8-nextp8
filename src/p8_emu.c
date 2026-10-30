@@ -138,7 +138,9 @@ const uint8_t io_icon[32] = {
 
 p8_clock_t p8_clock(void)
 {
-#if defined(OS_FREERTOS)
+#if defined(__AFL_COMPILER)
+    return 0;
+#elif defined(OS_FREERTOS)
     return xTaskGetTickCount();
 #elif defined(NEXTP8)
     return *(volatile uint64_t *)_UTIMER_1MHZ;
@@ -165,9 +167,9 @@ p8_clock_t p8_clock_delta(p8_clock_t start, p8_clock_t end)
 
 static void p8_sleep(unsigned ms)
 {
-#ifdef OS_FREERTOS
+#if defined(OS_FREERTOS)
     vTaskDelay(pdMS_TO_TICKS(ms));
-#else
+#elif !defined(__AFL_COMPILER)
     usleep(ms * 1000);
 #endif
 }
@@ -176,7 +178,11 @@ int p8_init()
 {
     assert(!m_initialized);
 
+#ifdef __AFL_COMPILER
+    srand(0);
+#else
     srand((unsigned int)time(NULL));
+#endif
 
 #ifdef SDL
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0)
@@ -934,6 +940,10 @@ static void p8_post_flip(void)
     p8_update_input();
     p8_check_for_pause();
     m_frames++;
+#ifdef __AFL_COMPILER
+    if (m_frames == 5)
+        p8_abort();
+#endif
 }
 
 void p8_flip()
@@ -1087,8 +1097,12 @@ void p8_reset(void)
     pencolor_set(6);
     reset_color();
     clip_set(0, 0, P8_WIDTH, P8_HEIGHT);
+#ifdef __AFL_COMPILER
+    p8_seed_rng_state(0);
+#else
     // time(NULL) is a plain integer; shift left 16 to make it a fix32 integer.
     p8_seed_rng_state((uint32_t)time(NULL) << 16);
+#endif
     m_memory[MEMORY_CURSOR] = cursor_x;
     m_memory[MEMORY_CURSOR + 1] = cursor_y;
 }
