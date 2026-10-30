@@ -626,7 +626,7 @@ void p8_render()
         {
             int sx, sy;
             screen_transform_pixel(transform, x, y, &sx, &sy);
-            int screen_offset = (m_memory[MEMORY_SCREEN_PHYS] << 8) + (sx >> 1) + sy * 64;
+            int screen_offset = MIN(m_memory[MEMORY_SCREEN_PHYS] << 8, 0xe000) + (sx >> 1) + sy * 64;
             uint8_t value = m_memory[screen_offset];
             uint8_t pix = IS_EVEN(sx) ? value & 0xF : value >> 4;
             uint8_t index;
