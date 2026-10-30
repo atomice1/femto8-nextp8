@@ -1592,9 +1592,13 @@ int dset(lua_State *L)
 // sub(str, from, [to])
 int sub(lua_State *L)
 {
-    const char *str = lua_tostring(L, 1);
-    int start = lua_tointeger(L, 2);
+    const char *str = lua_gettop(L) >= 1 ? lua_tostring(L, 1) : NULL;
+    int start = lua_to_or_default(L, integer, 2, 0);
     int end = lua_to_or_default(L, integer, 3, -1);
+    if (!str) {
+        lua_pushlstring(L, "", 0);
+        return 1;
+    }
     int str_len = strlen(str);
 
     if (start < 1) start = 1;
