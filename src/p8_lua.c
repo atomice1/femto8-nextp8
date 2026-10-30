@@ -725,10 +725,8 @@ int spr(lua_State *L)
 
     if (lua_gettop(L) > 3)
     {
-        assert(lua_gettop(L) >= 5);
-
         lua_Number w_raw = lua_tonumber(L, 4);
-        lua_Number h_raw = lua_tonumber(L, 5);
+        lua_Number h_raw = lua_gettop(L) >= 5 ? lua_tonumber(L, 5) : 0;
 
         if (lua_gettop(L) >= 6)
             flip_x = lua_toboolean(L, 6);
