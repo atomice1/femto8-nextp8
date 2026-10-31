@@ -951,7 +951,7 @@ void p8_flip()
     p8_render();
 
     unsigned elapsed_time = p8_elapsed_time();
-    const unsigned target_frame_time = 1000 / m_fps;
+    const unsigned target_frame_time = 1000 / MAX(m_fps, 1);
     int sleep_time = target_frame_time - elapsed_time;
     if (sleep_time < 0 || m_no_frame_delay)
         sleep_time = 0;
@@ -971,7 +971,7 @@ void p8_flip()
 void p8_check_for_next_frame()
 {
     unsigned elapsed_time = p8_elapsed_time();
-    const unsigned target_frame_time = 1000 / m_fps;
+    const unsigned target_frame_time = 1000 / MAX(m_fps, 1);
     int remaining_time = target_frame_time - elapsed_time;
     if (remaining_time < 0) {
         if (in_main_loop)
@@ -989,7 +989,7 @@ static int p8_main_loop()
     in_main_loop = true;
     for (;;)
     {
-        const int target_frame_time = 1000 / m_fps;
+        const int target_frame_time = 1000 / MAX(m_fps, 1);
 
         int ret = lua_update();
         if (ret != 0) {
