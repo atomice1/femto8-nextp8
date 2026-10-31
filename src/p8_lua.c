@@ -1557,6 +1557,10 @@ int dget(lua_State *L)
 int dset(lua_State *L)
 {
     unsigned index = lua_tounsigned(L, 1);
+
+    if (index >= MEMORY_CARTDATA_SIZE / 4)
+        return luaL_argerror(L, 1, "cart data index out of range");
+
     lua_Number val_num = lua_tonumber(L, 2);
     uint32_t value = fix32_bits(val_num);
 
