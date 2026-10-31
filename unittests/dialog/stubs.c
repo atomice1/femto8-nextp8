@@ -15,6 +15,7 @@
 
 #include "p8_emu.h"
 #include "p8_dialog.h"
+#include "p8_options.h"
 
 /* Include the test header to expose static functions */
 #include "p8_dialog_test_priv.h"
@@ -235,4 +236,28 @@ int lua_exec_repl(const char *input, const char **err_type, char *err, int err_s
     (void)err;
     (void)err_size;
     return 0;
+}
+
+/* p8_options.h - options management stubs */
+p8_options_t g_options = { .volume = 0x80 };
+
+void p8_options_load(void)
+{
+    /* Stub - no-op in tests */
+}
+
+void p8_options_save(void)
+{
+    /* Stub - no-op in tests */
+}
+
+void p8_options_apply(void)
+{
+    /* Stub - no-op in tests */
+}
+
+void p8_options_set_volume(uint8_t volume)
+{
+    (void)volume;
+    /* Stub - no-op in tests */
 }

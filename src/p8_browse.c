@@ -32,7 +32,9 @@
 #endif
 #include "p8_emu.h"
 #include "p8_lua_helper.h"
+#include "p8_controls_dialog.h"
 #include "p8_options.h"
+#include "p8_options_dialog.h"
 #include "p8_overlay_helper.h"
 #include "p8_pause_menu.h"
 #include "p8_preview.h"
@@ -214,10 +216,11 @@ static inline void screen_pixel(int x, int y, int col)
         *dest = (*dest & 0xF0) | (col & 0x0F);
 }
 
-static void draw_preview_label(const p8_dialog_t *dialog, void *user_data, int x, int y, int width, int height)
+static void draw_preview_label(const p8_dialog_t *dialog, void *user_data, int x, int y, int width, int height, bool selected)
 {
     (void)dialog;
     (void)user_data;
+    (void)selected;
     if (!preview_info.has_label) {
         int draw_w = width < PREVIEW_LABEL_DISPLAY_SIZE ? width : PREVIEW_LABEL_DISPLAY_SIZE;
         int draw_h = height < PREVIEW_LABEL_DISPLAY_SIZE ? height : PREVIEW_LABEL_DISPLAY_SIZE;
@@ -361,7 +364,8 @@ static int show_menu(void)
 #endif
         DIALOG_MENUITEM("show version", 4),
         DIALOG_MENUITEM("controls", 5),
-        DIALOG_MENUITEM("back", 6)
+        DIALOG_MENUITEM("options", 6),
+        DIALOG_MENUITEM("back", 7)
     };
     bool valid_cart = false;
     if (selected_index >= 0 && selected_index < nitems) {
@@ -623,6 +627,9 @@ static void browse_update(void)
                 break;
             case 5:
                 p8_show_controls_dialog();
+                break;
+            case 6:
+                p8_show_options_dialog();
                 break;
             default:
                 break;

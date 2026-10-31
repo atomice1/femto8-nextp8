@@ -13,7 +13,7 @@
 #include "p8_dialog.h"
 #include "p8_input.h"
 #include "p8_overlay_helper.h"
-#include "p8_options.h"
+#include "p8_controls_dialog.h"
 #include "p8_audio.h"
 #include "lua.h"
 #include "lauxlib.h"

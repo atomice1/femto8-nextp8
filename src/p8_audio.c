@@ -206,6 +206,9 @@ int m_pcm_buffered = 0;
 int m_pcm_repeat = 0;
 int16_t m_pcm_dampen = 0;
 
+/* Global volume multiplier for SDL audio (0-255, top 4 bits used) */
+int16_t m_global_volume = 0x80;  /* Default: 0x80 = 53% of maximum */
+
 #ifdef SDL
 SDL_AudioSpec m_audio_spec;
 #endif
@@ -663,6 +666,7 @@ float get_frequency(int pitch)
 void render_sound(int waveform, int pitch, int volume, int position, int offset, int length, int16_t *buffer)
 {
     int16_t amplitude = (int16_t)((MAX_VOLUME / 8) * volume);
+    
     unsigned int frequency = (unsigned int)get_frequency(pitch);
     switch (waveform)
     {
@@ -832,6 +836,8 @@ void render_sounds(int16_t *buffer, int total_samples)
             m_pcm_repeat = 0;
             m_pcm_dampen = 0;
         }
+
+        buffer[i] = (int16_t)((int32_t)buffer[i] * m_global_volume / 255);
     }
 }
 #endif
@@ -897,6 +903,15 @@ int16_t audio_pcm_app_buffer()
     return PCM_BUFFER_SIZE / 4;
 #else
     return 0;
+#endif
+}
+
+void audio_set_volume(uint8_t volume)
+{
+#ifdef NEXTP8
+    *(volatile uint8_t*)_VOLUME_CONTROL = volume;
+#else
+    m_global_volume = volume;
 #endif
 }
 

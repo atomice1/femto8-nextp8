@@ -52,7 +52,7 @@ typedef struct {
      * DIALOG_CUSTOM_CONTROL so it can be used directly as a callback.
      */
     void (*draw)(const p8_dialog_t *dialog, void *user_data,
-                 int x, int y, int w, int h);
+                 int x, int y, int w, int h, bool selected);
 
     /**
      * Handle a raw key event.  Write one of the SUBEDITOR_ACTION_* constants

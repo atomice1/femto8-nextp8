@@ -34,6 +34,7 @@ char reloc_default_carts_path[32];
 char reloc_cartdata_path[32];
 char reloc_cache_path[32];
 char reloc_fallback_carts_path[32];
+char reloc_options_ini_path[32];
 #endif
 
 #define VERSION "1.0.00"
@@ -89,10 +90,12 @@ int main(int argc, char *argv[])
     strcpy(reloc_cartdata_path, "0:/machines/nextp8/cdata");
     strcpy(reloc_cache_path, "0:/machines/nextp8/cache");
     strcpy(reloc_fallback_carts_path, "0:/");
+    strcpy(reloc_options_ini_path, "0:/machines/nextp8/options.ini");
     reloc_default_carts_path[0] = sdcard_drive;
     reloc_cartdata_path[0] = sdcard_drive;
     reloc_cache_path[0] = sdcard_drive;
     reloc_fallback_carts_path[0] = sdcard_drive;
+    reloc_options_ini_path[0] = sdcard_drive;
 #endif
 
     if (p8_init() != 0)

@@ -16,6 +16,7 @@
 #include "p8_dialog.h"
 #include "p8_input.h"
 #include "p8_emu.h"
+#include "p8_options.h"
 
 /* Note: p8_lua_helper.h functions (static inline) are stubbed here */
 
@@ -378,4 +379,28 @@ void clear_screen(int color)
 int color_index(uint8_t c)
 {
     return ((c >> 3) & 0x10) | (c & 0xf);
+}
+
+/* p8_options.h - options management stubs */
+p8_options_t g_options = { .volume = 0x80 };
+
+void p8_options_load(void)
+{
+    /* Stub - no-op in tests */
+}
+
+void p8_options_save(void)
+{
+    /* Stub - no-op in tests */
+}
+
+void p8_options_apply(void)
+{
+    /* Stub - no-op in tests */
+}
+
+void p8_options_set_volume(uint8_t volume)
+{
+    (void)volume;
+    /* Stub - no-op in tests */
 }

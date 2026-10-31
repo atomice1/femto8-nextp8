@@ -51,9 +51,9 @@ static p8_editor_tab_t * const tab_subeditors[P8_TAB_COUNT] = {
 
 /* --- Title bar with tab strip ---------------------------------------------- */
 
-static void draw_top(const p8_dialog_t *dialog, void *user_data, int x, int y, int width, int height)
+static void draw_top(const p8_dialog_t *dialog, void *user_data, int x, int y, int width, int height, bool selected)
 {
-    (void)dialog; (void)user_data; (void)height;
+    (void)dialog; (void)user_data; (void)height; (void)selected;
     /* Inverted title bar background */
     overlay_draw_rectfill(x, y, x + width - 1, y + GLYPH_HEIGHT - 1, DIALOG_BG_INVERTED);
 
@@ -101,8 +101,9 @@ static void draw_top(const p8_dialog_t *dialog, void *user_data, int x, int y, i
 }
 
 static void draw_subeditor(const p8_dialog_t *dialog, void *user_data,
-                           int x, int y, int width, int height)
+                           int x, int y, int width, int height, bool selected)
 {
+    (void) selected;
     tab_subeditors[active_tab]->draw(dialog, user_data, x, y, width, height);
 }
 

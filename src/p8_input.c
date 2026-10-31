@@ -721,7 +721,12 @@ void p8_update_input()
             break;
         case SDL_TEXTINPUT:
             if (event.text.text[0] != '\0') {
-                queue_keypress(0, (uint8_t)event.text.text[0], 0);
+                /* Process all characters in the text input */
+                const char *text = event.text.text;
+                while (*text) {
+                    queue_keypress(0, (uint8_t)*text, 0);
+                    text++;
+                }
             }
             break;
         case SDL_KEYDOWN:

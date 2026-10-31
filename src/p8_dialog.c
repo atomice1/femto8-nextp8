@@ -243,6 +243,7 @@ void p8_dialog_init(p8_dialog_t *dialog,
 static void draw_control(const p8_dialog_t *dialog, int control_idx, int x, int y, int width, bool focused)
 {
     const p8_dialog_control_t *control = &dialog->controls[control_idx];
+    int i = control_idx;  // For custom control selection check
 
     int bg_color = control->inverted ? DIALOG_BG_INVERTED : DIALOG_BG_NORMAL;
     int fg_color = control->inverted ? DIALOG_TEXT_INVERTED : (control->enabled ? DIALOG_TEXT_NORMAL : DIALOG_TEXT_DISABLED);
@@ -508,8 +509,10 @@ static void draw_control(const p8_dialog_t *dialog, int control_idx, int x, int 
         }
 
         case DIALOG_CUSTOM: {
-            if (control->data.custom.draw_fn)
-                control->data.custom.draw_fn(dialog, control->data.custom.user_data, x, y, width, get_control_height(control));
+            if (control->data.custom.draw_fn) {
+                bool selected = (dialog->focused_control == i);
+                control->data.custom.draw_fn(dialog, control->data.custom.user_data, x, y, width, get_control_height(control), selected);
+            }
             break;
         }
     }
@@ -877,6 +880,14 @@ p8_dialog_action_t p8_dialog_update(p8_dialog_t *dialog)
     if (dialog->focused_control >= 0) {
         // Action buttons
         p8_dialog_control_t *control = &dialog->controls[dialog->focused_control];
+
+        if (control->type == DIALOG_CUSTOM && control->data.custom.handle_buttons) {
+            // Call handle_buttons with current button state and pressed state
+            if (control->data.custom.handle_buttons(dialog, control->data.custom.user_data, m_buttons[0], m_buttonsp[0])) {
+                // Event consumed by handle_buttons, return immediately
+                return result;
+            }
+        }
 
         // Button 1 (O) / Space activates focused control
         if (buttons & (BUTTON_MASK_ACTION1 | BUTTON_MASK_SPACE | BUTTON_MASK_RETURN)) {

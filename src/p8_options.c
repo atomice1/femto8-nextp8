@@ -2,76 +2,89 @@
  * Copyright (C) 2026 Chris January
  */
 
-#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "p8_options.h"
-#include "p8_dialog.h"
-#include "p8_emu.h"
-#include "p8_overlay_helper.h"
+#include "p8_audio.h"
 
-/* Height of the keyboard reference card drawing area (in pixels) */
-#define CONTROLS_CARD_HEIGHT 38
+/* Global options variable */
+p8_options_t g_options = {
+    .volume = 0x80  /* Default volume */
+};
 
-/* Draw the keyboard reference card for the controls dialog */
-static void draw_controls_card(const p8_dialog_t *dialog, void *user_data, int x, int y, int width, int height)
+/* Options file path */
+#define OPTIONS_FILE "options.ini"
+
+/**
+ * Load options from options.ini.
+ */
+void p8_options_load(void)
 {
-    (void)dialog;
-    (void)user_data;
-    (void)height;
+    FILE *fp = fopen(OPTIONS_FILE, "r");
+    if (!fp)
+    {
+        /* File doesn't exist, use defaults */
+        return;
+    }
 
-    int col_w = width / 2;
-    int col2  = x + col_w;
-    int ry    = y;
+    char line[256];
+    while (fgets(line, sizeof(line), fp))
+    {
+        /* Skip comments and empty lines */
+        if (line[0] == '#' || line[0] == '\n' || line[0] == '\r')
+            continue;
 
-    /* Inverted header row: "player 1" left, "player 2" right */
-    overlay_draw_rectfill(x, ry, x + col_w - GLYPH_WIDTH - 1, ry + GLYPH_HEIGHT - 1, DIALOG_BG_INVERTED);
-    overlay_draw_simple_text("player 1", x + 1, ry, DIALOG_TEXT_INVERTED);
-    overlay_draw_rectfill(col2, ry, col2 + col_w - 1, ry + GLYPH_HEIGHT - 1, DIALOG_BG_INVERTED);
-    overlay_draw_simple_text("player 2", col2 + 1, ry, DIALOG_TEXT_INVERTED);
-    ry += GLYPH_HEIGHT + 2;
+        /* Parse key=value */
+        char *key = line;
+        char *value = strchr(line, '=');
+        if (!value)
+            continue;
 
-    /* Movement row */
-    overlay_draw_simple_text("arrows", x, ry, DIALOG_TEXT_NORMAL);
-    overlay_draw_simple_text("move", x + 7 * GLYPH_WIDTH, ry, DIALOG_TEXT_NORMAL);
-    overlay_draw_simple_text("s/d/e/f", col2, ry, DIALOG_TEXT_NORMAL);
-    overlay_draw_simple_text("move", col2 + 9 * GLYPH_WIDTH, ry, DIALOG_TEXT_NORMAL);
-    ry += GLYPH_HEIGHT + 1;
+        *value = '\0';
+        value++;
 
-    /* Button 1 row */
-    overlay_draw_simple_text("z,c,n", x, ry, DIALOG_TEXT_NORMAL);
-    overlay_draw_simple_text("btn 1", x + 7 * GLYPH_WIDTH, ry, DIALOG_TEXT_NORMAL);
-    overlay_draw_simple_text("tab/shft", col2, ry, DIALOG_TEXT_NORMAL);
-    overlay_draw_simple_text("btn 1", col2 + 9 * GLYPH_WIDTH, ry, DIALOG_TEXT_NORMAL);
-    ry += GLYPH_HEIGHT + 1;
+        /* Remove trailing whitespace/newlines from value */
+        char *end = value + strlen(value) - 1;
+        while (end > value && (*end == '\n' || *end == '\r' || *end == ' ' || *end == '\t'))
+        {
+            *end = '\0';
+            end--;
+        }
 
-    /* Button 2 row */
-    overlay_draw_simple_text("x,m,v", x, ry, DIALOG_TEXT_NORMAL);
-    overlay_draw_simple_text("btn 2", x + 7 * GLYPH_WIDTH, ry, DIALOG_TEXT_NORMAL);
-    overlay_draw_simple_text("q,a", col2, ry, DIALOG_TEXT_NORMAL);
-    overlay_draw_simple_text("btn 2", col2 + 9 * GLYPH_WIDTH, ry, DIALOG_TEXT_NORMAL);
-    ry += GLYPH_HEIGHT + 2;
+        if (strcmp(key, "volume") == 0)
+        {
+            g_options.volume = (uint8_t)strtol(value, NULL, 10);
+        }
+    }
 
-    /* Separator line */
-    overlay_draw_hline(x, x + width - 1, ry, DIALOG_TEXT_NORMAL);
-    ry += 2;
-
-    /* Pause row (spans both columns) */
-    overlay_draw_simple_text("p/enter", x, ry, DIALOG_TEXT_NORMAL);
-    overlay_draw_simple_text("pause", x + 8 * GLYPH_WIDTH, ry, DIALOG_TEXT_NORMAL);
+    fclose(fp);
 }
 
-/* Show the keyboard controls reference card dialog */
-void p8_show_controls_dialog(void)
+/**
+ * Save options to options.ini.
+ */
+void p8_options_save(void)
 {
-    p8_dialog_control_t controls[] = {
-        DIALOG_CUSTOM_CONTROL(110, CONTROLS_CARD_HEIGHT, draw_controls_card, NULL),
-        DIALOG_SPACING(),
-        DIALOG_BUTTONBAR_OK_ONLY()
-    };
+    FILE *fp = fopen(OPTIONS_FILE, "w");
+    if (!fp)
+    {
+        return;
+    }
 
-    p8_dialog_t dialog;
-    p8_dialog_init(&dialog, "controls", controls,
-                   sizeof(controls) / sizeof(controls[0]), 120);
-    p8_dialog_run(&dialog);
-    p8_dialog_cleanup(&dialog);
+    fprintf(fp, "# femto8-nextp8 options file\n");
+    fprintf(fp, "volume=%d\n", g_options.volume);
+
+    fclose(fp);
 }
+
+/**
+ * Apply current options.
+ */
+void p8_options_apply(void)
+{
+
+    audio_set_volume(g_options.volume);
+}
+

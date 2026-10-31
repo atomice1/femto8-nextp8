@@ -40,10 +40,12 @@
 #define CARTDATA_PATH       reloc_cartdata_path
 #define CACHE_PATH          reloc_cache_path
 #define FALLBACK_CARTS_PATH reloc_fallback_carts_path
+#define OPTIONS_INI_PATH    reloc_options_ini_path
 extern char reloc_default_carts_path[32];
 extern char reloc_cartdata_path[32];
 extern char reloc_cache_path[32];
 extern char reloc_fallback_carts_path[32];
+extern char reloc_options_ini_path[32];
 #else
 #define SDL
 #define ENABLE_AUDIO
@@ -68,6 +70,10 @@ extern char reloc_fallback_carts_path[32];
 
 #ifndef FALLBACK_CARTS_PATH
 #define FALLBACK_CARTS_PATH "."
+#endif
+
+#ifndef OPTIONS_INI_PATH
+#define OPTIONS_INI_PATH "options.ini"
 #endif
 
 // #define BOOL_NULL -1

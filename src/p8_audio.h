@@ -33,8 +33,6 @@ int32_t audio_stat(int32_t index);
 void audio_pcm_write(unsigned address, unsigned length);
 int16_t audio_pcm_buffered();
 int16_t audio_pcm_app_buffer();
-#ifdef NEXTP8
-void audio_update();
-#endif
+void audio_set_volume(uint8_t volume);
 
 #endif

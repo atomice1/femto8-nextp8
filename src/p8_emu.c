@@ -31,6 +31,7 @@
 #include "p8_input.h"
 #include "p8_lua.h"
 #include "p8_lua_helper.h"
+#include "p8_options.h"
 #include "p8_overlay_helper.h"
 #include "p8_parser.h"
 #include "p8_pause_menu.h"
@@ -283,6 +284,10 @@ int p8_init()
 #ifdef ENABLE_AUDIO
     audio_init();
 #endif
+
+    /* Load and apply options (including volume) */
+    p8_options_load();
+    p8_options_apply();
 
     p8_init_lcd();
     p8_init_input();

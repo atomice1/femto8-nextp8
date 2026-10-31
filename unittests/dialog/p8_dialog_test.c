@@ -16,8 +16,8 @@
 #include "p8_dialog.h"
 #include "p8_input.h"
 
-extern void input_setup(void **state);
-extern void input_teardown(void **state);
+extern int input_setup(void **state);
+extern int input_teardown(void **state);
 extern void test_typing_inserts_at_cursor(void **state);
 extern void test_selection_delete_on_type(void **state);
 extern void test_backspace_with_selection(void **state);

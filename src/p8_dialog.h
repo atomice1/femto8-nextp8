@@ -68,8 +68,9 @@ typedef struct {
         struct {
             int width;    // Minimum content width required (0 = no constraint)
             int height;   // Control height in pixels
-            void (*draw_fn)(const p8_dialog_t *dialog, void *user_data, int x, int y, int width, int height); // Draw function
+            void (*draw_fn)(const p8_dialog_t *dialog, void *user_data, int x, int y, int width, int height, bool selected); // Draw function
             void *user_data; // User data pointer passed to draw function
+            bool (*handle_buttons)(p8_dialog_t *dialog, void *user_data, int button_mask, int buttonp_mask); // Optional: handle button events (return true if handled)
         } custom;
 
         struct {
@@ -312,8 +313,24 @@ extern bool m_dialog_showing;
  */
 #define DIALOG_CUSTOM_CONTROL(w, h, fn, usr_data) \
     { .type = DIALOG_CUSTOM, .label = NULL, \
-      .data.custom = { .width = (w), .height = (h), .draw_fn = (fn), .user_data = (usr_data) }, \
+      .data.custom = { .width = (w), .height = (h), .draw_fn = (fn), .user_data = (usr_data), .handle_buttons = NULL }, \
       .selectable = false, .enabled = true, \
+      .inverted = false }
+
+/**
+ * Create a selectable custom-drawn control with a handle_buttons callback.
+ * The draw function receives the dialog pointer, user data, position, dimensions, and selection state.
+ * The handle_buttons function receives the dialog pointer, user data, current button mask, and pressed button mask.
+ * @param w          Minimum content width needed (0 = no constraint).
+ * @param h          Control height in pixels.
+ * @param fn         Draw callback: void fn(const p8_dialog_t *dialog, void *user_data, int x, int y, int width, int height, bool selected)
+ * @param usr_data   User data pointer passed to draw and handle_buttons functions (can be NULL)
+ * @param handle_btn Handle buttons callback: bool fn(p8_dialog_t *dialog, void *user_data, int button_mask, int buttonp_mask)
+ */
+#define DIALOG_CUSTOM_CONTROL_SELECTABLE(w, h, fn, usr_data, handle_btn) \
+    { .type = DIALOG_CUSTOM, .label = NULL, \
+      .data.custom = { .width = (w), .height = (h), .draw_fn = (fn), .user_data = (usr_data), .handle_buttons = (handle_btn) }, \
+      .selectable = true, .enabled = true, \
       .inverted = false }
 
 /**

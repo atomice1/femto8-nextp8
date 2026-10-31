@@ -39,10 +39,11 @@ int input_setup(void **state)
 }
 
 /* Teardown function to cleanup test state */
-void input_teardown(void **state)
+int input_teardown(void **state)
 {
     (void)state;
     p8_dialog_cleanup(&test_dialog);
+    return 0;
 }
 
 /* Typing a character inserts at cursor */
