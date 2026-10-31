@@ -25,6 +25,7 @@
 #include "p8_audio.h"
 #include "p8_cache.h"
 #include "p8_dialog.h"
+#include "p8_editor.h"
 #include "p8_editor_code.h"
 #include "p8_emu.h"
 #include "p8_input.h"
@@ -402,6 +403,8 @@ int p8_run(void)
         // should not be reachable
         abort();
     }
+
+    p8_editor_autosave();
 
     if (setjmp(jmpbuf_restart)) {
         cart_running = false;

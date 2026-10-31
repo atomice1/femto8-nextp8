@@ -30,6 +30,9 @@ extern void p8_editor_sync(void);
 /** Load a previous auto-save **/
 extern void p8_editor_autoload(void);
 
+/** Auto-save the cart if modified */
+extern void p8_editor_autosave(void);
+
 /** Set current editor tab */
 extern void p8_editor_set_tab(p8_tab_t tab);
 

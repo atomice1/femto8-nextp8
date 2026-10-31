@@ -235,7 +235,7 @@ void p8_editor_autoload(void)
     }
 }
 
-static void editor_autosave(void)
+void p8_editor_autosave(void)
 {
     if (!autosave_file_path[0] || !autosave_metadata_file_path[0]) return;
     if (cart_modified) {
@@ -279,7 +279,7 @@ static void editor_screen_init(void)
 static void editor_screen_shutdown(void)
 {
     p8_dialog_cleanup(&editor_dialog);
-    editor_autosave();
+    p8_editor_autosave();
     for (int i = 0; i < P8_TAB_COUNT; i++) {
         if (tab_subeditors[i]->shutdown)
             tab_subeditors[i]->shutdown();

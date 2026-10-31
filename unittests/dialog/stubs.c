@@ -186,6 +186,11 @@ void p8_editor_code_set_line(int line)
     (void)line;
 }
 
+void p8_editor_autosave(void)
+{
+    /* Stub */
+}
+
 /* p8_pause_menu.h - pause menu */
 void p8_show_pause_menu(void)
 {
