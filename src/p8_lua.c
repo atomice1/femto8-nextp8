@@ -1538,7 +1538,7 @@ int _srand(lua_State *L)
 int cartdata(lua_State *L)
 {
     const char *id = lua_tostring(L, 1);
-    bool success = p8_open_cartdata(id);
+    bool success = id ? p8_open_cartdata(id) : false;
     lua_pushboolean(L, success);
     return 1;
 }
