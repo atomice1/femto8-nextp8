@@ -14,6 +14,7 @@
 #include "p8_editor_tab.h"
 #include "p8_emu.h"
 #include "p8_input.h"
+#include "p8_options.h"
 #include "p8_overlay_helper.h"
 #include "p8_parser.h"
 #include "scancodes.h"
@@ -238,6 +239,7 @@ void p8_editor_autoload(void)
 
 void p8_editor_autosave(void)
 {
+    if (!g_options.autosave_enabled) return;
     if (!autosave_file_path[0] || !autosave_metadata_file_path[0]) return;
     if (cart_modified) {
         for (int i = 0; i < P8_TAB_COUNT; i++) {

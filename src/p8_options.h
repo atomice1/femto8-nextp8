@@ -14,6 +14,8 @@ typedef struct
 {
     /** Global volume level (0-255, top 4 bits stored in hardware) */
     uint8_t volume;
+    /** Autosave enabled flag */
+    bool autosave_enabled;
 } p8_options_t;
 
 /**

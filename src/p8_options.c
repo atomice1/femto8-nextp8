@@ -2,6 +2,7 @@
  * Copyright (C) 2026 Chris January
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,7 +12,8 @@
 
 /* Global options variable */
 p8_options_t g_options = {
-    .volume = 0x80  /* Default volume */
+    .volume = 0x80,  /* Default volume */
+    .autosave_enabled = true  /* Default autosave enabled */
 };
 
 /* Options file path */
@@ -57,6 +59,10 @@ void p8_options_load(void)
         {
             g_options.volume = (uint8_t)strtol(value, NULL, 10);
         }
+        else if (strcmp(key, "autosave_enabled") == 0)
+        {
+            g_options.autosave_enabled = (strcmp(value, "true") == 0);
+        }
     }
 
     fclose(fp);
@@ -75,6 +81,7 @@ void p8_options_save(void)
 
     fprintf(fp, "# femto8-nextp8 options file\n");
     fprintf(fp, "volume=%d\n", g_options.volume);
+    fprintf(fp, "autosave_enabled=%s\n", g_options.autosave_enabled ? "true" : "false");
 
     fclose(fp);
 }
@@ -84,7 +91,6 @@ void p8_options_save(void)
  */
 void p8_options_apply(void)
 {
-
     audio_set_volume(g_options.volume);
 }
 

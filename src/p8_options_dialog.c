@@ -80,13 +80,16 @@ static bool handle_volume_buttons(p8_dialog_t *dialog, void *user_data, int butt
     return false;
 }
 
-/* Show the options dialog with volume control */
+/* Show the options dialog with volume control and autosave checkbox */
 void p8_show_options_dialog(void)
 {
     uint8_t volume = g_options.volume;
+    bool autosave_enabled = g_options.autosave_enabled;
     p8_dialog_control_t controls[] = {
-        DIALOG_CUSTOM_CONTROL_SELECTABLE(VOLUME_CONTROL_WIDTH, VOLUME_CONTROL_HEIGHT, draw_volume_control, &volume, handle_volume_buttons),
         DIALOG_LABEL("volume"),
+        DIALOG_CUSTOM_CONTROL_SELECTABLE(VOLUME_CONTROL_WIDTH, VOLUME_CONTROL_HEIGHT, draw_volume_control, &volume, handle_volume_buttons),
+        DIALOG_SPACING(),
+        DIALOG_CHECKBOX("autosave", &autosave_enabled),
         DIALOG_SPACING(),
         DIALOG_BUTTONBAR()
     };
@@ -99,6 +102,7 @@ void p8_show_options_dialog(void)
 
     if (result.type == DIALOG_RESULT_ACCEPTED) {
         g_options.volume = volume;
+        g_options.autosave_enabled = autosave_enabled;
         p8_options_apply();
         p8_options_save();
     }
