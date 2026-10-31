@@ -720,6 +720,9 @@ static inline int get_p8_symbol(const char *str, int str_len, uint8_t *symbol_le
 // Simple text drawing - draws a single line with no P8SCII support
 static inline void draw_simple_text(const char *str, int x, int y, int col)
 {
+    if (!str)
+        return;
+
     int cursor_x = x;
     for (const char *c = str; *c != '\0'; c++) {
         draw_char((uint8_t)*c, cursor_x, y, col);
@@ -746,6 +749,9 @@ static inline uint8_t gfx_addr_get(int x, int y, uint8_t *memory, int location, 
         return 0;
     int offset = location + (x >> 1) + y * 64;
 
+    if (offset < 0 || offset + 1 > size)
+        return 0;
+
     return IS_EVEN(x) ? memory[offset] & 0xF : memory[offset] >> 4;
 }
 
@@ -763,6 +769,10 @@ static inline void gfx_set(int x, int y, int location, int size, int col)
         return;
 
     int offset = gfx_addr_remap(location) + (x >> 1) + y * 64;
+
+    if (offset < 0 || offset + 1 > MEMORY_SIZE)
+        return;
+
     uint8_t rw_mask = m_memory[MEMORY_RW_MASK];
     if (location == MEMORY_SCREEN && rw_mask != 0xff) {
         uint8_t write_mask = rw_mask & 0xf;
