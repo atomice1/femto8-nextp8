@@ -446,14 +446,14 @@ void read_sfx(uint8_t *dest, int dest_length, uint8_t *src, int read_length, int
     int read_offset = 0;
     int write_offset = 0;
 
-    while (read_offset < read_length)
+    while (read_offset + 4 <= read_length)
     {
         uint8_t byte_0 = src[read_offset++];
         uint8_t byte_1 = src[read_offset++];
         uint8_t byte_2 = src[read_offset++];
         uint8_t byte_3 = src[read_offset++];
 
-        for (int i = 0; i < 16; i++)
+        for (int i = 0; i < 16 && read_offset + 6 <= read_length; i++)
         {
             uint8_t byte_a = src[read_offset++];
             uint8_t byte_b = src[read_offset++];
