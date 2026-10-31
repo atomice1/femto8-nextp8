@@ -949,11 +949,12 @@ static inline bool is_button_set(int index, int button, bool btnp)
 static inline int scroll(int y, int line_height)
 {
     int bottom = P8_HEIGHT - line_height;
-    int scrolly = MAX(y - bottom, 0);
+    int scrolly = MIN(MAX(y - bottom, 0), P8_HEIGHT);
     if (scrolly == 0)
         return y;
-    memmove(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8), m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8) + 64 * scrolly, 0x2000 - 64 * scrolly);
-    memset(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8) + 0x2000 - 64 * scrolly, 0, 64 * scrolly);
+    uint8_t *screen_memory = m_memory + MIN(m_memory[MEMORY_SCREEN_PHYS] << 8, 0xe000);
+    memmove(screen_memory, screen_memory + 64 * scrolly, 0x2000 - 64 * scrolly);
+    memset(screen_memory + 0x2000 - 64 * scrolly, 0, 64 * scrolly);
     return y - scrolly;
 }
 
