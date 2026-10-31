@@ -1265,10 +1265,10 @@ int _memcpy(lua_State *L)
         return 1;
     }
 
-    while (len > 0) {
-        unsigned chunk = MIN(MIN(len, 0x2000 - (sourceaddr & 0x1fff)), 0x2000 - (destaddr & 0x1fff));
+    while (len > 0 && sourceaddr < 0x10000 && destaddr < 0x10000) {
         unsigned destaddr1 = addr_remap(destaddr);
         unsigned sourceaddr1 = addr_remap(sourceaddr);
+        unsigned chunk = MIN(MIN(len, 0x2000 - (sourceaddr1 & 0x1fff)), 0x2000 - (destaddr1 & 0x1fff));
         memmove(m_memory + destaddr1, m_memory + sourceaddr1, chunk);
         destaddr += chunk;
         sourceaddr += chunk;
