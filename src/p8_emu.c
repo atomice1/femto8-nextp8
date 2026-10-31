@@ -1125,7 +1125,10 @@ static void p8_common_reset_cart()
 
 void p8_new_cart(void)
 {
-    assert(!cart_running);
+    if (cart_running) {
+        // new() ignored from within a cart
+        return;
+    }
     m_current_cart_file_name[0] = '\0';
     m_real_current_cart_file_name[0] = '\0';
     memset(m_cart_memory, 0, CART_MEMORY_SIZE);
