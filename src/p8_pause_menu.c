@@ -14,6 +14,7 @@
 #include "p8_input.h"
 #include "p8_overlay_helper.h"
 #include "p8_controls_dialog.h"
+#include "p8_options_dialog.h"
 #include "p8_audio.h"
 #include "lua.h"
 #include "lauxlib.h"
@@ -127,7 +128,8 @@ void p8_show_pause_menu(void)
     pause_controls[num_controls++] = (p8_dialog_control_t)DIALOG_MENUITEM("restart", 1);
     pause_controls[num_controls++] = (p8_dialog_control_t)DIALOG_MENUITEM("show version", 2);
     pause_controls[num_controls++] = (p8_dialog_control_t)DIALOG_MENUITEM("controls", 3);
-    pause_controls[num_controls++] = (p8_dialog_control_t)DIALOG_MENUITEM("quit", 4);
+    pause_controls[num_controls++] = (p8_dialog_control_t)DIALOG_MENUITEM("options", 4);
+    pause_controls[num_controls++] = (p8_dialog_control_t)DIALOG_MENUITEM("quit", 5);
 
     p8_dialog_t pause_dialog;
     p8_dialog_init(&pause_dialog, NULL, pause_controls, num_controls, P8_WIDTH / 2);
@@ -199,7 +201,10 @@ void p8_show_pause_menu(void)
         case 3: // Controls
             p8_show_controls_dialog();
             break;
-        case 4: // Quit
+        case 4: // Options
+            p8_show_options_dialog();
+            break;
+        case 5: // Quit
             p8_abort();
             break;
         default:
