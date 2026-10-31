@@ -963,9 +963,10 @@ static inline int scroll_newline(int y)
     int threshold = P8_HEIGHT - GLYPH_HEIGHT;
     if (y <= threshold)
         return y;
-    int scrolly = MAX(y - threshold, GLYPH_HEIGHT);
-    memmove(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8), m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8) + 64 * scrolly, 0x2000 - 64 * scrolly);
-    memset(m_memory + (m_memory[MEMORY_SCREEN_PHYS] << 8) + 0x2000 - 64 * scrolly, 0, 64 * scrolly);
+    int scrolly = MIN(MAX(y - threshold, GLYPH_HEIGHT), P8_HEIGHT);
+    uint8_t *screen_memory = m_memory + MIN(m_memory[MEMORY_SCREEN_PHYS] << 8, 0xe000);
+    memmove(screen_memory, screen_memory + 64 * scrolly, 0x2000 - 64 * scrolly);
+    memset(screen_memory + 0x2000 - 64 * scrolly, 0, 64 * scrolly);
     return y - scrolly;
 }
 
