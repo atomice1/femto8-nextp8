@@ -1307,7 +1307,7 @@ int peek(lua_State *L)
 
     luaL_checkstack(L, n, "too many values");
 
-    for (unsigned i=0;i<n;++i)
+    for (unsigned i=0;i<n && addr+i+1 <= MEMORY_SIZE;++i)
         lua_pushinteger(L, m_memory[addr+i]);
 
     return n;
@@ -1323,7 +1323,7 @@ int peek2(lua_State *L)
 
     luaL_checkstack(L, n, "too many values");
 
-    for (unsigned i=0;i<n;++i)
+    for (unsigned i=0;i<n && addr+i*2+2 <= MEMORY_SIZE;++i)
         lua_pushinteger(L, (m_memory[addr + i*2 + 1] << 8) | (m_memory[addr + i*2]));
 
     return n;
@@ -1339,7 +1339,7 @@ int peek4(lua_State *L)
 
     luaL_checkstack(L, n, "too many values");
 
-    for (unsigned i=0;i<n;++i)
+    for (unsigned i=0;i<n && addr+i*4+4 <= MEMORY_SIZE;++i)
         lua_pushnumber(L, fix32_from_bits((m_memory[addr + i*4 + 3] << 24) | (m_memory[addr + i*4 + 2] << 16) | (m_memory[addr + i*4 + 1] << 8) | m_memory[addr + i*4]));
 
     return n;
@@ -1357,7 +1357,7 @@ int poke(lua_State *L)
 
         size_t offset = (size_t)(i - 2);
         // Skip if offset would overflow memory
-        if (offset > MEMORY_SIZE - addr) break;
+        if (addr + offset + 1 > MEMORY_SIZE) break;
         m_memory[addr + i-2] = val;
     }
 
@@ -1379,7 +1379,7 @@ int poke2(lua_State *L)
         unsigned val = i <= lua_gettop(L) ? lua_tounsigned(L, i) : 0;
         size_t offset = (size_t)(i - 2) * 2;
         // Skip if offset would overflow memory
-        if (offset > MEMORY_SIZE - addr) break;
+        if (addr + offset + 2 > MEMORY_SIZE) break;
         m_memory[addr + offset] = val;
         m_memory[addr + offset + 1] = val >> 8;
     }
@@ -1402,7 +1402,7 @@ int poke4(lua_State *L)
         uint32_t val = i <= lua_gettop(L) ? lua_tonumber(L, i) : 0;
         size_t offset = (size_t)(i - 2) * 4;
         // Skip if offset would overflow memory
-        if (offset > MEMORY_SIZE - addr) break;
+        if (addr + offset + 4 > MEMORY_SIZE) break;
         m_memory[addr + offset] = val;
         m_memory[addr + offset + 1] = val >> 8;
         m_memory[addr + offset + 2] = val >> 16;
